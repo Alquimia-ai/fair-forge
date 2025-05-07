@@ -1,0 +1,105 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v5.json",
+  "config": {
+    "background": "#f9f9f9",
+    "axis": {
+      "labelFont": "Arial",
+      "labelFontSize": 12,
+      "titleFont": "Arial",
+      "titleFontSize": 14,
+      "gridColor": "#e0e0e0",
+      "domainColor": "#888"
+    }
+  },
+  "padding": 5,
+  "data": [
+    {
+      "name": "table",
+      "url": {
+        "%context%": true,
+        "index": "arsat-word2vec",
+        "body": {
+          "size": 1000,
+          "_source": ["word", "x", "y", "session_id"]
+        }
+      },
+      "format": { "property": "hits.hits" },
+      "transform": [
+        {
+          "type": "formula",
+          "expr": "datum._source.word",
+          "as": "word"
+        },
+        {
+          "type": "formula",
+          "expr": "toNumber(datum._source.x)",
+          "as": "x"
+        },
+        {
+          "type": "formula",
+          "expr": "toNumber(datum._source.y)",
+          "as": "y"
+        },
+        {
+          "type": "formula",
+          "expr": "datum._source.session_id",
+          "as": "session_id"
+        },
+        {
+          "type": "filter",
+          "expr": "isFinite(datum.x) && isFinite(datum.y)"
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "xscale",
+      "type": "linear",
+      "domain": { "data": "table", "field": "x" },
+      "range": "width",
+      "nice": true
+    },
+    {
+      "name": "yscale",
+      "type": "linear",
+      "domain": { "data": "table", "field": "y" },
+      "range": "height",
+      "nice": true
+    },
+    {
+      "name": "colorScale",
+      "type": "sequential",
+      "domain": { "data": "table", "field": "x" },
+      "range": { "scheme": "blues" }
+    }
+  ],
+
+  "axes": [
+    { "orient": "bottom", "scale": "xscale", "title": "X", "tickCount": 10 },
+    { "orient": "left", "scale": "yscale", "title": "Y", "tickCount": 10 }
+  ],
+
+  "marks": [
+    {
+      "type": "symbol",
+      "from": { "data": "table" },
+      "encode": {
+        "enter": {
+          "x": { "scale": "xscale", "field": "x" },
+          "y": { "scale": "yscale", "field": "y" },
+          "size": { "value": 60 },
+          "fill": { "scale": "colorScale", "field": "x" },
+          "stroke": { "value": "#fff" },
+          "strokeWidth": { "value": 1 }
+        },
+        "update": {
+          "tooltip": {
+            "signal": "datum.word"
+          }
+        }
+      }
+    }
+  ]
+}

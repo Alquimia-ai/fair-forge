@@ -1,0 +1,7 @@
+langchain-groq
+langchain_openai
+elasticsearch
+nltk
+gensim
+shap
+transformers
