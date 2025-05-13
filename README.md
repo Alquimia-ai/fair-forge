@@ -1,5 +1,10 @@
 # Alquimia AI Fair Forge
 
+
+<p align="center">
+  <img src='https://www.alquimia.ai/logo-alquimia.svg' width=800>
+</p>
+
 **Alquimia AI Fair Forge** is a powerful performance-measurement component designed specifically for evaluating AI models and assistants. Provides clarity and insightful metrics, helping you understand and improve your AI applications.
 
 ---
@@ -14,8 +19,7 @@ To execute **Alquimia AI Fair Forge**, ensure that a pipeline server is installe
 ### Configuration
 
 1. Open the `logos.pipeline` file.
-2. Under each notebook in `node_properties` you are going to have the required env variables:
-<img width="495" alt="image" src="https://github.com/user-attachments/assets/47fa8826-e7c4-498a-9383-bd846ebd2494" />
+2. Under each notebook in `node_properties` you are going to have the required env variables
 
 ### Env variables
 ```shell

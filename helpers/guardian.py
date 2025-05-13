@@ -2,7 +2,6 @@ from pydantic import BaseModel
 import requests
 from transformers import AutoTokenizer
 import math
-import logging
 
 class GuardianInfer(BaseModel):
     is_risk: bool

@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple, Dict
 from pydantic import BaseModel, parse_obj_as
 import os
 import boto3
-
+from typing import Generic, TypeVar
 S3_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
 S3_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
 S3_BUCKET_NAME = os.environ.get("AWS_S3_BUCKET")
@@ -25,6 +25,12 @@ class Conversation(BaseModel):
     assistant_id: str
     conversation: List[Batch] = []
 
+
+T = TypeVar('T', bound=BaseModel)   
+
+class Metric(Generic[T], BaseModel):
+    session_id: str
+    conv_thread: List[T] = []
 
 ### Dataset retrieved from S3
 class RawConversation(BaseModel):
