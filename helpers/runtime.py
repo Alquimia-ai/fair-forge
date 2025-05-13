@@ -1,7 +1,6 @@
 import requests
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel
 from .dataset import load_raw_dataset,Conversation,Batch
 import json
 import re
@@ -62,13 +61,7 @@ class AlquimiaRuntime():
             "Authorization": f"Bearer {self.token}"
         }
         self.stream_endpoint_template = f"{url}/stream/{{stream_id}}"
-        self.reasoning_model = ChatGroq(
-            model="deepseek-r1-distill-llama-70b",
-            temperature=0,
-            max_tokens=None,
-            timeout=None,
-            max_retries=2,
-        )
+        
     def _infer(self, assistant:str ,query:str,session_id:str,runtime:dict = {}):
         payload = {
             "query": query,
