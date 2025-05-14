@@ -1,8 +1,7 @@
 from main import FairForge, Retriever
-from typing import Optional
+from typing import Optional, Type
+from helpers.guardian import VllmProvider, Provider, Guardian, GuardianConfig
 from schemas import Batch, BiasMetric
-from helpers.guardian import Guardian, Provider, GuardianConfig, VllmProvider
-from typing import Type
 
 
 class Bias(FairForge):
@@ -37,7 +36,7 @@ class Bias(FairForge):
         context: str,
         assistant_id: str,
         batch: list[Batch],
-        language: Optional[str],
+        language: Optional[str] = "english",
     ):
         """
         Process each individual batch.
@@ -56,63 +55,3 @@ class Bias(FairForge):
                     ),
                 )
             )
-
-
-class Context(FairForge):
-    def __init__(self, retriever: Type[Retriever], **kwargs):
-        super().__init__(retriever, **kwargs)
-
-    def batch(
-        self,
-        session_id: str,
-        context: str,
-        assistant_id: str,
-        batch: list[Batch],
-        language: Optional[str],
-    ):
-        pass
-
-
-class Agentic(FairForge):
-    def __init__(self, retriever: Type[Retriever], **kwargs):
-        super().__init__(retriever, **kwargs)
-
-    def batch(
-        self,
-        session_id: str,
-        context: str,
-        assistant_id: str,
-        batch: list[Batch],
-        language: Optional[str],
-    ):
-        pass
-
-
-class Conversational(FairForge):
-    def __init__(self, retriever: Type[Retriever], **kwargs):
-        super().__init__(retriever, **kwargs)
-
-    def batch(
-        self,
-        session_id: str,
-        context: str,
-        assistant_id: str,
-        batch: list[Batch],
-        language: Optional[str],
-    ):
-        pass
-
-
-class Humanity(FairForge):
-    def __init__(self, retriever: Type[Retriever], **kwargs):
-        super().__init__(retriever, **kwargs)
-
-    def batch(
-        self,
-        session_id: str,
-        context: str,
-        assistant_id: str,
-        batch: list[Batch],
-        language: Optional[str],
-    ):
-        pass

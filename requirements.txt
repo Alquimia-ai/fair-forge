@@ -1,8 +1,8 @@
 langchain-groq
 langchain_openai
 elasticsearch
+scipy
 nltk
-gensim
 shap
 transformers
 torch

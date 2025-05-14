@@ -78,3 +78,38 @@ class BiasMetric(Metric):
         is_risk: bool
 
     risks: list[Risks]
+
+
+class ContextMetric(Metric):
+    context_insight: str
+    context_awareness: float
+    context_thinkings: str
+
+
+class ConversationalMetric(Metric):
+    """
+    Conversational metric for evaluating the assistant's conversational abilities.
+    """
+
+    conversational_memory: float
+    conversational_insight: str
+    conversational_language: float
+    conversational_quality_maxim: float
+    conversational_quantity_maxim: float
+    conversational_relation_maxim: float
+    conversational_manner_maxim: float
+    conversational_sensibleness: float
+    conversational_thinkings: str
+
+
+class HumanityMetric(Metric):
+    humanity_assistant_emotional_entropy: float
+    humanity_ground_truth_spearman: float
+    humanity_assistant_anger: float
+    humanity_assistant_anticipation: float
+    humanity_assistant_disgust: float
+    humanity_assistant_fear: float
+    humanity_assistant_joy: float
+    humanity_assistant_sadness: float
+    humanity_assistant_surprise: float
+    humanity_assistant_trust: float

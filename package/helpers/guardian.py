@@ -3,7 +3,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from typing import Any, Optional, Type
 import requests
 import math
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 import torch
 from functools import partial
 
