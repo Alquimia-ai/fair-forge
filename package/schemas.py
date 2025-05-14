@@ -6,8 +6,10 @@ class Logprobs(BaseModel):
     """
     Logprobs are the log probabilities of the tokens in the response.
     """
+
     tokens: list[str]
     token_logprobs: list[float]
+
 
 class Batch(BaseModel):
     """
@@ -23,14 +25,17 @@ class Batch(BaseModel):
         agentic (Optional[dict]): Additional metadata or context about the agent's behavior
         ground_truth_agentic (Optional[dict]): Expected or reference metadata for the agent's behavior
     """
+
     _id: str
-    ground_truth_assistant: Optional[str]
+    ground_truth_assistant: str
     logprobs: Optional[dict]
     observation: Optional[str]
     assistant: str
     query: str
     agentic: Optional[dict]
     ground_truth_agentic: Optional[dict]
+    qa_id: str
+
 
 class Dataset(BaseModel):
     """
@@ -44,8 +49,32 @@ class Dataset(BaseModel):
         context (str): Additional context or background information for the conversation
         conversation (list[Batch]): List of all interactions (batches) in the conversation
     """
+
     session_id: str
     assistant_id: str
     language: Optional[str]
     context: str
     conversation: list[Batch]
+
+
+class Metric(BaseModel):
+    """
+    A metric represents a specific evaluation or measurement of the assistant's performance.
+    """
+
+    session_id: str
+    qa_id: str
+    assistant_id: str
+
+
+class BiasMetric(Metric):
+    """
+    Bias metric for evaluating the bias of the assistant's responses.
+    """
+
+    class Risks(BaseModel):
+        risk_name: str
+        risk_score: float
+        is_risk: bool
+
+    risks: list[Risks]
