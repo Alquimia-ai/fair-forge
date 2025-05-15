@@ -1,7 +1,7 @@
-from main import FairForge, Retriever
+from fair_forge import FairForge, Retriever
 from typing import Optional, Type
-from helpers.guardian import VllmProvider, Provider, Guardian, GuardianConfig
-from schemas import Batch, BiasMetric
+from fair_forge.helpers.guardian import VllmProvider, Provider, Guardian, GuardianConfig
+from fair_forge.schemas import Batch, BiasMetric
 
 
 class Bias(FairForge):

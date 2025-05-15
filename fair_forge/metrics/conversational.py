@@ -1,15 +1,15 @@
-from main import FairForge, Retriever
-from typing import Optional, Type
+from fair_forge import FairForge, Retriever
+from typing import Type, Optional
 from pydantic import SecretStr
-from schemas import Batch, ContextMetric
-from prompts import (
-    context_reasoning_system_prompt,
-    context_reasoning_system_prompt_observation,
+from fair_forge.schemas import Batch, ConversationalMetric
+from fair_forge.helpers.judge import Judge
+from fair_forge.prompts import (
+    conversational_reasoning_system_prompt,
+    conversational_reasoning_system_prompt_observation,
 )
-from helpers.judge import Judge
 
 
-class Context(FairForge):
+class Conversational(FairForge):
     def __init__(
         self,
         retriever: Type[Retriever],
@@ -52,36 +52,40 @@ class Context(FairForge):
             eos_json_clause=self.judge_eos_json_clause,
         )
         for interaction in batch:
-            query = interaction.query
             data = {
-                "context": context,
+                "preferred_language": language,
                 "assistant_answer": interaction.assistant,
             }
             if interaction.observation:
                 thinking, json = judge.check(
-                    context_reasoning_system_prompt_observation,
-                    query,
+                    conversational_reasoning_system_prompt_observation,
+                    interaction.query,
                     {"observation": interaction.observation, **data},
                 )
             else:
                 thinking, json = judge.check(
-                    context_reasoning_system_prompt,
-                    query,
+                    conversational_reasoning_system_prompt,
+                    interaction.query,
                     {"ground_truth_assistant": interaction.assistant, **data},
                 )
-
             if json is None:
                 raise ValueError(
-                    f"[FAIR FORGE/CONTEXT] No JSON found {self.judge_bos_json_clause} {self.judge_eos_json_clause} "
+                    f"[FAIR FORGE/CONVERSATIONAL] No JSON found {self.judge_bos_json_clause} {self.judge_eos_json_clause} "
                 )
 
             self.metrics.append(
-                ContextMetric(
-                    context_insight=json["insight"],
-                    context_thinkings=thinking,
-                    context_awareness=json["awareness"],
+                ConversationalMetric(
                     session_id=session_id,
-                    assistant_id=assistant_id,
                     qa_id=interaction.qa_id,
+                    assistant_id=assistant_id,
+                    conversational_insight=json["insight"],
+                    conversational_memory=json["memory"],
+                    conversational_language=json["language"],
+                    conversational_quality_maxim=json["quality_maxim"],
+                    conversational_quantity_maxim=json["quantity_maxim"],
+                    conversational_relation_maxim=json["relation_maxim"],
+                    conversational_manner_maxim=json["manner_maxim"],
+                    conversational_sensibleness=json["sensibleness"],
+                    conversational_thinkings=thinking,
                 )
             )

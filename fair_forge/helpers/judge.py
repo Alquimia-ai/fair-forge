@@ -1,5 +1,5 @@
 from pydantic import SecretStr
-from cot import CoT
+from fair_forge.helpers.cot import CoT
 import re
 import logging
 import json

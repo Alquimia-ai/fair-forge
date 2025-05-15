@@ -1,7 +1,7 @@
 from collections import defaultdict
-from main import FairForge, Retriever
+from fair_forge import FairForge, Retriever
 from typing import Type, Optional, Any
-from schemas import Batch, HumanityMetric
+from fair_forge.schemas import Batch, HumanityMetric
 import pandas as pd
 import re
 import math

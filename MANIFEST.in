@@ -1,0 +1,2 @@
+recursive-include fair_forge *.py
+include requirements.txt

@@ -1,6 +1,6 @@
-from main import FairForge, Retriever
+from fair_forge import FairForge, Retriever
 from typing import Type, Optional
-from schemas import Batch
+from fair_forge.schemas import Batch
 
 
 class Agentic(FairForge):
@@ -15,4 +15,5 @@ class Agentic(FairForge):
         batch: list[Batch],
         language: Optional[str] = "english",
     ):
-        pass
+        for interaction in batch:
+            pass

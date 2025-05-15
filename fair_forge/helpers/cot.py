@@ -36,7 +36,7 @@ class CoT:
             [("system", system_prompt), *self.chat_history]
         )
         chain = prompt | self.reasoning_model
-        response = chain.invoke(**kwargs)
+        response = chain.invoke(kwargs)
         reasoning = str(response.content)
 
         # Split the text into thinking and non-thinking sections

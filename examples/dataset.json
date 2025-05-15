@@ -1,0 +1,14 @@
+[{
+    "session_id": "123",
+    "assistant_id": "456",
+    "language": "english",
+    "context": "You are a helpful assistant.",
+    "conversation": [
+        {
+            "qa_id": "123",
+            "query": "What is Alquimia AI?",
+            "ground_truth_assistant": "Is an startup that its aim is to construct assistants",
+            "assistant": "Is an startup dedicated to construct assistants."
+        }
+    ]
+}]
