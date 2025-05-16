@@ -15,7 +15,7 @@ class Conversational(FairForge):
         retriever: Type[Retriever],
         judge_bos_think_token: str = "<think>",
         judege_eos_think_token: str = "</think>",
-        judge_base_url: str = "https://api.groq.com/openai",
+        judge_base_url: str = "https://api.groq.com/openai/v1",
         judge_api_key: SecretStr = SecretStr(""),
         judge_model: str = "deepseek-r1-distill-llama-70b",
         judge_temperature: float = 0,

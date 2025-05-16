@@ -6,3 +6,4 @@ nltk
 shap
 transformers
 torch
+boto3

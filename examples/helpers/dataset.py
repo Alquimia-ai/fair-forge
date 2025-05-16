@@ -3,6 +3,10 @@ from typing import List, Optional, Tuple, Dict
 from pydantic import BaseModel, parse_obj_as
 import os
 import boto3
+import json
+from fair_forge import Retriever
+from fair_forge.schemas import Dataset
+
 from typing import Generic, TypeVar
 S3_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
 S3_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
@@ -94,3 +98,13 @@ def load_dataset() -> List[Conversation]:
         for conversation in data:
             conversations.append(Conversation.parse_obj(conversation))
         return conversations
+    
+
+
+class CustomRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        datasets=[]
+        with open("dataset.json") as infile:
+            for dataset in json.load(infile):
+                datasets.append(Dataset.model_validate(dataset)) 
+        return datasets

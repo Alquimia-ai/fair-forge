@@ -1,2 +1,3 @@
 recursive-include fair_forge *.py
+recursive-include fair_forge/artifacts *.csv
 include requirements.txt

@@ -18,7 +18,7 @@ To execute **Alquimia AI Fair Forge**, ensure that a pipeline server is installe
 
 ### Configuration
 
-1. Open the `logos.pipeline` file.
+1. Open the `fair-forge.pipeline` file.
 2. Under each notebook in `node_properties` you are going to have the required env variables
 
 ### Env variables
@@ -63,53 +63,28 @@ Alquimia AI Fair Forge works under 5 main metrics:
 
 When you run Alquimia AI Fair Forge an specific dataset must be provided in order to properly work:
 ```json
-[
-  {
-    "context": "The ASB Banking Assistant has been developed with the goal of providing highly accurate, coherent, and context-aware responses based on information available from various sources, such as uploaded documents, historical records, and direct user inquiries. Its processing capabilities enable real-time data analysis, identification of relevant patterns, and the generation of well-founded responses, ensuring that the information provided is reliable and relevant for financial decision-making.  The Assistant Responses Showcase functionality is designed to demonstrate the potential of artificial intelligence in the banking sector, ensuring that responses are not only technically correct but also comprehensible and adapted to the specific context of each query. Through advanced natural language processing (NLP) techniques and machine learning, the assistant can interpret different types of requests, apply information filters based on predefined criteria, and generate reports or visualizations in a structured and easy-to-interpret format.  Furthermore, ASB maintains a strong focus on user experience (UX) and visual interface (UI), delivering information in a clear, organized, and accessible manner. It dynamically adapts to conversations, maintaining contextual coherence throughout interactions and allowing users to explore data in greater depth. The transparency in information presentation, combined with real-time update capabilities, ensures that responses reflect the most recent data and provide valuable insights for strategic decision-making.",
-    "preferred_language": "english",
-    "args": {
-      "force_profile": {
-        "_collection_id": "asb-empresas"
-      }
-    },
-    "assistant": "asb-financial",
+[{
+    "session_id": "123",
+    "assistant_id": "456",
+    "language": "english",
+    "context": "You are a helpful assistant.",
     "conversation": [
-      {
-        "user": "Give me summary statistics of loan amounts.",
-        "leviathan": {
-          "tool_summary": {
-            "name": "query_dataframe",
-            "parameters": {
-              "sql_query": "SELECT MIN(LOAN_AMOUNT) AS min_amount, MAX(LOAN_AMOUNT) AS max_amount, AVG(LOAN_AMOUNT) AS avg_amount, COUNT(LOAN_ID) AS num_loans FROM loans;"
-            }
-          }
-        },
-        "assistant": "The lowest recorded loan amount is $200,000, while the highest reaches $700,000. On average, the loans granted amount to $422,500. In total, 20 loans have been issued, adding up to a total of $8,450,000."
-      },
-      {
-        "user": "Can you provide delinquency and risk analysis?",
-        "leviathan": {
-          "tool_summary": {
-            "name": "query_dataframe",
-            "parameters": {
-              "sql_query": "SELECT CREDIT_STATUS, COUNT(*) AS total_loans, SUM(LOAN_AMOUNT) AS total_amount FROM loans GROUP BY CREDIT_STATUS;"
-            }
-          }
-        },
-        "assistant": "There are currently 5 loans with an 'Excellent' credit status, amounting to $2,650,000 in total. Additionally, 7 loans fall under the 'Good' credit status, summing up to $3,150,000. Lastly, we have 8 loans classified as 'Regular', with a combined total of $2,650,000."
-      }
+        {
+            "qa_id": "123",
+            "query": "What is Alquimia AI?",
+            "ground_truth_assistant": "Is an startup that its aim is to construct assistants",
+            "assistant": "I'm so happy to answer your question. Alquimia AI Is an startup dedicated to construct assistants."
+        }
     ]
-  }
-]
+}]
+
 ```
 - Under `context` you specify where is the assistant being developed.
-- `preferred_language` is to tell the humanity metric in which language should *ALWAYS* answer the assistant
-- `assistant` tells Alquimia AI Fair Forge to which assistant should this conversation be made
-- `args` is used for alquimia-runtime to specify some overrides
+- `language` is to tell the humanity metric in which language should *ALWAYS* answer the assistant
+- `assistant_id` tells Alquimia AI Fair Forge to which assistant should this conversation be made
 
 Finally under the `conversation` we have each interaction of a user and assistant where:
 - `user`: Refers to the human question
-- `leviathan` aims at specifying which are the desired outputs of each intermediate model such as tool_analyst,intent, sentiment or any other
 - `assistant` is the desired assistant answer used as ground truth to be evaluated later, in some cases we do not know the assistant answer so we can specify `observation` where we can tell Alquimia AI Fair Forge how it should answer (in an specific format for example)
 
 #### **Elastic mapping**

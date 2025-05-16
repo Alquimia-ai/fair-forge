@@ -8,7 +8,7 @@
             "qa_id": "123",
             "query": "What is Alquimia AI?",
             "ground_truth_assistant": "Is an startup that its aim is to construct assistants",
-            "assistant": "Is an startup dedicated to construct assistants."
+            "assistant": "I'm so happy to answer your question. Alquimia AI Is an startup dedicated to construct assistants."
         }
     ]
 }]

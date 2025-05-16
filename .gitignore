@@ -2,3 +2,4 @@
 venv/
 dist/
 alquimia_fair_forge.egg-info/
+__pycache__/

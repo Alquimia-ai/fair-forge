@@ -7,7 +7,7 @@ import re
 import math
 import numpy as np
 from scipy.stats import spearmanr
-
+import pkg_resources
 
 class Humanity(FairForge):
     def __init__(self, retriever: Type[Retriever], **kwargs):
@@ -25,7 +25,9 @@ class Humanity(FairForge):
 
     def _load_emotion_lexicon(
         self,
-        path: Optional[str] = "artifacts/lexicon.csv",
+        path: Optional[str] = pkg_resources.resource_filename(
+            "fair_forge", "artifacts/lexicon.csv"
+        ),
         separator: Optional[str] = ";",
         language: Optional[str] = "english",
     ):
@@ -72,8 +74,11 @@ class Humanity(FairForge):
         assistant_id: str,
         batch: list[Batch],
         language: Optional[str] = "english",
+        path: Optional[str] = pkg_resources.resource_filename(
+            "fair_forge", "artifacts/lexicon.csv"
+        ),
     ):
-        lexicon = self._load_emotion_lexicon(language)
+        lexicon = self._load_emotion_lexicon(path=path, language=language)
         for interaction in batch:
             assistant_distribution = self._get_emotion_distribution(
                 interaction.assistant, lexicon, self.emotion_columns

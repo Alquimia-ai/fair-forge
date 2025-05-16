@@ -20,5 +20,6 @@ setup(
     author="Alquimia AI",
     url="https://github.com/Alquimia-ai/fair-forge.git",
     packages=setuptools.find_packages(),
+    include_package_data=True,
     install_requires=requirements
 )
