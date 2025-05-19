@@ -1,0 +1,253 @@
+\documentclass[12pt]{article}
+
+\topmargin 0.0cm
+\oddsidemargin 0.2cm
+\textwidth 16cm 
+\textheight 21cm
+\footskip 1.0cm
+
+\title{Fair Forge: A Framework for Explainable and Fair AI Assistant Evaluation Through Comprehensive Metrics and Assurance} 
+
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{cleveref}
+
+\begin{document}
+
+\maketitle
+
+\section{Humanity Metrics in AI Assistant Evaluation}
+
+The assessment of human-like interaction in AI assistants requires sophisticated metrics that capture both emotional complexity and response alignment. This section presents two key metrics: Emotional Entropy and Ground Truth Spearman Correlation.
+
+\subsection{Emotional Entropy}
+
+Emotional entropy quantifies the diversity and natural distribution of emotions in AI responses, based on Plutchik's Wheel of Emotions \cite{plutchik2001nature}. Given a vocabulary $V$ and the NRC Emotion Lexicon dataset \cite{mohammad2013nrc}, we define the emotional distribution as follows:
+
+For each word $w \in V$, we have a set of emotions $E = \{e_1, e_2, ..., e_8\}$ corresponding to Plutchik's eight basic emotions. For a given response $R$, we calculate the probability distribution of emotions $P(e|R)$ as:
+
+\begin{equation}
+    P(e|R) = \frac{\sum_{w \in R} \mathbb{I}(e \in E_w)}{\sum_{e' \in E} \sum_{w \in R} \mathbb{I}(e' \in E_w)}
+\end{equation}
+
+where $\mathbb{I}$ is the indicator function and $E_w$ represents the set of emotions associated with word $w$.
+
+The emotional entropy $H(R)$ is then calculated using Shannon's entropy formula:
+
+\begin{equation}
+    H(R) = -\sum_{e \in E} P(e|R) \log_2 P(e|R)
+\end{equation}
+
+This metric provides a measure of emotional diversity in the response, where:
+\begin{itemize}
+    \item Higher entropy indicates more diverse and natural emotional expression
+    \item Lower entropy suggests more focused or limited emotional range
+\end{itemize}
+
+\subsection{Ground Truth Spearman Correlation}
+
+To evaluate how well an AI assistant's emotional response aligns with expected human responses, we employ Spearman's rank correlation coefficient. Given the emotional distributions of the AI response $P_{AI}(e|R)$ and the ground truth response $P_{GT}(e|R)$, we calculate the correlation as:
+
+\begin{equation}
+    \rho = 1 - \frac{6\sum_{i=1}^{n} d_i^2}{n(n^2-1)}
+\end{equation}
+
+where $d_i$ is the difference between the ranks of corresponding emotions in $P_{AI}$ and $P_{GT}$, and $n$ is the number of emotions (8 in our case).
+
+The correlation coefficient $\rho$ ranges from -1 to 1, where:
+\begin{itemize}
+    \item $\rho = 1$ indicates perfect positive correlation
+    \item $\rho = 0$ indicates no correlation
+    \item $\rho = -1$ indicates perfect negative correlation
+\end{itemize}
+
+\section{Bias and Risk Assessment Metrics}
+
+The evaluation of AI assistant interactions requires robust mechanisms to detect and mitigate potential biases and risks. This section presents a comprehensive framework for bias assessment and risk detection using the Granite Guardian model \cite{ibm2024granite} and AI ATLAS risk framework \cite{ibm2024atlas}.
+
+\subsection{Risk Detection Framework}
+
+The risk assessment framework operates across three primary dimensions:
+
+\begin{equation}
+    R_{total} = \sum_{i=1}^{3} w_i R_i
+\end{equation}
+
+where $R_i$ represents the risk scores for each dimension and $w_i$ are their respective weights. The three primary dimensions are:
+
+\begin{enumerate}
+    \item \textbf{Prompt Risk} ($R_1$): Assessment of user-supplied text
+    \item \textbf{Response Risk} ($R_2$): Evaluation of model-generated content
+    \item \textbf{Context Risk} ($R_3$): Analysis of retrieved information relevance
+\end{enumerate}
+
+\section{Conversational Quality Metrics}
+
+The assessment of conversational quality in AI assistants requires a multi-dimensional approach that evaluates various aspects of human-like communication. This section presents a comprehensive framework for evaluating conversational quality through multiple metrics.
+
+\subsection{Memory and Context Retention}
+
+The memory score $M$ is evaluated on a scale of 0 to 10, measuring the assistant's ability to maintain context and recall previous interactions:
+
+\begin{equation}
+    M = \frac{1}{n}\sum_{i=1}^{n} m_i
+\end{equation}
+
+where $m_i$ represents individual memory assessments for $n$ previous interactions, evaluated by an LLM judge.
+
+\subsection{Language Adaptation}
+
+The language score $L$ measures the assistant's ability to adapt to the user's preferred language:
+
+\begin{equation}
+    L = \sum_{i=1}^{k} w_i l_i
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $l_i$ represents different aspects of language adaptation
+    \item $w_i$ are weighting factors for each aspect
+    \item $k$ is the number of language adaptation criteria
+\end{itemize}
+
+\subsection{Grice's Maxims Compliance}
+
+Following Grice's Cooperative Principle \cite{grice1975logic}, we evaluate the assistant's adherence to four fundamental maxims:
+
+\begin{enumerate}
+    \item \textbf{Maxim of Quantity}: Information should be as informative as required
+    \item \textbf{Maxim of Quality}: Information should be true and supported by evidence
+    \item \textbf{Maxim of Relation}: Information should be relevant to the conversation
+    \item \textbf{Maxim of Manner}: Information should be clear and unambiguous
+\end{enumerate}
+
+The Gricean compliance score $G$ is calculated as:
+
+\begin{equation}
+    G = \frac{1}{4}\sum_{i=1}^{4} g_i
+\end{equation}
+
+where $g_i$ represents the compliance score for each maxim, evaluated on a scale of 0 to 1.
+
+\subsection{Sensibleness and Specificity}
+
+Based on the Sensibleness and Specificity Average (SSA) metric \cite{adolphs2020evaluation}, we define a composite score:
+
+\begin{equation}
+    SSA = \frac{S + Sp}{2}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $S$ is the sensibleness score
+    \item $Sp$ is the specificity score
+\end{itemize}
+
+The sensibleness score $S$ evaluates whether the response makes sense in the given context, while the specificity score $Sp$ measures how specific and detailed the response is.
+
+
+and $\gamma_i$ are the respective weights that sum to 1.
+
+\section{Context Adherence Metrics}
+
+The evaluation of context adherence in AI assistant responses is crucial for ensuring relevant and appropriate interactions. This section presents a framework for assessing how well an assistant's responses align with the provided context and expected outcomes.
+
+\subsection{Context Evaluation Framework}
+
+The context evaluation process employs an LLM-as-a-judge approach, where a specialized language model (specifically deepseek-r1) evaluates the following components:
+
+\begin{enumerate}
+    \item \textbf{Context}: The provided background information and conversation history
+    \item \textbf{Human Question}: The user's query or input
+    \item \textbf{Assistant Answer}: The actual response generated by the AI assistant
+    \item \textbf{Ground Truth/Observation}: The expected or ideal response
+\end{enumerate}
+
+\subsection{Evaluation Process}
+
+The evaluation process follows a structured approach:
+
+\begin{enumerate}
+    \item \textbf{Context Analysis}: The judge model analyzes the provided context and its relevance to the conversation
+    \item \textbf{Response Assessment}: The assistant's answer is evaluated against the ground truth
+    \item \textbf{Scoring}: A numerical score is assigned based on context adherence
+    \item \textbf{Insight Generation}: The judge provides detailed reasoning for the assigned score
+\end{enumerate}
+
+\subsection{Chain-of-Thought Evaluation}
+
+The evaluation process is enhanced by the judge model's ability to provide its reasoning through Chain-of-Thought (CoT) analysis. This includes:
+
+\begin{itemize}
+    \item Step-by-step reasoning about context relevance
+    \item Analysis of response alignment with ground truth
+    \item Identification of potential context mismatches
+    \item Suggestions for improvement
+\end{itemize}
+
+\subsection{Storage and Analysis}
+
+The evaluation results are stored in an Elasticsearch database, containing:
+
+\begin{itemize}
+    \item Context adherence scores
+    \item Generated insights
+    \item Complete thinking process
+    \item Ground truth comparisons
+    \item Timestamps and metadata
+\end{itemize}
+
+This structured storage enables:
+\begin{itemize}
+    \item Longitudinal analysis of context adherence
+    \item Pattern identification in context mismatches
+    \item Performance tracking over time
+    \item Quality improvement opportunities
+\end{itemize}
+
+\subsection{Integration with Other Metrics}
+
+The context adherence evaluation complements other metrics by providing:
+\begin{itemize}
+    \item Additional validation of response quality
+    \item Insights into context-aware performance
+    \item Ground truth alignment verification
+    \item Continuous improvement feedback
+\end{itemize}
+
+\begin{thebibliography}{9}
+\bibitem{plutchik2001nature}
+Plutchik, R. (2001).
+\newblock The nature of emotions.
+\newblock {\em American Scientist}, 89(4), 344-350.
+
+\bibitem{mohammad2013nrc}
+Mohammad, S. M., \& Turney, P. D. (2013).
+\newblock Crowdsourcing a word-emotion association lexicon.
+\newblock {\em Computational Intelligence}, 29(3), 436-465.
+
+\bibitem{ibm2024granite}
+IBM. (2024).
+\newblock Granite Guardian: Enterprise-grade risk detection model.
+\newblock {\em Hugging Face Model Hub}.
+
+\bibitem{grice1975logic}
+Grice, H. P. (1975).
+\newblock Logic and conversation.
+\newblock {\em Syntax and Semantics}, 3, 41-58.
+
+\bibitem{adolphs2020evaluation}
+Adolphs, L., et al. (2020).
+\newblock Evaluation of neural response generation models.
+\newblock {\em arXiv preprint arXiv:2001.09977}.
+
+\bibitem{deepseek2024}
+DeepSeek. (2024).
+\newblock DeepSeek-R1: Advanced reasoning model.
+\newblock {\em DeepSeek AI Documentation}.
+\end{thebibliography}
+
+\end{document}

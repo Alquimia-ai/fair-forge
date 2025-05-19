@@ -9,6 +9,7 @@ import numpy as np
 from scipy.stats import spearmanr
 import pkg_resources
 
+
 class Humanity(FairForge):
     def __init__(self, retriever: Type[Retriever], **kwargs):
         super().__init__(retriever, **kwargs)
@@ -80,10 +81,15 @@ class Humanity(FairForge):
     ):
         lexicon = self._load_emotion_lexicon(path=path, language=language)
         for interaction in batch:
+            self.logger.debug(f"QA ID: {interaction.qa_id}")
+
             assistant_distribution = self._get_emotion_distribution(
                 interaction.assistant, lexicon, self.emotion_columns
             )
+            
             generated_vec = [assistant_distribution[e] for e in self.emotion_columns]
+            self.logger.debug(f"Assistant distribution: {assistant_distribution}")
+            self.logger.debug(f"Generated vector: {generated_vec}")
             ## Execute emotional entropy
             ent = self._emotional_entropy(assistant_distribution)
             spearman_val: float = 0.0
@@ -102,9 +108,7 @@ class Humanity(FairForge):
                 else:
                     result: Any = spearmanr(expected_vec, generated_vec)
                     spearman_val = result.correlation
-
-            self.metrics.append(
-                HumanityMetric(
+            metric = HumanityMetric(
                     session_id=session_id,
                     qa_id=interaction.qa_id,
                     assistant_id=assistant_id,
@@ -115,4 +119,8 @@ class Humanity(FairForge):
                         for key in self.emotion_columns
                     },
                 )
-            )
+            self.logger.debug(f"Spearman value: {metric.humanity_ground_truth_spearman}")
+            self.logger.debug(f"Emotional entropy: {metric.humanity_assistant_emotional_entropy}")
+            for key in self.emotion_columns:
+                self.logger.debug(f"{key}: {metric[f'humanity_assistant_{key.lower()}']}")
+            self.metrics.append(metric)

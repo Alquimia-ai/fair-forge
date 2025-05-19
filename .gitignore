@@ -3,3 +3,7 @@ venv/
 dist/
 alquimia_fair_forge.egg-info/
 __pycache__/
+*.gz
+*.log
+*.aux
+*.out

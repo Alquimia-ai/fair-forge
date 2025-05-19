@@ -1,26 +1,51 @@
 # Alquimia AI Fair Forge
 
-
 <p align="center">
   <img src='https://www.alquimia.ai/logo-alquimia.svg' width=800>
 </p>
 
-**Alquimia AI Fair Forge** is a powerful performance-measurement component designed specifically for evaluating AI models and assistants. Provides clarity and insightful metrics, helping you understand and improve your AI applications.
+<p align="center">
+  <a href="#overview">Overview</a> •
+  <a href="#installation">Installation</a> •
+  <a href="#how-it-works">How It Works</a> •
+  <a href="#metrics">Metrics</a> •
+  <a href="#usage">Usage</a>
+  <a href="#examples">Examples</a>
+</p>
 
----
+## Overview
 
-## Getting Started
+**Alquimia AI Fair Forge** is a powerful performance-measurement component designed specifically for evaluating AI models and assistants. It provides clarity and insightful metrics, helping you understand and improve your AI applications through comprehensive analysis and evaluation.
 
-## How does it work?
-Alquimia AI Fair Forge works under 5 main metrics:
-- conversational
-- humanity
-- bias
-- context
+## Installation
 
-### Dataset
+To get started with Alquimia AI Fair Forge, follow these simple steps:
 
-When you run Alquimia AI Fair Forge an specific dataset must be provided in order to properly work:
+1. First, build the package:
+```shell
+make package
+```
+
+2. Then install it using pip:
+```shell
+pip install --force-reinstall dist/alquimia_fair_forge-0.0.1.tar.gz -q
+```
+
+## How It Works
+
+Alquimia AI Fair Forge evaluates AI models and assistants through four main metrics:
+
+- **Conversational**: Measures the quality and effectiveness of conversations
+- **Humanity**: Evaluates how human-like and natural the responses are
+- **Bias**: Analyzes potential biases in the responses
+- **Context**: Assesses how well the assistant maintains and uses context
+
+For detailed information about how each metric is computed, please refer to our [technical documentation](docs/journal.pdf) or [LaTeX source](docs/journal.tex).
+
+### Dataset Structure
+
+To use Alquimia AI Fair Forge, you need to provide a dataset in the following JSON format:
+
 ```json
 [{
     "session_id": "123",
@@ -36,19 +61,25 @@ When you run Alquimia AI Fair Forge an specific dataset must be provided in orde
         }
     ]
 }]
-
 ```
-- Under `context` you specify where is the assistant being developed.
-- `language` is to tell the humanity metric in which language should *ALWAYS* answer the assistant
-- `assistant_id` tells Alquimia AI Fair Forge to which assistant should this conversation be made
 
-Finally under the `conversation` we have each interaction of a user and assistant where:
-- `user`: Refers to the human question
-- `assistant` is the desired assistant answer used as ground truth to be evaluated later, in some cases we do not know the assistant answer so we can specify `observation` where we can tell Alquimia AI Fair Forge how it should answer (in an specific format for example)
+#### Dataset Fields Explained:
 
-### Set your custom retriever
+- `session_id`: Unique identifier for the conversation session
+- `assistant_id`: Identifier for the specific assistant being evaluated
+- `language`: The language in which the assistant should respond (used by the humanity metric)
+- `context`: The development environment or context of the assistant
+- `conversation`: Array of interactions containing:
+  - `qa_id`: Unique identifier for the question-answer pair
+  - `query`: The user's question
+  - `ground_truth_assistant`: The expected or ideal response
+  - `assistant`: The actual response from the assistant being evaluated
 
-In order to succesfully use your dataset with any of Fair Forge metrics you must set your custom retriever. 
+## Usage
+
+### Setting Up Your Custom Retriever
+
+To use your dataset with Fair Forge metrics, you need to create a custom retriever:
 
 ```python
 from fair_forge.schemas import Dataset
@@ -56,16 +87,16 @@ from fair_forge import Retriever
 
 class CustomRetriever(Retriever):
     def load_dataset(self) -> list[Dataset]:
-        datasets=[]
+        datasets = []
         with open("dataset.json") as infile:
             for dataset in json.load(infile):
                 datasets.append(Dataset.model_validate(dataset)) 
         return datasets
 ```
 
-## Use your desired metric
-In order to properly use a metric you should instantiate and pass the custom retriever. 
+### Using the Metrics
 
+#### Context Metric
 ```python
 from getpass import getpass
 from fair_forge.metrics import Context
@@ -74,6 +105,91 @@ judge_api_key = SecretStr(getpass("Please enter your Judge API key: "))
 
 metrics = Context.run(
     CustomRetriever,
-    judge_api_key=judge_api_key
+    judge_api_key=judge_api_key,
+    verbose=True  # Enable detailed logging
 )
 ```
+
+#### Humanity Metric
+```python
+from fair_forge.metrics import Humanity
+
+metrics = Humanity.run(
+    CustomRetriever,
+    verbose=True  # Enable detailed logging
+)
+```
+
+#### Conversational Metric
+```python
+from getpass import getpass
+from fair_forge.metrics import Conversational
+
+judge_api_key = SecretStr(getpass("Please enter your Judge API key: "))
+
+metrics = Conversational.run(
+    CustomRetriever,
+    judge_api_key=judge_api_key,
+    verbose=True  # Enable detailed logging
+)
+```
+
+#### Bias Metric
+
+To properly run this metric, you need to deploy a Guardian Model using an OpenAI-like API. We recommend using the IBM Granite Guardian model, which is specifically designed for risk detection and bias assessment.
+
+You can find the model at: [IBM Granite Guardian 3.1 2B](https://huggingface.co/ibm-granite/granite-guardian-3.1-2b)
+
+```python
+from getpass import getpass
+from fair_forge.metrics import Bias
+
+guardian_api_key = SecretStr(getpass("Please enter your Guardian API key: "))
+GUARDIAN_URL = os.environ.get("GUARDIAN_URL")
+GUARDIAN_MODEL_NAME = os.environ.get("GUARDIAN_MODEL_NAME")
+GUARDIAN_API_KEY = guardian_api_key
+
+metrics = Bias.run(
+    CustomRetriever,
+    guardian_url=GUARDIAN_URL,
+    guardian_api_key=GUARDIAN_API_KEY,
+    guardian_model=GUARDIAN_MODEL_NAME,
+    guardian_temperature=guardian_temperature,
+    max_tokens=max_tokens,
+    verbose=True  # Enable detailed logging
+)
+```
+
+When `verbose=True` is set, the following information will be logged:
+- Dataset loading progress
+- Metric calculation steps
+- API calls and responses
+- Processing status for each conversation
+- Detailed error messages (if any)
+- Performance metrics and timing information
+
+The IBM Granite Guardian model is specifically trained to detect various risks including:
+- Social Bias
+- Harmful Content
+- Unethical Behavior
+- Jailbreaking Attempts
+- Violence
+- Profanity
+- Sexual Content
+
+## Examples
+
+For practical examples of how to use Alquimia AI Fair Forge, please refer to our example implementations in the repository:
+
+- [Openshift AI Pipeline](examples/fair-forge.pipeline) - A simple implementation showing how to set up and use the basic metrics using Elyra pipeline to be executed.
+- [Custom Retriever Example](examples/helpers/retriever.py) - Implementation of a custom dataset retriever
+
+Each example includes detailed comments and explanations to help you understand the implementation details. Feel free to use these examples as a starting point for your own implementations.
+
+## Contributing
+
+We welcome contributions! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

@@ -63,18 +63,16 @@ class Metric(BaseModel):
     qa_id: str
     assistant_id: str
 
+class Risk(BaseModel):
+    risk_name: str
+    risk_score: float
+    is_risk: bool
 
 class BiasMetric(Metric):
     """
     Bias metric for evaluating the bias of the assistant's responses.
     """
-
-    class Risks(BaseModel):
-        risk_name: str
-        risk_score: float
-        is_risk: bool
-
-    risks: list[Risks]
+    risks: list[Risk]
 
 
 class ContextMetric(Metric):

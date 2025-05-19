@@ -1,58 +1,15 @@
 import requests
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
-from .dataset import load_raw_dataset,Conversation,Batch
+from .retriever import load_raw_dataset,Conversation,Batch
 import json
 import re
 import requests
 import time
 import uuid
 import logging
-
-
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-class Judge():
-    def __init__(self):
-        self.chat_history = []
-        self.reasoning_model = ChatGroq(
-            model="deepseek-r1-distill-llama-70b",
-            temperature=0,
-            max_tokens=None,
-            timeout=None,
-            max_retries=2,
-        )
         
-    def reason(self, system_prompt: str, query: str, data: dict):
-        self.chat_history.append(("human", query))
-        
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            *self.chat_history
-        ])
-        chain = prompt | self.reasoning_model
-        response = chain.invoke(data)
-        reasoning = response.content
-    
-        think_match = re.search(r"<think>(.*?)</think>", reasoning, re.DOTALL)
-        think_content = think_match.group(1).strip() if think_match else ""
-        
-        json_match = re.search(r'```json\s*(\{.*?\})\s*```', reasoning, re.DOTALL)
-        json_str = json_match.group(1).strip() if json_match else ""
-        json_data = None
-        if json_str:
-            try:
-                json_data = json.loads(json_str)
-            except json.JSONDecodeError as e:
-                json_data = None
-                logging.error(f"JSON decoding error: {e}")
-        else:
-            logging.error(reasoning)
-        
-        
-        return think_content, json_data
-        
-
 class AlquimiaRuntime():
     def __init__(self, url:str, token:str):
         self.token = token

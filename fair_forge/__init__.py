@@ -2,6 +2,50 @@ from .schemas import Batch, Dataset
 from abc import ABC, abstractmethod
 from typing import Type
 from typing import Optional
+import logging
+
+class VerboseLogger:
+    """
+    Custom logger class that handles verbose logging.
+    Only logs messages when verbose mode is enabled.
+    """
+    def __init__(self, verbose: bool = False):
+        self.verbose = verbose
+        self.logger = logging.getLogger(__name__)
+        if not self.logger.hasHandlers():
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+            
+        self.logger.setLevel(logging.DEBUG)
+
+    def info(self, message: str):
+        """Log info message if verbose is enabled"""
+        if self.verbose:
+            self.logger.info(message)
+
+    def debug(self, message: str):
+        """Log debug message if verbose is enabled"""
+        if self.verbose:
+            self.logger.debug(message)
+
+    def warning(self, message: str):
+        """Log warning message if verbose is enabled"""
+        if self.verbose:
+            self.logger.warning(message)
+
+    def error(self, message: str):
+        """Log error message if verbose is enabled"""
+        if self.verbose:
+            self.logger.error(message)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 class Retriever:
@@ -54,19 +98,26 @@ class FairForge(ABC):
         retriever (Type[Retriever]): The retriever class to use for loading data.
         metrics (list): List to store computed metrics.
         dataset (list[Dataset]): The loaded dataset for processing.
+        verbose (bool): Whether to enable verbose logging.
+        logger (VerboseLogger): Logger instance for verbose logging.
     """
 
-    def __init__(self, retriever: Type[Retriever], **kwargs):
+    def __init__(self, retriever: Type[Retriever], verbose: bool = False, **kwargs):
         """
         Initialize FairForge with a data retriever.
         
         Args:
             retriever (Type[Retriever]): The retriever class to use for loading data.
+            verbose (bool): Whether to enable verbose logging.
             **kwargs: Additional configuration parameters.
         """
         self.retriever = retriever
         self.metrics = []
+        self.verbose = verbose
+        self.logger = VerboseLogger(verbose)
+        
         self.dataset = self.retriever().load_dataset()
+        self.logger.info(f"Loaded dataset with {len(self.dataset)} batches")
 
     @abstractmethod
     def batch(
@@ -96,7 +147,7 @@ class FairForge(ABC):
         raise Exception("Should be implemented by each metric")
     
     @classmethod
-    def run(cls, retriever: Type[Retriever], **kwargs) -> list:
+    def run(cls, retriever: Type[Retriever],  **kwargs) -> list:
         """
         Run the  metric analysis on the entire dataset.
         
@@ -110,7 +161,7 @@ class FairForge(ABC):
         Returns:
             list: The computed metrics for the entire dataset.
         """
-        return cls(retriever, **kwargs)._process()
+        return cls(retriever,**kwargs)._process()
 
     def _process(self)->list:
         """
@@ -122,7 +173,12 @@ class FairForge(ABC):
         Returns:
             list: The computed metrics for all batches in the dataset.
         """
-        for batch in self.dataset:
+        self.logger.info("Starting to process dataset")
+        
+        for i, batch in enumerate(self.dataset):
+            self.logger.info(f"Processing batch {i+1}/{len(self.dataset)}")
+            self.logger.info(f"Session ID: {batch.session_id}, Assistant ID: {batch.assistant_id}")
+            
             self.batch(
                 session_id=batch.session_id,
                 context=batch.context,
@@ -131,4 +187,5 @@ class FairForge(ABC):
                 language=batch.language,
             )
 
+        self.logger.info(f"Completed processing all batches. Total metrics collected: {len(self.metrics)}")
         return self.metrics

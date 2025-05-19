@@ -52,6 +52,8 @@ class Context(FairForge):
             eos_json_clause=self.judge_eos_json_clause,
         )
         for interaction in batch:
+            self.logger.debug(f"QA ID: {interaction.qa_id}")
+
             query = interaction.query
             data = {
                 "context": context,
@@ -74,9 +76,7 @@ class Context(FairForge):
                 raise ValueError(
                     f"[FAIR FORGE/CONTEXT] No JSON found {self.judge_bos_json_clause} {self.judge_eos_json_clause} "
                 )
-
-            self.metrics.append(
-                ContextMetric(
+            metric = ContextMetric(
                     context_insight=json["insight"],
                     context_thinkings=thinking,
                     context_awareness=json["score"],
@@ -84,4 +84,6 @@ class Context(FairForge):
                     assistant_id=assistant_id,
                     qa_id=interaction.qa_id,
                 )
-            )
+            self.logger.debug(f"Context insight: {metric.context_insight}")
+            self.logger.debug(f"Context awareness: {metric.context_awareness}")
+            self.metrics.append(metric)

@@ -52,6 +52,8 @@ class Conversational(FairForge):
             eos_json_clause=self.judge_eos_json_clause,
         )
         for interaction in batch:
+            self.logger.debug(f"QA ID: {interaction.qa_id}")
+
             data = {
                 "preferred_language": language,
                 "assistant_answer": interaction.assistant,
@@ -72,9 +74,7 @@ class Conversational(FairForge):
                 raise ValueError(
                     f"[FAIR FORGE/CONVERSATIONAL] No JSON found {self.judge_bos_json_clause} {self.judge_eos_json_clause} "
                 )
-
-            self.metrics.append(
-                ConversationalMetric(
+            metric = ConversationalMetric(
                     session_id=session_id,
                     qa_id=interaction.qa_id,
                     assistant_id=assistant_id,
@@ -88,4 +88,11 @@ class Conversational(FairForge):
                     conversational_sensibleness=json["sensibleness"],
                     conversational_thinkings=thinking,
                 )
-            )
+            self.logger.debug(f"Conversational memory: {metric.conversational_memory}")
+            self.logger.debug(f"Conversational language: {metric.conversational_language}")
+            self.logger.debug(f"Conversational quality maxim: {metric.conversational_quality_maxim}")
+            self.logger.debug(f"Conversational quantity maxim: {metric.conversational_quantity_maxim}")
+            self.logger.debug(f"Conversational relation maxim: {metric.conversational_relation_maxim}")
+            self.logger.debug(f"Conversational manner maxim: {metric.conversational_manner_maxim}")
+            self.logger.debug(f"Conversational sensibleness: {metric.conversational_sensibleness}")
+            self.metrics.append(metric)

@@ -6,6 +6,8 @@ import math
 from abc import abstractmethod
 import torch
 from functools import partial
+from pydantic import SecretStr
+from fair_forge.schemas import Risk
 
 
 class GuardianInfer(BaseModel):
@@ -39,7 +41,7 @@ class Provider:
         self.tokenizer = tokenizer
 
     @abstractmethod
-    def infer(self, prompt) -> GuardianProvider:
+    def infer(self, prompt:partial) -> GuardianProvider:
         raise NotImplementedError("You should implement this method.")
 
 
@@ -56,7 +58,7 @@ class VllmProvider(Provider):
         prob_token = math.exp(prob_token)
         return answer_token, prob_token
 
-    def infer(self, prompt) -> GuardianProvider:
+    def infer(self, prompt:partial) -> GuardianProvider:
         response = requests.post(
             f"{self.url}/v1/completions",
             headers={
@@ -65,7 +67,7 @@ class VllmProvider(Provider):
             },
             json={
                 "model": self.model,
-                "prompt": prompt,
+                "prompt": prompt(),
                 "temperature": self.temperature,
                 "max_tokens": self.max_tokens,
                 "logprobs": self.logprobs,
@@ -158,7 +160,7 @@ class GuardianConfig(BaseModel):
     """
 
     url: Optional[str]
-    api_key: Optional[str]
+    api_key: Optional[SecretStr]
     model: Optional[str]
     temperature: float = 0
     max_tokens: float = 5
@@ -173,7 +175,7 @@ class Guardian:
 
     def __init__(self, config: GuardianConfig):
         self.url = config.url
-        self.api_key = config.api_key
+        self.api_key = config.api_key.get_secret_value()
         self.model = config.model
         self.temperature = config.temperature
         self.max_tokens = config.max_tokens
@@ -204,7 +206,7 @@ class Guardian:
         ]
         prompt = partial(
             self.tokenizer.apply_chat_template,
-            messages=messages,
+            conversation=messages,
             guardian_config=config,
             tokenize=False,
             add_generation_prompt=True,
@@ -217,14 +219,20 @@ class Guardian:
             probability=infer.probability,
         )
 
-    def has_any_risk(self, question: str, answer: str, context: str) -> list:
+    def has_any_risk(self, question: str, answer: str, context: str) -> list[Risk]:
         """
         Given a question and answer, detect if there is a risk related to it.
         """
         risks = []
         for risk in self.risks:
             infer = self._infer_risk(question, context, answer, config=risk)
-            risks.append(infer)
+            risks.append(
+                Risk(
+                    risk_name=risk["risk_name"],
+                    risk_score=infer.probability,
+                    is_risk=infer.is_risk,
+                )
+            )
         return risks
 
     def is_context_aware(self):

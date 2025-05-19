@@ -20,10 +20,7 @@ Is going to be a single doc where:
 - assistant: This is the real answer inferred from the assistant
 
 ### Context Metric
-
-This metric aims at using the `context` from each conversation to check if the assistant answer adjusts to the given or provided context. To properly calculate this metric we focus on using an `LLM As a Judge` that receives context, human question, assistant answer and ground truth assistant answer (The one expected ) or observation. Finally this llm assigns an score of how much is the real assistant attached to the context based on the ground truth/observation, alongside this score an `insight` is also provided.
-
-As we use CoT models (specifically deepseek-r1) the full reasoning process is provided so the thinking process is also saved. Finally we have this mapping in elastic:
+#### **Elastic mapping**
 
 ```json
 {
@@ -37,25 +34,7 @@ As we use CoT models (specifically deepseek-r1) the full reasoning process is pr
 }
 ```
 
-The context metric also runs a word embedding process that for each session_id saves calculate the corresponding embedding. Then through a TSNE process we obtain the 3-dimensionalities of each word, in elastic this properties are saved also as docs like this:
-```json
-{
-  "word": {"type": "text"},
-  "x": {"type": "float"},
-  "y": {"type": "float"},
-  "z": {"type": "float"},
-  "session_id": {"type": "keyword"},
-  "assistant_id": {"type": "keyword"}
-}
-```
 ## Conversational Metric
-
-This metric aims at anaylizing any data related to conversation. In order to properly handle this type of metric several criterias were set up:
-- Using an `llm as a judge` we check the memory (how well the model perform in terms of remembering). It goes from 0 to 10 as an scoring
-- `language score` assigns a value from 0 to 10 of how well did the assistant address the language barrier, taking into account the the preferred language
-- In social science generally and linguistics specifically, the cooperative principle describes how people achieve effective conversational communication in common social situations—that is, how listeners and speakers act cooperatively and mutually accept one another to be understood in a particular way. The concept of the cooperative principle was introduced by the linguist Paul Grice in his pragmatic theory. Grice researched the ways in which people derive meaning from language. Alquimia AI Fair Forge retrieve 4 maxims as [Grice's Maxims](https://www.sas.upenn.edu/~haroldfs/dravling/grice.html) specified
-- `sensibleness` is a metric that takes inspiration from google's [Sensibleness and specificity Average](https://arxiv.org/abs/2001.09977)
-- Finally inside the metric `conversational_thinkings` and `conversational_insight` the whole thinking process of the CoT model is retrieved and also the insight.
 
 #### Elastic mapping
 ```json
@@ -77,10 +56,6 @@ This metric aims at anaylizing any data related to conversation. In order to pro
 ```
 
 ## Humanity Metric
-For this type of metric we are trying to measure how 'human' does it feel to talk with the assistant. In order to properly handle this several metric are taken into account
-
-- `Emotional entropy`: Following [Psychological Metrics for Dialog evaluations](https://arxiv.org/pdf/2305.14757) we used the [NRC Emotion Lexicon Dataset](https://nrc-publications.canada.ca/eng/view/object/?id=0b6a5b58-a656-49d3-ab3e-252050a7a88c) that gives for each word in a given vocabulary a set of emotions, which are motivated by [Plutchik Wheel of emotions](https://www.6seconds.org/2025/02/06/plutchik-wheel-emotions/). Then given the answer from the assistant we find a emotional distribution that basically says the probability of each of the 8 emotions to appear in the assistant real answer. Finally the [entropy](https://en.wikipedia.org/wiki/Entropy_(information_theory)) of that emotion distribution is calculated.
-- `Ground truth spearman`: Using the same dataset from before we calculate the emotional distribution from the assistant answer and the emotional distribution from the ground truth assistant answer, we then use spearman's correlation to study how well does the emotion of the assistant aligns to the expected emotion
 
 #### Elastic mapping
 Under humanity_assistant_{emotion} you will find the probability of the {emotion} from [Plutchik Wheel of emotions](https://www.6seconds.org/2025/02/06/plutchik-wheel-emotions/) that appears in the assistant answer
@@ -104,12 +79,6 @@ Under humanity_assistant_{emotion} you will find the probability of the {emotion
 ```
 
 ## Bias Metric
-Following towards a more robust assistant's architecture, we made an integration with [Granite Guardian](https://huggingface.co/ibm-granite/granite-guardian-3.1-2b) to check that all human and assistant interactions do not follow any risk set in [AI ATLAS](https://www.ibm.com/docs/en/watsonx/saas?topic=ai-risk-atlas). 
-
-Granite Guardian is useful for risk detection use-cases which are applicable across a wide-range of enterprise applications 
-- Detecting harm-related risks within prompt text or model response (as guardrails). These present two fundamentally different use cases as the former assesses user supplied text while the latter evaluates model generated text.
-- RAG (retrieval-augmented generation) use-case where the guardian model assesses three key issues: context relevance (whether the retrieved context is relevant to the query), groundedness (whether the response is accurate and faithful to the provided context), and answer relevance (whether the response directly addresses the user's query).
-- Function calling risk detection within agentic workflows, where Granite Guardian evaluates intermediate steps for syntactic and semantic hallucinations. This includes assessing the validity of function calls and detecting fabricated information, particularly during query translation.
 
 #### Elastic mapping
 ```json
@@ -120,20 +89,5 @@ Granite Guardian is useful for risk detection use-cases which are applicable acr
   "bias_guard_probability": {"type": "float"},
   "assistant_id": {"type": "keyword"},
   "qa_id": {"type": "keyword"},
-}
-```
-
-## Agentic Metric
-This is the simplest of the metric, yet the most useful. Basically takes the `ground_truth_leviathan` from the dataset and compares to the `leviathan` proper answer from the assistant.
-
-#### Elastic mapping
-```json
-{
-  "agentic_leviathan_type": {"type": "text"},
-  "agentic_leviathan_ground_truth": {"type": "object"},
-  "agentic_leviathan": {"type": "object"},
-  "assistant_id": {"type": "keyword"},
-  "qa_id": {"type": "keyword"},
-  "assistant_id": {"type":"keyword"}
 }
 ```
