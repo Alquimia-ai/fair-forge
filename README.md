@@ -11,6 +11,7 @@
   <a href="#metrics">Metrics</a> •
   <a href="#usage">Usage</a>
   <a href="#examples">Examples</a>
+  <a href="#contributing">Create your own metric</a>
 </p>
 
 ## Overview
@@ -185,6 +186,54 @@ For practical examples of how to use Alquimia AI Fair Forge, please refer to our
 - [Custom Retriever Example](examples/helpers/retriever.py) - Implementation of a custom dataset retriever
 
 Each example includes detailed comments and explanations to help you understand the implementation details. Feel free to use these examples as a starting point for your own implementations.
+
+## Contributing
+
+To contribute a new metric to Fair Forge, follow these steps:
+
+1. Create a new Python file in the `fair_forge/metrics` directory with your metric name (e.g., `my_metric.py`)
+
+2. Follow the basic structure:
+
+```python
+from fair_forge import FairForge, Retriever
+from typing import Type, Optional
+from fair_forge.schemas import Batch
+
+class MyMetric(FairForge):
+    def __init__(self, retriever: Type[Retriever], **kwargs):
+        super().__init__(retriever, **kwargs)
+
+    def batch(
+        self,
+        session_id: str,
+        context: str,
+        assistant_id: str,
+        batch: list[Batch],
+        language: Optional[str] = "english",
+    ):
+        # Implement your metric logic here
+        for interaction in batch:
+            # Process each interaction
+            pass
+```
+
+3. Implement your metric logic in the `batch` method, which receives:
+   - `session_id`: Unique identifier for the conversation session
+   - `context`: The development environment or context of the assistant
+   - `assistant_id`: Identifier for the specific assistant being evaluated
+   - `batch`: List of interactions to evaluate
+   - `language`: Optional language parameter (defaults to "english")
+
+4. Document your metric in the `docs/journal.tex` file, including:
+   - Mathematical formulation
+   - Implementation details
+   - Usage examples
+   - References to relevant research
+
+5. Add tests for your metric in the `tests` directory
+
+6. Submit a pull request with your implementation
 
 ## Contributing
 
