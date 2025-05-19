@@ -9,8 +9,8 @@
   <a href="#installation">Installation</a> •
   <a href="#how-it-works">How It Works</a> •
   <a href="#metrics">Metrics</a> •
-  <a href="#usage">Usage</a>
-  <a href="#examples">Examples</a>
+  <a href="#usage">Usage</a> •
+  <a href="#examples">Examples</a> •
   <a href="#contributing">Create your own metric</a>
 </p>
 

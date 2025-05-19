@@ -10,7 +10,7 @@ S3_BUCKET_NAME = os.environ.get("AWS_S3_BUCKET")
 S3_ENDPOINT = os.environ.get("AWS_S3_ENDPOINT")
 
 
-class CustomRetriever(Retriever):
+class LocalRetriever(Retriever):
     def load_dataset(self) -> list[Dataset]:
         datasets=[]
         with open("dataset.json") as infile:
