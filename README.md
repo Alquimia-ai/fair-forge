@@ -22,14 +22,22 @@
 
 To get started with Alquimia AI Fair Forge, follow these simple steps:
 
-1. First, build the package:
+1. First. Activate your venv
+
+```shell
+source venv/bin/activate
+```
+
+1. Then, build the package:
+
 ```shell
 make package
 ```
 
 2. Then install it using pip:
+
 ```shell
-pip install --force-reinstall dist/alquimia_fair_forge-0.0.1.tar.gz -q
+pip install dist/alquimia_fair_forge-0.0.1.tar.gz -q
 ```
 
 ## How It Works
@@ -48,20 +56,22 @@ For detailed information about how each metric is computed, please refer to our 
 To use Alquimia AI Fair Forge, you need to provide a dataset in the following JSON format:
 
 ```json
-[{
+[
+  {
     "session_id": "123",
     "assistant_id": "456",
     "language": "english",
     "context": "You are a helpful assistant.",
     "conversation": [
-        {
-            "qa_id": "123",
-            "query": "What is Alquimia AI?",
-            "ground_truth_assistant": "Is an startup that its aim is to construct assistants",
-            "assistant": "I'm so happy to answer your question. Alquimia AI Is an startup dedicated to construct assistants."
-        }
+      {
+        "qa_id": "123",
+        "query": "What is Alquimia AI?",
+        "ground_truth_assistant": "Is an startup that its aim is to construct assistants",
+        "assistant": "I'm so happy to answer your question. Alquimia AI Is an startup dedicated to construct assistants."
+      }
     ]
-}]
+  }
+]
 ```
 
 #### Dataset Fields Explained:
@@ -91,13 +101,14 @@ class CustomRetriever(Retriever):
         datasets = []
         with open("dataset.json") as infile:
             for dataset in json.load(infile):
-                datasets.append(Dataset.model_validate(dataset)) 
+                datasets.append(Dataset.model_validate(dataset))
         return datasets
 ```
 
 ### Using the Metrics
 
 #### Context Metric
+
 ```python
 from getpass import getpass
 from fair_forge.metrics import Context
@@ -112,6 +123,7 @@ metrics = Context.run(
 ```
 
 #### Humanity Metric
+
 ```python
 from fair_forge.metrics import Humanity
 
@@ -122,6 +134,7 @@ metrics = Humanity.run(
 ```
 
 #### Conversational Metric
+
 ```python
 from getpass import getpass
 from fair_forge.metrics import Conversational
@@ -162,6 +175,7 @@ metrics = Bias.run(
 ```
 
 When `verbose=True` is set, the following information will be logged:
+
 - Dataset loading progress
 - Metric calculation steps
 - API calls and responses
@@ -170,6 +184,7 @@ When `verbose=True` is set, the following information will be logged:
 - Performance metrics and timing information
 
 The IBM Granite Guardian model is specifically trained to detect various risks including:
+
 - Social Bias
 - Harmful Content
 - Unethical Behavior
@@ -219,19 +234,29 @@ class MyMetric(FairForge):
 ```
 
 3. Implement your metric logic in the `batch` method, which receives:
+
    - `session_id`: Unique identifier for the conversation session
    - `context`: The development environment or context of the assistant
    - `assistant_id`: Identifier for the specific assistant being evaluated
    - `batch`: List of interactions to evaluate
    - `language`: Optional language parameter (defaults to "english")
 
-4. Document your metric in the `docs/journal.tex` file, including:
+
+4. In file `metrics/__init__.py` add your metric file export:
+
+```python
+from .my_metric import MyMetric
+
+__all__ = [
+    'MyMetric'
+]
+```
+
+5. Document your metric in the `docs/journal.tex` file, including:
    - Mathematical formulation
    - Implementation details
    - Usage examples
    - References to relevant research
-
-5. Add tests for your metric in the `tests` directory
 
 6. Submit a pull request with your implementation
 
