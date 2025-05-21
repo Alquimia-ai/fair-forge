@@ -68,6 +68,25 @@ The correlation coefficient $\rho$ ranges from -1 to 1, where:
 
 The evaluation of AI assistant interactions requires robust mechanisms to detect and mitigate potential biases and risks. This section presents a comprehensive framework for bias assessment and risk detection using the Granite Guardian model \cite{ibm2024granite} and AI ATLAS risk framework \cite{ibm2024atlas}.
 
+\section{Levenshtein Distance Metric}
+
+The Levenshtein distance between two strings \( a = a_1 a_2 \dots a_m \) and \( b = b_1 b_2 \dots b_n \) is defined as the minimum number of single-character edits (insertions, deletions, or substitutions) required to transform one string into the other. It is formally computed using dynamic programming:
+
+\[
+D(i, j) = 
+\begin{cases}
+\max(i, j) & \text{if } \min(i, j) = 0 \\
+\min
+\begin{cases}
+D(i - 1, j) + 1 \\
+D(i, j - 1) + 1 \\
+D(i - 1, j - 1) + [a_i \ne b_j]
+\end{cases} & \text{otherwise}
+\end{cases}
+\]
+
+Where \( D(i, j) \) represents the Levenshtein distance between the first \( i \) characters of \( a \) and the first \( j \) characters of \( b \), and \([a_i \ne b_j]\) is 0 if \( a_i = b_j \), and 1 otherwise.
+
 \subsection{Risk Detection Framework}
 
 The risk assessment framework operates across three primary dimensions:

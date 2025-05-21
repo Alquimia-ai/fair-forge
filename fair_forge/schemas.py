@@ -111,3 +111,10 @@ class HumanityMetric(Metric):
 
 class AgenticMetric(Metric):
     pass
+
+class LevenshteinDistanceMetric(Metric):
+    """
+    Levenshtein metric for measuring the similarity between the assistant response and expected answer.
+    """
+
+    levenshtein_distance: int
