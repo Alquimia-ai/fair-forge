@@ -1,8 +1,9 @@
-from .schemas import Batch, Dataset
+from .schemas import Batch, Dataset, GuardianBias,ProtectedAttribute
 from abc import ABC, abstractmethod
 from typing import Type
 from typing import Optional
 import logging
+from pydantic import BaseModel
 
 class VerboseLogger:
     """
@@ -48,7 +49,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class Retriever:
+class Retriever(ABC):
     """
     Abstract base class for data retrieval from cold storage.
     
@@ -189,3 +190,49 @@ class FairForge(ABC):
 
         self.logger.info(f"Completed processing all batches. Total metrics collected: {len(self.metrics)}")
         return self.metrics
+    
+
+
+
+class Guardian(ABC):
+    """
+    An abstract base class that serves as a framework for implementing bias detection in LLM interactions.
+    
+    This class is designed to be implemented by different bias detection mechanisms that can analyze
+    question-answer pairs for potential biases towards specific attributes. It provides a standardized
+    interface for bias detection across different implementations.
+
+    The class uses a nested BiasInfer model to structure the bias detection results in a consistent format.
+    """
+    def __init__(self,protected_attributes:list[ProtectedAttribute] | list[dict],**kwargs):
+        """
+        Initialize the Guardian with a VerboseLogger for detailed logging of bias detection operations.
+        """
+        self.logger = VerboseLogger()
+        self.protected_attributes = protected_attributes
+        
+    @abstractmethod
+    def is_biased(self, question: str, answer: str, attribute: ProtectedAttribute | dict, context: Optional[str] = None) -> GuardianBias:
+        """
+        Analyze a question-answer interaction for potential bias towards specific attributes.
+
+        This abstract method must be implemented by concrete Guardian classes to define their
+        specific bias detection logic. The implementation should analyze the given question and
+        answer pair for potential bias towards the specified attributes.
+
+        Args:
+            question (str): The question being analyzed
+            answer (str): The answer being analyzed
+            attribute (dict): A dictionary specifying the attributes to check for bias
+            context (Optional[str]): Additional context that might be relevant for bias detection
+
+        Returns:
+            GuardianBias: A GuardianBias object containing:
+                - is_biased: Whether bias was detected
+                - attribute: The specific attribute(s) that showed bias
+                - certainty: Optional confidence score for the detection
+
+        Raises:
+            NotImplementedError: If the concrete class does not implement this method
+        """
+        raise NotImplementedError("You should implement this method.")

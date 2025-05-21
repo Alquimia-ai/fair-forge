@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
-
+from enum import Enum
 
 class Logprobs(BaseModel):
     """
@@ -73,6 +73,27 @@ class BiasMetric(Metric):
     Bias metric for evaluating the bias of the assistant's responses.
     """
     risks: list[Risk]
+
+class GuardianBias(BaseModel):
+    """
+    A data model that represents the result of a bias detection analysis.
+
+    Attributes:
+            is_biased (bool): Indicates whether bias was detected in the interaction
+            attribute (dict): The specific attribute(s) that were analyzed for bias
+            certainty (Optional[float]): A confidence score for the bias detection, if available
+    """
+    is_biased: bool
+    attribute: str
+    certainty: Optional[float]
+
+class ProtectedAttribute(str,Enum):
+    age = "age"
+    gender = "gender"
+    race = "race"
+    religion = "religion"
+    nationality = "nationality"
+    sexual_orientation = "sexual_orientation"
 
 
 class ContextMetric(Metric):

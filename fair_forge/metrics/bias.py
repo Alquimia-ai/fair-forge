@@ -1,34 +1,44 @@
-from fair_forge import FairForge, Retriever
+from fair_forge import FairForge, Retriever, Guardian
 from typing import Optional, Type
-from fair_forge.helpers.guardian import VllmProvider, Provider, Guardian, GuardianConfig
-from fair_forge.schemas import Batch, BiasMetric
-from pydantic import SecretStr
+from fair_forge.schemas import Batch,  GuardianBias, ProtectedAttribute
 
 class Bias(FairForge):
     def __init__(
         self,
         retriever: Type[Retriever],
-        guardian_url: Optional[str],
-        guardian_api_key: Optional[SecretStr]=SecretStr(""),
-        guardian_model: Optional[str]="ibm-granite/granite-guardian-3.1-2b",
-        guardian_temperature: float = 0,
-        guardian_max_tokens: float = 5,
-        guardian_risks: Optional[list[dict]] = None,
-        guardian_provider: Type[Provider] = VllmProvider,
+        guardian: Type[Guardian],
+        confidence_level: float = 0.95,
         **kwargs,
     ):
         super().__init__(retriever, **kwargs)
-        self.guardian = Guardian(
-            GuardianConfig(
-                url=guardian_url,
-                api_key=guardian_api_key,
-                model=guardian_model,
-                temperature=guardian_temperature,
-                max_tokens=guardian_max_tokens,
-                risks=guardian_risks,
-                provider=guardian_provider,
-            )
+        self.protected_attributes = [ProtectedAttribute.gender,
+                                ProtectedAttribute.race,
+                                ProtectedAttribute.religion,
+                                ProtectedAttribute.nationality,
+                                ProtectedAttribute.sexual_orientation
+        ] ## PROTECTED ATTRIBUTES DEFINED BY FAIR FORGE
+        self.guardian = guardian(protected_attributes=self.protected_attributes)
+        self.confidence_level = confidence_level
+
+    def _is_biased_by_attribute(self,question:str,answer:str,attribute:str) -> GuardianBias:
+        return self.guardian.is_biased(
+            question=question,
+            answer=answer,
+            attribute=attribute,
         )
+    
+    def _confidence_interval_by_protected_attribute(self,bias:list[GuardianBias]):
+        pass
+
+    def _kl_divergence(self,p:list[float],q:list[float])-> float:
+        """
+        Calculate the Kullback-Leibler (KL) divergence between two probability distributions.
+
+        Args:
+            p (list[float]): The first probability distribution.
+            q (list[float]): The second probability distribution.
+        """
+        pass
 
     def batch(
         self,
@@ -44,15 +54,6 @@ class Bias(FairForge):
         """
         for interaction in batch:
             self.logger.debug(f"QA ID: {interaction.qa_id}")
-            self.metrics.append(
-                BiasMetric(
-                    session_id=session_id,
-                    qa_id=interaction.qa_id,
-                    assistant_id=assistant_id,
-                    risks=self.guardian.has_any_risk(
-                        question=interaction.query,
-                        answer=interaction.ground_truth_assistant,
-                        context=context,
-                    ),
-                )
-            )
+            for attribute in self.attributes:
+                bias = self._is_biased_by_attribute(interaction.query,interaction.ground_truth_assistant,attribute)
+                self.logger.debug(f"Bias: {bias}")
