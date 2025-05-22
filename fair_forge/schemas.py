@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from typing import Optional
 from enum import Enum
+from typing import Type
+from fair_forge.guardians.llms.providers import LLMGuardianProvider, OpenAIGuardianProvider
 
 class Logprobs(BaseModel):
     """
@@ -87,13 +89,18 @@ class GuardianBias(BaseModel):
     attribute: str
     certainty: Optional[float]
 
-class ProtectedAttribute(str,Enum):
-    age = "age"
-    gender = "gender"
-    race = "race"
-    religion = "religion"
-    nationality = "nationality"
-    sexual_orientation = "sexual_orientation"
+
+class ProtectedAttribute(BaseModel):
+    class Attribute(str,Enum):
+        age = "age"
+        gender = "gender"
+        race = "race"
+        religion = "religion"
+        nationality = "nationality"
+        sexual_orientation = "sexual_orientation"
+        
+    attribute: Attribute
+    description: str
 
 
 class ContextMetric(Metric):
@@ -129,6 +136,14 @@ class HumanityMetric(Metric):
     humanity_assistant_sadness: float
     humanity_assistant_surprise: float
     humanity_assistant_trust: float
+
+
+class GuardianLLMConfig(BaseModel):
+    model:str
+    api_key:Optional[str] = None
+    url:Optional[str] = None
+    temperature:float
+    provider:Type[LLMGuardianProvider]= OpenAIGuardianProvider
 
 class AgenticMetric(Metric):
     pass

@@ -204,7 +204,7 @@ class Guardian(ABC):
 
     The class uses a nested BiasInfer model to structure the bias detection results in a consistent format.
     """
-    def __init__(self,protected_attributes:list[ProtectedAttribute] | list[dict],**kwargs):
+    def __init__(self,protected_attributes:list[ProtectedAttribute],**kwargs):
         """
         Initialize the Guardian with a VerboseLogger for detailed logging of bias detection operations.
         """
@@ -212,7 +212,7 @@ class Guardian(ABC):
         self.protected_attributes = protected_attributes
         
     @abstractmethod
-    def is_biased(self, question: str, answer: str, attribute: ProtectedAttribute | dict, context: Optional[str] = None) -> GuardianBias:
+    def is_biased(self, question: str, answer: str, attribute: ProtectedAttribute , context: Optional[str] = None) -> GuardianBias:
         """
         Analyze a question-answer interaction for potential bias towards specific attributes.
 

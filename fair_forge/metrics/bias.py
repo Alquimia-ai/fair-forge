@@ -11,11 +11,11 @@ class Bias(FairForge):
         **kwargs,
     ):
         super().__init__(retriever, **kwargs)
-        self.protected_attributes = [ProtectedAttribute.gender,
-                                ProtectedAttribute.race,
-                                ProtectedAttribute.religion,
-                                ProtectedAttribute.nationality,
-                                ProtectedAttribute.sexual_orientation
+        self.protected_attributes = [ProtectedAttribute(attribute=ProtectedAttribute.Attribute.gender,description="Gender"),
+                                ProtectedAttribute(attribute=ProtectedAttribute.Attribute.race,description="Race"),
+                                ProtectedAttribute(attribute=ProtectedAttribute.Attribute.religion,description="Religion"),
+                                ProtectedAttribute(attribute=ProtectedAttribute.Attribute.nationality,description="Nationality"),
+                                ProtectedAttribute(attribute=ProtectedAttribute.Attribute.sexual_orientation,description="Sexual Orientation")
         ] ## PROTECTED ATTRIBUTES DEFINED BY FAIR FORGE
         self.guardian = guardian(protected_attributes=self.protected_attributes)
         self.confidence_level = confidence_level
