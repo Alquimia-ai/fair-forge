@@ -7,3 +7,4 @@ shap
 transformers
 torch
 boto3
+langfair

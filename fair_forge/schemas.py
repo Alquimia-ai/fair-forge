@@ -2,7 +2,9 @@ from pydantic import BaseModel
 from typing import Optional
 from enum import Enum
 from typing import Type
-from fair_forge.guardians.llms.providers import LLMGuardianProvider, OpenAIGuardianProvider
+from abc import ABC, abstractmethod
+from functools import partial
+from transformers import AutoTokenizer
 
 class Logprobs(BaseModel):
     """
@@ -138,12 +140,45 @@ class HumanityMetric(Metric):
     humanity_assistant_trust: float
 
 
+class LLMGuardianProviderInfer(BaseModel):
+    is_bias: bool
+    probability: float
+
+class LLMGuardianProvider(ABC):
+    def __init__(self,
+                 model:str,
+                 tokenizer:AutoTokenizer,
+                 api_key:Optional[str] = None,
+                 url:Optional[str] = None,
+                 temperature:float=0.0,
+                 safe_token: str = "Yes",
+                 unsafe_token: str = "No",
+                 max_tokens:int = 5 ,
+                 logprobs:bool=True,
+                 
+                 **kwargs):
+        
+        self.model = model
+        self.api_key = api_key
+        self.url = url
+        self.temperature = temperature
+        self.safe_token = safe_token
+        self.unsafe_token = unsafe_token
+        self.max_tokens = max_tokens
+        self.tokenizer = tokenizer
+        self.logprobs = logprobs
+        
+    @abstractmethod
+    def infer(self,prompt: partial) -> LLMGuardianProviderInfer:
+        raise NotImplementedError("Subclass must implement this method")
+
 class GuardianLLMConfig(BaseModel):
     model:str
     api_key:Optional[str] = None
     url:Optional[str] = None
     temperature:float
-    provider:Type[LLMGuardianProvider]= OpenAIGuardianProvider
+    logprobs:bool = False
+    provider:Type[LLMGuardianProvider]
 
 class AgenticMetric(Metric):
     pass

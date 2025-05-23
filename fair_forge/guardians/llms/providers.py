@@ -7,25 +7,9 @@ import math
 import requests
 from typing import Any
 import torch
+from fair_forge.schemas import LLMGuardianProviderInfer,LLMGuardianProvider
 
-class LLMGuardianProviderInfer(BaseModel):
-    is_bias: bool
-    probability: float
 
-class LLMGuardianProvider(ABC):
-    def __init__(self,model:str,api_key:Optional[str] = None,url:Optional[str] = None,temperature:float=0.0,safe_token: str = "Yes",unsafe_token: str = "No",max_tokens:int = 5 ,**kwargs):
-        self.model = model
-        self.api_key = api_key
-        self.url = url
-        self.temperature = temperature
-        self.safe_token = safe_token
-        self.unsafe_token = unsafe_token
-        self.max_tokens = max_tokens
-        self.tokenizer = AutoTokenizer.from_pretrained(model)
-
-    @abstractmethod
-    def infer(self,prompt: partial) -> LLMGuardianProviderInfer:
-        raise NotImplementedError("Subclass must implement this method")
 
 class HuggingFaceGuardianProvider(LLMGuardianProvider):
     def __init__(self,model:str,api_key:Optional[str] = None,url:Optional[str] = None,temperature:float=0.0,safe_token: str = "Yes",unsafe_token: str = "No",max_tokens:int = 5 ,**kwargs):
@@ -99,24 +83,46 @@ class HuggingFaceGuardianProvider(LLMGuardianProvider):
         return LLMGuardianProviderInfer(probability=prob_of_bias, is_bias=is_bias)
 
 class OpenAIGuardianProvider(LLMGuardianProvider):
-    def __init__(self,model:str,api_key:Optional[str] = None,url:Optional[str] = None,temperature:float=0.0,safe_token: str = "Yes",unsafe_token: str = "No",max_tokens:int = 5 ,**kwargs):
-        super().__init__(model,api_key,url,temperature,safe_token,unsafe_token,max_tokens,**kwargs)
+    def __init__(self,
+                 model:str,
+                 tokenizer:AutoTokenizer,
+                 api_key:Optional[str] = None,
+                 url:Optional[str] = None,
+                 temperature:float=0.0,
+                 safe_token: str = "Yes",
+                 unsafe_token: str = "No",
+                 max_tokens:int = 5 ,
+                 logprobs:bool=True,
+                 **kwargs):
+        super().__init__(model,tokenizer,api_key,url,temperature,safe_token,unsafe_token,max_tokens,logprobs,**kwargs)
         ## We can use chat completions if we want to use the model in a chat format
         self.chat_completions = True if 'chat_completions' in kwargs else False
 
     def _parse_guardian_response(self, response_json):
         choice = response_json["choices"][0]
-        logprobs = choice["logprobs"]
-        answer_token = True if logprobs["tokens"][0] == self.safe_token else False
-        prob_token = logprobs["token_logprobs"][0]
-        prob_token = math.exp(prob_token)
+        if self.logprobs:
+            logprobs = choice["logprobs"]
+            answer_token = True if logprobs["tokens"][0] == self.safe_token else False
+            prob_token = logprobs["token_logprobs"][0]
+            prob_token = math.exp(prob_token)
+            return answer_token, prob_token
+        else:
+            # Handle both chat completions and regular completions response formats
+            if "message" in choice:
+                # Chat completions format
+                message_content = choice["message"]["content"]
+            else:
+                # Regular completions format
+                message_content = choice["text"]
+            answer_token = True if message_content == self.safe_token else False
+            prob_token = 1.0
         return answer_token, prob_token
     
     def _with_chat_completions(self,prompt: partial) -> partial:
         messages =[
             {
                 "role": "user",
-                "content": prompt() 
+                "content": partial(prompt, tokenize=False)()
             }
         ]
         response = requests.post(
@@ -130,7 +136,7 @@ class OpenAIGuardianProvider(LLMGuardianProvider):
                 "messages": messages,
                 "temperature": self.temperature,
                 "max_tokens": self.max_tokens,
-                "logprobs": True,
+                "logprobs": self.logprobs,
             },
         )
         return response.json()
@@ -147,10 +153,10 @@ class OpenAIGuardianProvider(LLMGuardianProvider):
             },
             json={
                 "model": self.model,
-                "prompt": prompt(),
+                "prompt": partial(prompt, tokenize=False)(),
                 "temperature": self.temperature,
                 "max_tokens": self.max_tokens,
-                "logprobs": True,
+                "logprobs": self.logprobs,
             },
         )
         return response.json()

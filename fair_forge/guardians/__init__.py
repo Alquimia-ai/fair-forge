@@ -3,6 +3,8 @@ from fair_forge.schemas import ProtectedAttribute
 from fair_forge.schemas import GuardianBias
 from fair_forge.schemas import GuardianLLMConfig
 from functools import partial
+from typing import Optional
+from transformers import AutoTokenizer
 
 class IBMGranite(Guardian):
     """
@@ -21,30 +23,32 @@ class IBMGranite(Guardian):
         config (GuardianLLMConfig): The configuration used for the IBM Granite model
         provider: The configured model provider instance for making inference calls
     """
-    def __init__(self,protected_attributes:list[ProtectedAttribute],config:GuardianLLMConfig,**kwargs):
-        super().__init__(protected_attributes,**kwargs)
+    def __init__(self,config:GuardianLLMConfig,**kwargs):
+        super().__init__(**kwargs)
         self.config = config
+        self.tokenizer = AutoTokenizer.from_pretrained(config.model)
         self.provider = config.provider(
             model=config.model,
+            tokenizer=self.tokenizer,
             api_key=config.api_key,
             url=config.url,
             temperature=config.temperature,
             safe_token="Yes",
+            logprobs=config.logprobs,
             unsafe_token="No"
         )
 
-    def is_biased(self,question:str,answer:str,attribute:ProtectedAttribute,context:str) -> GuardianBias:
+    def is_biased(self, question: str, answer: str, attribute: ProtectedAttribute , context: Optional[str] = None) -> GuardianBias:
         messages = [
-            {"role": "system", "content": context},
             {"role": "user", "content": question},
             {"role": "assistant", "content": answer},
         ]
         prompt = partial(
-            self.tokenizer.apply_chat_template,
+            self.provider.tokenizer.apply_chat_template,
             conversation=messages,
             guardian_config={
                 "risk_name": attribute.attribute.value,
-                "risk_description": attribute.description,
+                "risk_definition": attribute.description,
             },
             tokenize=False,
             add_generation_prompt=True,
@@ -73,21 +77,24 @@ class LLamaGuard(Guardian):
         config (GuardianLLMConfig): The configuration used for the LLamaGuard model
         provider: The configured model provider instance for making inference calls
     """
-    def __init__(self,protected_attributes:list[ProtectedAttribute],config:GuardianLLMConfig,**kwargs):
-        super().__init__(protected_attributes,**kwargs)
+    def __init__(self,config:GuardianLLMConfig,**kwargs):
+        super().__init__(**kwargs)
         self.config = config
+        self.tokenizer = AutoTokenizer.from_pretrained(config.model)
         self.provider = config.provider(
             model=config.model,
+            tokenizer=self.tokenizer,
             api_key=config.api_key,
             url=config.url,
             temperature=config.temperature,
             safe_token="safe",
-            unsafe_token="unsafe"
+            unsafe_token="unsafe",
+            logprobs=config.logprobs,
+            chat_completions= True
         )
 
-    def is_biased(self,question:str,answer:str,attribute:ProtectedAttribute,context:str) -> GuardianBias:
+    def is_biased(self, question: str, answer: str, attribute: ProtectedAttribute , context: Optional[str] = None) -> GuardianBias:
         messages = [
-            {"role": "system", "content": context},
             {"role": "user", "content": question},
             {"role": "assistant", "content": answer},
         ]
@@ -96,9 +103,7 @@ class LLamaGuard(Guardian):
             conversation= messages,
             categories = {
                 "S1": f"{attribute.attribute.value}.\n{attribute.description}"
-            },
-            tokenize= False,
-            add_generation_prompt=True
+            }
         )
         infer = self.provider.infer(prompt)
         return GuardianBias(
