@@ -1,6 +1,6 @@
 from fair_forge import FairForge, Retriever, Guardian
 from typing import Optional, Type
-from fair_forge.schemas import Batch,  GuardianBias, ProtectedAttribute
+from fair_forge.schemas import Batch,  GuardianBias, ProtectedAttribute, BiasMetric
 import scipy.stats as st
 
 class Bias(FairForge):
@@ -85,21 +85,51 @@ class Bias(FairForge):
         for interaction in batch:
             self.logger.info(f"QA ID: {interaction.qa_id}")
             for attribute in self.protected_attributes:
-                bias = self._is_biased_by_attribute(interaction.query,interaction.ground_truth_assistant,attribute,context)
-                biases_by_attribute[attribute.attribute.value].append(bias.is_biased)
+                bias = self._is_biased_by_attribute(interaction.query,interaction.assistant,attribute,context)
+                biases_by_attribute[attribute.attribute.value].append(BiasMetric.GuardianInteraction(
+                    qa_id=interaction.qa_id,
+                    is_biased=bias.is_biased,
+                    attribute=bias.attribute,
+                    certainty=bias.certainty
+                ))
 
         ## Create confidence interval by each attribute
         for attribute in self.protected_attributes:
             ## Calculate the probability of the truth using laplace
             samples = len(biases_by_attribute[attribute.attribute.value])
             # amount of unbiased / amount of total interactions
-            k_success = sum(1 for bias in biases_by_attribute[attribute.attribute.value] if not bias)
+            k_success = sum(1 for bias in biases_by_attribute[attribute.attribute.value] if not bias.is_biased)
             alpha = 1 - self.confidence_level
 
-            p_l = st.beta.ppf(alpha/2, k_success, samples - k_success + 1)
-            p_u = st.beta.ppf(1 - alpha/2, k_success + 1, samples - k_success)
-            p_truth = k_success / samples
+            if k_success == samples:
+                ## If all interactions are unbiased, the probability of the truth is 1.0
+                p_truth = 1.0
+                p_u = 1.0
+            else:
+                p_truth = k_success / samples
+                p_u = st.beta.ppf(1 - alpha/2, k_success + 1, samples - k_success)
 
-            self.logger.info(f"[{attribute.attribute.value}]: Clopper-Pearson Confidence Interval: [{p_l} - {p_truth} - {p_u}]")
+            p_l = st.beta.ppf(alpha/2, k_success, samples - k_success + 1)
+            
+
+            confidence_interval = BiasMetric.ConfidenceInterval(
+                lower_bound=p_l,
+                upper_bound=p_u,
+                probability=p_truth,
+                samples=samples,
+                k_success=k_success,
+                alpha=alpha,
+                confidence_level=self.confidence_level,
+                protected_attribute=attribute.attribute.value
+            )
+
+            bias_metric = BiasMetric(
+                session_id=session_id,
+                assistant_id=assistant_id,
+                guardian_attributes_confidence_interval=confidence_interval,
+                evaluated_guardian_interactions=biases_by_attribute[attribute.attribute.value]
+            )
+
+            self.metrics.append(bias_metric)
 
 

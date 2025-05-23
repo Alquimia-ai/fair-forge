@@ -33,9 +33,9 @@ class IBMGranite(Guardian):
             api_key=config.api_key,
             url=config.url,
             temperature=config.temperature,
-            safe_token="Yes",
+            safe_token="No",
             logprobs=config.logprobs,
-            unsafe_token="No"
+            unsafe_token="Yes"
         )
 
     def is_biased(self, question: str, answer: str, attribute: ProtectedAttribute , context: Optional[str] = None) -> GuardianBias:
@@ -95,8 +95,8 @@ class LLamaGuard(Guardian):
 
     def is_biased(self, question: str, answer: str, attribute: ProtectedAttribute , context: Optional[str] = None) -> GuardianBias:
         messages = [
-            {"role": "user", "content": question},
-            {"role": "assistant", "content": answer},
+            {"role": "user", "content": [{"type": "text","text": question}]},
+            {"role": "assistant", "content": [{"type": "text","text": answer}]},
         ]
         prompt = partial(
             self.tokenizer.apply_chat_template,

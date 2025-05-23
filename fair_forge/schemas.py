@@ -59,24 +59,13 @@ class Dataset(BaseModel):
     conversation: list[Batch]
 
 
-class Metric(BaseModel):
+class BaseMetric(BaseModel):
     """
     A metric represents a specific evaluation or measurement of the assistant's performance.
     """
     session_id: str
-    qa_id: str
     assistant_id: str
 
-class Risk(BaseModel):
-    risk_name: str
-    risk_score: float
-    is_risk: bool
-
-class BiasMetric(Metric):
-    """
-    Bias metric for evaluating the bias of the assistant's responses.
-    """
-    risks: list[Risk]
 
 class GuardianBias(BaseModel):
     """
@@ -91,6 +80,26 @@ class GuardianBias(BaseModel):
     attribute: str
     certainty: Optional[float]
 
+class BiasMetric(BaseMetric):
+    """
+    Bias metric for evaluating the bias of the assistant's responses.
+    """
+    class ConfidenceInterval(BaseModel):
+        lower_bound: float
+        upper_bound: float
+        probability: float
+        samples:int
+        k_success:int
+        alpha: float
+        confidence_level: float
+        protected_attribute: str
+
+    class GuardianInteraction(GuardianBias):
+        qa_id:str
+
+    guardian_attributes_confidence_interval: ConfidenceInterval
+    evaluated_guardian_interactions: list[GuardianInteraction]
+
 
 class ProtectedAttribute(BaseModel):
     class Attribute(str,Enum):
@@ -104,18 +113,18 @@ class ProtectedAttribute(BaseModel):
     attribute: Attribute
     description: str
 
-
-class ContextMetric(Metric):
+class ContextMetric(BaseMetric):
     context_insight: str
     context_awareness: float
     context_thinkings: str
+    qa_id: str
 
 
-class ConversationalMetric(Metric):
+
+class ConversationalMetric(BaseMetric):
     """
     Conversational metric for evaluating the assistant's conversational abilities.
     """
-
     conversational_memory: float
     conversational_insight: str
     conversational_language: float
@@ -125,9 +134,11 @@ class ConversationalMetric(Metric):
     conversational_manner_maxim: float
     conversational_sensibleness: float
     conversational_thinkings: str
+    qa_id: str
 
 
-class HumanityMetric(Metric):
+
+class HumanityMetric(BaseMetric):
     humanity_assistant_emotional_entropy: float
     humanity_ground_truth_spearman: float
     humanity_assistant_anger: float
@@ -138,6 +149,8 @@ class HumanityMetric(Metric):
     humanity_assistant_sadness: float
     humanity_assistant_surprise: float
     humanity_assistant_trust: float
+    qa_id: str
+
 
 
 class LLMGuardianProviderInfer(BaseModel):
@@ -151,8 +164,8 @@ class LLMGuardianProvider(ABC):
                  api_key:Optional[str] = None,
                  url:Optional[str] = None,
                  temperature:float=0.0,
-                 safe_token: str = "Yes",
-                 unsafe_token: str = "No",
+                 safe_token: str = "No",
+                 unsafe_token: str = "Yes",
                  max_tokens:int = 5 ,
                  logprobs:bool=True,
                  
@@ -180,5 +193,5 @@ class GuardianLLMConfig(BaseModel):
     logprobs:bool = False
     provider:Type[LLMGuardianProvider]
 
-class AgenticMetric(Metric):
+class AgenticMetric(BaseMetric):
     pass

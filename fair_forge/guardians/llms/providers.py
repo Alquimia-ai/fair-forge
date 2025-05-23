@@ -32,7 +32,7 @@ class HuggingFaceGuardianProvider(LLMGuardianProvider):
             output.sequences[:, input_len:][0], skip_special_tokens=True
         ).strip()
 
-        is_bias = True if res.lower() == self.unsafe_token.lower() else False
+        is_bias = True if self.unsafe_token.lower() in res.lower()  else False
 
         if prob_of_bias is None:
             raise ValueError(
@@ -49,9 +49,9 @@ class HuggingFaceGuardianProvider(LLMGuardianProvider):
                 gen_token_i.values.tolist()[0], gen_token_i.indices.tolist()[0]
             ):
                 decoded_token = self.tokenizer.convert_ids_to_tokens(index)
-                if decoded_token.strip().lower() == self.safe_token.lower():
+                if self.safe_token.lower() in decoded_token.strip().lower():
                     safe_token_prob += math.exp(logprob)
-                if decoded_token.strip().lower() == self.unsafe_token.lower():
+                if self.unsafe_token.lower() in decoded_token.strip().lower():
                     unsafe_token_prob += math.exp(logprob)
 
         probabilities = torch.softmax(
@@ -92,7 +92,7 @@ class OpenAIGuardianProvider(LLMGuardianProvider):
                  safe_token: str = "Yes",
                  unsafe_token: str = "No",
                  max_tokens:int = 5 ,
-                 logprobs:bool=True,
+                 logprobs:bool=False,
                  **kwargs):
         super().__init__(model,tokenizer,api_key,url,temperature,safe_token,unsafe_token,max_tokens,logprobs,**kwargs)
         ## We can use chat completions if we want to use the model in a chat format
@@ -100,23 +100,19 @@ class OpenAIGuardianProvider(LLMGuardianProvider):
 
     def _parse_guardian_response(self, response_json):
         choice = response_json["choices"][0]
+        prob_token = 1.0
+        if 'message' in choice:
+            message_content = choice["message"]["content"]
+            is_biased = True if self.unsafe_token in message_content   else False
+        else:
+            is_biased = True if self.unsafe_token in choice['text'] else False
+
         if self.logprobs:
             logprobs = choice["logprobs"]
-            answer_token = True if logprobs["tokens"][0] == self.safe_token else False
             prob_token = logprobs["token_logprobs"][0]
             prob_token = math.exp(prob_token)
-            return answer_token, prob_token
-        else:
-            # Handle both chat completions and regular completions response formats
-            if "message" in choice:
-                # Chat completions format
-                message_content = choice["message"]["content"]
-            else:
-                # Regular completions format
-                message_content = choice["text"]
-            answer_token = True if message_content == self.safe_token else False
-            prob_token = 1.0
-        return answer_token, prob_token
+            
+        return is_biased, prob_token
     
     def _with_chat_completions(self,prompt: partial) -> partial:
         messages =[
