@@ -97,8 +97,9 @@ class BiasMetric(BaseMetric):
     class GuardianInteraction(GuardianBias):
         qa_id:str
 
-    guardian_attributes_confidence_interval: ConfidenceInterval
-    evaluated_guardian_interactions: list[GuardianInteraction]
+    confidence_intervals: list[ConfidenceInterval]
+    guardian_interactions: dict[str,list[GuardianInteraction]]
+    cluster_profiling: dict[float,float]
 
 
 class ProtectedAttribute(BaseModel):
@@ -118,7 +119,6 @@ class ContextMetric(BaseMetric):
     context_awareness: float
     context_thinkings: str
     qa_id: str
-
 
 
 class ConversationalMetric(BaseMetric):
@@ -195,3 +195,7 @@ class GuardianLLMConfig(BaseModel):
 
 class AgenticMetric(BaseMetric):
     pass
+
+class ToxicityDataset(BaseModel):
+    word:str
+    category: Optional[str] = None
