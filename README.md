@@ -150,29 +150,127 @@ metrics = Conversational.run(
 
 #### Bias Metric
 
-To properly run this metric, you need to deploy a Guardian Model using an OpenAI-like API. We recommend using the IBM Granite Guardian model, which is specifically designed for risk detection and bias assessment.
+The Bias metric provides comprehensive bias analysis across multiple protected attributes including gender, race, religion, nationality, and sexual orientation. It uses a combination of clustering techniques, confidence intervals, and guardian-based bias detection to provide detailed insights into potential biases in AI assistant responses.
 
-You can find the model at: [IBM Granite Guardian 3.1 2B](https://huggingface.co/ibm-granite/granite-guardian-3.1-2b)
+The metric is highly flexible and allows you to implement your own bias detection mechanisms through the Guardian interface. Fair Forge provides two built-in guardians out of the box:
+
+1. **IBMGranite**: Uses IBM's Granite model for bias detection
+2. **LLamaGuard**: Uses Meta's LLamaGuard model for bias detection
+
+You can also create your own guardian by implementing the Guardian interface:
+
+```python
+from fair_forge import Guardian
+from fair_forge.schemas import ProtectedAttribute, GuardianBias
+from typing import Optional
+
+class MyCustomGuardian(Guardian):
+    def is_biased(self, question: str, answer: str, attribute: ProtectedAttribute, context: Optional[str] = None) -> GuardianBias:
+        # Implement your bias detection logic here
+        # Return a GuardianBias object with:
+        # - is_biased: Whether bias was detected
+        # - attribute: The specific attribute that showed bias
+        # - certainty: Confidence score for the detection
+        pass
+```
+
+Here's an example using the built-in IBMGranite guardian:
 
 ```python
 from getpass import getpass
 from fair_forge.metrics import Bias
+from fair_forge.guardians import IBMGranite, GuardianLLMConfig, OpenAIGuardianProvider
+from fair_forge.retrievers import LocalRetriever
 
-guardian_api_key = SecretStr(getpass("Please enter your Guardian API key: "))
+# Set up your environment variables
 GUARDIAN_URL = os.environ.get("GUARDIAN_URL")
 GUARDIAN_MODEL_NAME = os.environ.get("GUARDIAN_MODEL_NAME")
-GUARDIAN_API_KEY = guardian_api_key
+GUARDIAN_API_KEY = SecretStr(getpass("Please enter your Guardian API key: "))
 
+# Configure and run the Bias metric
 metrics = Bias.run(
-    CustomRetriever,
-    guardian_url=GUARDIAN_URL,
-    guardian_api_key=GUARDIAN_API_KEY,
-    guardian_model=GUARDIAN_MODEL_NAME,
-    guardian_temperature=guardian_temperature,
-    max_tokens=max_tokens,
-    verbose=True  # Enable detailed logging
+    LocalRetriever,
+    guardian=IBMGranite,
+    confidence_level=0.80,
+    config=GuardianLLMConfig(
+        model=GUARDIAN_MODEL_NAME,
+        api_key=GUARDIAN_API_KEY.get_secret_value(),
+        url=GUARDIAN_URL,
+        temperature=0.0,
+        provider=OpenAIGuardianProvider,
+        logprobs=True
+    ),
+    toxicity_min_cluster_size=2,
+    toxicity_cluster_use_latent_space=True,
+    umap_n_neighbors=30,
+    verbose=True
 )
 ```
+
+And here's an example using your custom guardian:
+
+```python
+from fair_forge.metrics import Bias
+from fair_forge.retrievers import LocalRetriever
+
+# Create an instance of your custom guardian
+my_guardian = MyCustomGuardian()
+
+# Run the Bias metric with your custom guardian
+metrics = Bias.run(
+    LocalRetriever,
+    guardian=my_guardian,
+    confidence_level=0.80,
+    verbose=True
+)
+```
+
+The Bias metric supports various configuration options for clustering and analysis:
+
+- `confidence_level`: Statistical confidence level for bias detection (default: 0.95)
+- `embedding_model`: Model for generating text embeddings (default: "all-MiniLM-L6-v2")
+- `toxicity_min_cluster_size`: Minimum size for clusters in HDBSCAN (default: 5)
+- `toxicity_cluster_selection_epsilon`: Epsilon value for cluster selection (default: 0.01)
+- `toxicity_cluster_selection_method`: Method used for cluster selection (default: "euclidean")
+- `toxicity_cluster_use_latent_space`: Whether to use latent space for clustering (default: True)
+- `umap_n_components`: Number of components for UMAP dimensionality reduction (default: 2)
+- `umap_n_neighbors`: Number of neighbors for UMAP (default: 15)
+- `umap_min_dist`: Minimum distance parameter for UMAP (default: 0.1)
+- `umap_random_state`: Random state for UMAP reproducibility (default: 42)
+- `umap_metric`: Metric used for UMAP (default: "cosine")
+
+### Custom Toxicity Loaders
+
+The Bias metric uses toxicity analysis to identify potentially harmful content in clusters of responses. You can create your own toxicity dataset loader by implementing the ToxicityLoader interface:
+
+```python
+from fair_forge import ToxicityLoader
+from fair_forge.schemas import ToxicityDataset
+
+class MyCustomToxicityLoader(ToxicityLoader):
+    def load(self, language: str) -> list[ToxicityDataset]:
+        # Load your custom toxicity dataset
+        # Return a list of ToxicityDataset objects containing:
+        # - word: The potentially offensive word
+        # - category: The category of toxicity
+        return [
+            ToxicityDataset(word="offensive_word", category="category_name")
+            # ... more entries
+        ]
+```
+
+Then use your custom loader with the Bias metric:
+
+```python
+metrics = Bias.run(
+    LocalRetriever,
+    guardian=my_guardian,
+    toxicity_loader=MyCustomToxicityLoader,
+    verbose=True
+)
+```
+
+The toxicity loader is used during cluster analysis to calculate the percentage of potentially offensive words in each cluster of responses. This helps identify patterns of harmful content in the assistant's responses.
 
 When `verbose=True` is set, the following information will be logged:
 

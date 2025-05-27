@@ -1,24 +1,3 @@
-#### **Elastic mapping**
-
-Is going to be a single doc where:
-```json
-{
-  "session_id": {"type": "keyword"},
-  "observation": {"type": "text"},
-  "assistant": {"type": "text"},
-  "ground_truth_assistant": {"type": "text"},
-  "question": {"type": "text"},
-  "qa_id": {"type": "keyword"},
-  "assistant_id": {"type":"keyword"}
-}
-```
-- session_id: Identifies to which conversation thread belongs these interaction
-- qa_id: Identifies this interaction
-- question: The human query
-- ground_truth_asisstant: What is was expected to be answered (can be null if only observation was specified)
-- observation: The observation added in the dataset (can be null if only the assistant was specified)
-- assistant: This is the real answer inferred from the assistant
-
 ### Context Metric
 #### **Elastic mapping**
 
@@ -83,11 +62,54 @@ Under humanity_assistant_{emotion} you will find the probability of the {emotion
 #### Elastic mapping
 ```json
 {
-  "session_id": {"type": "keyword"},
-  "bias_guard_is_risk": {"type": "boolean"},
-  "bias_guard_type": {"type": "text"},
-  "bias_guard_probability": {"type": "float"},
-  "assistant_id": {"type": "keyword"},
-  "qa_id": {"type": "keyword"},
+  "mappings": {
+    "properties": {
+      "session_id": {"type": "keyword"},
+      "assistant_id": {"type": "keyword"},
+      "confidence_intervals": {
+        "type": "nested",
+        "properties": {
+          "protected_attribute": {"type": "keyword"},
+          "lower_bound": {"type": "float"},
+          "upper_bound": {"type": "float"},
+          "probability": {"type": "float"},
+          "samples": {"type": "integer"},
+          "k_success": {"type": "integer"},
+          "alpha": {"type": "float"},
+          "confidence_level": {"type": "float"}
+        }
+      },
+      "guardian_interactions": {
+        "type": "nested",
+        "properties": {
+          "protected_attribute": {"type": "keyword"},
+          "qa_id": {"type": "keyword"},
+          "is_biased": {"type": "boolean"},
+          "certainty": {"type": "float"}
+        }
+      },
+      "cluster_profiling": {
+        "type": "object",
+        "properties": {
+          "cluster_id": {"type": "keyword"},
+          "toxicity_score": {"type": "float"}
+        }
+      },
+      "assistant_space": {
+        "properties": {
+          "cluster_labels": {"type": "keyword"},
+          "embeddings": {"type": "float"},
+          "latent_space": {"type": "float"}
+        }
+      }
+    }
+  }
 }
 ```
+
+The mapping includes:
+- `session_id` and `assistant_id`: Identifiers for the session and assistant
+- `confidence_intervals`: Nested object containing statistical confidence intervals for protected attributes
+- `guardian_interactions`: Nested object tracking bias detection results from the guardian
+- `cluster_profiling`: Object containing cluster analysis results
+- `assistant_space`: Object containing embedding and latent space information

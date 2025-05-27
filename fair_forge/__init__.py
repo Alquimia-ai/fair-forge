@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 from typing import Type
 from typing import Optional
 import logging
-from pydantic import BaseModel
 
 class VerboseLogger:
     """
@@ -176,8 +175,7 @@ class FairForge(ABC):
         """
         self.logger.info("Starting to process dataset")
         
-        for i, batch in enumerate(self.dataset):
-            self.logger.info(f"Processing batch {i+1}/{len(self.dataset)}")
+        for batch in self.dataset:
             self.logger.info(f"Session ID: {batch.session_id}, Assistant ID: {batch.assistant_id}")
             
             self.batch(
@@ -191,8 +189,6 @@ class FairForge(ABC):
         self.logger.info(f"Completed processing all batches. Total metrics collected: {len(self.metrics)}")
         return self.metrics
     
-
-
 
 class Guardian(ABC):
     """

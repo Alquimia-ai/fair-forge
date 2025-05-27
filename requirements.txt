@@ -10,3 +10,4 @@ boto3
 langfair
 umap-learn
 hdbscan
+tqdm>=4.65.0

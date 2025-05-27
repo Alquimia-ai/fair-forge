@@ -97,9 +97,15 @@ class BiasMetric(BaseMetric):
     class GuardianInteraction(GuardianBias):
         qa_id:str
 
+    class AssistantSpace(BaseModel):
+        latent_space: list
+        embeddings: list
+        cluster_labels: list
+
     confidence_intervals: list[ConfidenceInterval]
     guardian_interactions: dict[str,list[GuardianInteraction]]
-    cluster_profiling: dict[float,float]
+    cluster_profiling: dict[float,float]    
+    assistant_space: AssistantSpace
 
 
 class ProtectedAttribute(BaseModel):
