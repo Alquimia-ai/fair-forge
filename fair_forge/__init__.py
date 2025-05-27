@@ -116,7 +116,7 @@ class FairForge(ABC):
         self.verbose = verbose
         self.logger = VerboseLogger(verbose)
         
-        self.dataset = self.retriever().load_dataset()
+        self.dataset = self.retriever(**kwargs).load_dataset()
         self.logger.info(f"Loaded dataset with {len(self.dataset)} batches")
 
     @abstractmethod

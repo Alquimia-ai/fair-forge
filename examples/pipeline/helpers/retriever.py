@@ -7,13 +7,6 @@ from fair_forge import Retriever
 import lakefs
 from lakefs.client import Client
 
-LAKEFS_HOST=os.environ.get("LAKEFS_HOST")
-LAKEFS_USERNAME= os.environ.get("LAKEFS_USERNAME")
-LAKEFS_PASSWORD= os.environ.get("LAKEFS_PASSWORD")
-LAKEFS_REPOSITORY= os.environ.get("LAKEFS_REPOSITORY")
-LAKEFS_BRANCH= os.environ.get("LAKEFS_BRANCH")
-LAKEFS_DATASET=os.environ.get("LAKEFS_DATASET")
-
 class LocalRetriever(Retriever):
     def load_dataset(self) -> list[Dataset]:
         datasets = []
@@ -42,14 +35,21 @@ class LakeFSRetriever(Retriever):
             Exception: If required environment variables are missing or if there are issues
                      connecting to LakeFS or reading the dataset.
         """
+        self.lakefs_host = self.kwargs.get("lakefs_host")
+        self.lakefs_username = self.kwargs.get("lakefs_username")
+        self.lakefs_password = self.kwargs.get("lakefs_password")
+        self.lakefs_repository = self.kwargs.get("lakefs_repository")
+        self.lakefs_branch = self.kwargs.get("lakefs_branch")
+        self.lakefs_dataset = self.kwargs.get("lakefs_dataset")
+
         # Validate required environment variables
         required_vars = {
-            "LAKEFS_HOST": LAKEFS_HOST,
-            "LAKEFS_USERNAME": LAKEFS_USERNAME,
-            "LAKEFS_PASSWORD": LAKEFS_PASSWORD,
-            "LAKEFS_REPOSITORY": LAKEFS_REPOSITORY,
-            "LAKEFS_BRANCH": LAKEFS_BRANCH,
-            "LAKEFS_DATASET": LAKEFS_DATASET
+            "LAKEFS_HOST": self.lakefs_host,
+            "LAKEFS_USERNAME": self.lakefs_username,
+            "LAKEFS_PASSWORD": self.lakefs_password,
+            "LAKEFS_REPOSITORY": self.lakefs_repository,
+            "LAKEFS_BRANCH": self.lakefs_branch,
+            "LAKEFS_DATASET": self.lakefs_dataset
         }
         
         missing_vars = [var for var, value in required_vars.items() if not value]
@@ -58,17 +58,17 @@ class LakeFSRetriever(Retriever):
         
         # Initialize LakeFS client
         client = Client(
-            host=LAKEFS_HOST,
-            username=LAKEFS_USERNAME,
-            password=LAKEFS_PASSWORD
+            host=self.lakefs_host,
+            username=self.lakefs_username,
+            password=self.lakefs_password
         )
         
         # Get repository and reference
-        repo = lakefs.Repository(repository_id=LAKEFS_REPOSITORY, client=client)
-        ref = repo.ref(LAKEFS_BRANCH)
+        repo = lakefs.Repository(repository_id=self.lakefs_repository, client=client)
+        ref = repo.ref(self.lakefs_branch)
         
         # Get the dataset object
-        obj = ref.object(path=LAKEFS_DATASET)
+        obj = ref.object(path=self.lakefs_dataset)
         
         datasets = []
         # Read and parse the dataset

@@ -14,6 +14,20 @@
           "op": "execute-notebook-node",
           "app_data": {
             "component_parameters": {
+              "pipeline_parameters": [
+                "run_name",
+                "guardian_temperature",
+                "confidence_level",
+                "umap_n_neighbors",
+                "umap_n_components",
+                "umap_min_dist",
+                "umap_random_state",
+                "umap_metric",
+                "toxicity_min_cluster_size",
+                "toxicity_cluster_use_latent_space",
+                "toxicity_cluster_selection_epsilon",
+                "toxicity_cluster_selection_method"
+              ],
               "dependencies": [
                 "helpers/retrieve.py"
               ],
@@ -36,37 +50,7 @@
                   "env_var": "GUARDIAN_MODEL_NAME"
                 },
                 {
-                  "env_var": "GUARDIAN_TEMPERATURE"
-                },
-                {
-                  "env_var": "CONFIDENCE_LEVEL"
-                },
-                {
-                  "env_var": "UMAP_N_NEIGHBORS"
-                },
-                {
-                  "env_var": "UMAP_N_COMPONENTS"
-                },
-                {
-                  "env_var": "UMAP_MIN_DIST"
-                },
-                {
-                  "env_var": "UMAP_RANDOM_STATE"
-                },
-                {
-                  "env_var": "UMAP_METRIC"
-                },
-                {
-                  "env_var": "TOXICITY_MIN_CLUSTER_SIZE"
-                },
-                {
-                  "env_var": "TOXICITY_CLUSTER_USE_LATENT_SPACE"
-                },
-                {
-                  "env_var": "TOXICITY_CLUSTER_SELECTION_EPSILON"
-                },
-                {
-                  "env_var": "TOXICITY_CLUSTER_SELECTION_METHOD"
+                  "env_var": "GUARDIAN_API_KEY"
                 }
               ],
               "kubernetes_pod_annotations": [],
@@ -122,6 +106,9 @@
           "op": "execute-notebook-node",
           "app_data": {
             "component_parameters": {
+              "pipeline_parameters": [
+                "run_name"
+              ],
               "dependencies": [
                 "helpers/retrieve.py"
               ],
@@ -136,6 +123,9 @@
                 },
                 {
                   "env_var": "ELASTIC_AUTH_PASSWORD"
+                },
+                {
+                  "env_var": "JUDGE_API_KEY"
                 }
               ],
               "kubernetes_pod_annotations": [],
@@ -198,6 +188,9 @@
           "op": "execute-notebook-node",
           "app_data": {
             "component_parameters": {
+              "pipeline_parameters": [
+                "run_name"
+              ],
               "dependencies": [
                 "helpers/retrieve.py"
               ],
@@ -212,6 +205,9 @@
                 },
                 {
                   "env_var": "ELASTIC_AUTH_PASSWORD"
+                },
+                {
+                  "env_var": "JUDGE_API_KEY"
                 }
               ],
               "kubernetes_pod_annotations": [],
@@ -274,6 +270,9 @@
           "op": "execute-notebook-node",
           "app_data": {
             "component_parameters": {
+              "pipeline_parameters": [
+                "run_name"
+              ],
               "dependencies": [
                 "helpers/retrieve.py"
               ],
@@ -354,7 +353,116 @@
         "properties": {
           "name": "fair-forge",
           "runtime": "Data Science Pipelines",
-          "pipeline_parameters": [],
+          "pipeline_parameters": [
+            {
+              "name": "run_name",
+              "description": "The name that is going to identify your run in elastic",
+              "default_value": {
+                "type": "String",
+                "value": "test"
+              },
+              "required": true
+            },
+            {
+              "name": "guardian_temperature",
+              "description": "How much temperature you would like that the guardian model to have",
+              "default_value": {
+                "type": "Float",
+                "value": 0.5
+              },
+              "required": false
+            },
+            {
+              "name": "confidence_level",
+              "description": "Confidence level used for the bias metric",
+              "default_value": {
+                "type": "Integer",
+                "value": 0.9
+              },
+              "required": false
+            },
+            {
+              "name": "umap_n_neighbors",
+              "description": "",
+              "default_value": {
+                "type": "Integer",
+                "value": 30
+              },
+              "required": false
+            },
+            {
+              "name": "umap_n_components",
+              "description": "",
+              "default_value": {
+                "type": "Integer",
+                "value": 2
+              },
+              "required": false
+            },
+            {
+              "name": "umap_min_dist",
+              "description": "",
+              "default_value": {
+                "type": "Float",
+                "value": 0.1
+              },
+              "required": false
+            },
+            {
+              "name": "umap_random_state",
+              "description": "",
+              "default_value": {
+                "type": "Integer",
+                "value": 42
+              },
+              "required": false
+            },
+            {
+              "name": "umap_metric",
+              "description": "",
+              "default_value": {
+                "type": "String",
+                "value": "cosine"
+              },
+              "required": false
+            },
+            {
+              "name": "toxicity_min_cluster_size",
+              "description": "",
+              "default_value": {
+                "type": "Integer",
+                "value": 2
+              },
+              "required": false
+            },
+            {
+              "name": "toxicity_cluster_use_latent_space",
+              "description": "",
+              "default_value": {
+                "type": "Bool",
+                "value": true
+              },
+              "required": false
+            },
+            {
+              "name": "toxicity_cluster_selection_epsilon",
+              "description": "",
+              "default_value": {
+                "type": "Float",
+                "value": 0.01
+              },
+              "required": false
+            },
+            {
+              "name": "toxicity_cluster_selection_method",
+              "description": "",
+              "default_value": {
+                "type": "String",
+                "value": "euclidean"
+              },
+              "required": false
+            }
+          ],
           "pipeline_defaults": {
             "kubernetes_shared_mem_size": {},
             "kubernetes_pod_labels": [],
