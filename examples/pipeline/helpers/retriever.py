@@ -1,13 +1,18 @@
 import json
 import os
 import json
+import io
 from fair_forge.schemas import Dataset
 from fair_forge import Retriever
+import lakefs
+from lakefs.client import Client
 
-S3_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
-S3_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
-S3_BUCKET_NAME = os.environ.get("AWS_S3_BUCKET")
-S3_ENDPOINT = os.environ.get("AWS_S3_ENDPOINT")
+LAKEFS_HOST=os.environ.get("LAKEFS_HOST")
+LAKEFS_USERNAME= os.environ.get("LAKEFS_USERNAME")
+LAKEFS_PASSWORD= os.environ.get("LAKEFS_PASSWORD")
+LAKEFS_REPOSITORY= os.environ.get("LAKEFS_REPOSITORY")
+LAKEFS_BRANCH= os.environ.get("LAKEFS_BRANCH")
+LAKEFS_DATASET=os.environ.get("LAKEFS_DATASET")
 
 class LocalRetriever(Retriever):
     def load_dataset(self) -> list[Dataset]:
@@ -21,3 +26,57 @@ class LocalRetriever(Retriever):
             for dataset in json.load(infile):
                 datasets.append(Dataset.model_validate(dataset)) 
         return datasets
+    
+class LakeFSRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        """
+        Load dataset from LakeFS storage.
+        
+        This method connects to LakeFS using environment variables for configuration,
+        retrieves the dataset file, and converts it into a list of Dataset objects.
+        
+        Returns:
+            list[Dataset]: A list of Dataset objects containing the retrieved data.
+            
+        Raises:
+            Exception: If required environment variables are missing or if there are issues
+                     connecting to LakeFS or reading the dataset.
+        """
+        # Validate required environment variables
+        required_vars = {
+            "LAKEFS_HOST": LAKEFS_HOST,
+            "LAKEFS_USERNAME": LAKEFS_USERNAME,
+            "LAKEFS_PASSWORD": LAKEFS_PASSWORD,
+            "LAKEFS_REPOSITORY": LAKEFS_REPOSITORY,
+            "LAKEFS_BRANCH": LAKEFS_BRANCH,
+            "LAKEFS_DATASET": LAKEFS_DATASET
+        }
+        
+        missing_vars = [var for var, value in required_vars.items() if not value]
+        if missing_vars:
+            raise Exception(f"Missing required environment variables: {', '.join(missing_vars)}")
+        
+        # Initialize LakeFS client
+        client = Client(
+            host=LAKEFS_HOST,
+            username=LAKEFS_USERNAME,
+            password=LAKEFS_PASSWORD
+        )
+        
+        # Get repository and reference
+        repo = lakefs.Repository(repository_id=LAKEFS_REPOSITORY, client=client)
+        ref = repo.ref(LAKEFS_BRANCH)
+        
+        # Get the dataset object
+        obj = ref.object(path=LAKEFS_DATASET)
+        
+        datasets = []
+        # Read and parse the dataset
+        with obj.reader(mode="rb") as raw_reader:
+            # Wrap the binary stream in a text wrapper
+            text_reader = io.TextIOWrapper(raw_reader, encoding="utf-8")
+            for dataset in json.load(text_reader):
+                datasets.append(Dataset.model_validate(dataset))
+        
+        return datasets
+        
