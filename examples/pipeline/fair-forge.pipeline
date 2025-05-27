@@ -9,21 +9,15 @@
       "id": "primary",
       "nodes": [
         {
-          "id": "027afd33-ca25-4f20-bbea-7c988c972f8c",
+          "id": "445fec4c-3946-4a34-8309-e5217093463b",
           "type": "execution_node",
           "op": "execute-notebook-node",
           "app_data": {
             "component_parameters": {
-              "pipeline_parameters": [
-                "dataset",
-                "ngram_w2v"
-              ],
               "dependencies": [
-                "helpers/dataset.py",
-                "helpers/runtime.py",
-                "helpers/logos.py"
+                "helpers/retrieve.py"
               ],
-              "include_subdirectories": false,
+              "include_subdirectories": true,
               "outputs": [],
               "env_vars": [
                 {
@@ -36,7 +30,112 @@
                   "env_var": "ELASTIC_AUTH_PASSWORD"
                 },
                 {
-                  "env_var": "GROQ_API_KEY"
+                  "env_var": "GUARDIAN_URL"
+                },
+                {
+                  "env_var": "GUARDIAN_MODEL_NAME"
+                },
+                {
+                  "env_var": "GUARDIAN_TEMPERATURE"
+                },
+                {
+                  "env_var": "CONFIDENCE_LEVEL"
+                },
+                {
+                  "env_var": "UMAP_N_NEIGHBORS"
+                },
+                {
+                  "env_var": "UMAP_N_COMPONENTS"
+                },
+                {
+                  "env_var": "UMAP_MIN_DIST"
+                },
+                {
+                  "env_var": "UMAP_RANDOM_STATE"
+                },
+                {
+                  "env_var": "UMAP_METRIC"
+                },
+                {
+                  "env_var": "TOXICITY_MIN_CLUSTER_SIZE"
+                },
+                {
+                  "env_var": "TOXICITY_CLUSTER_USE_LATENT_SPACE"
+                },
+                {
+                  "env_var": "TOXICITY_CLUSTER_SELECTION_EPSILON"
+                },
+                {
+                  "env_var": "TOXICITY_CLUSTER_SELECTION_METHOD"
+                }
+              ],
+              "kubernetes_pod_annotations": [],
+              "kubernetes_pod_labels": [],
+              "kubernetes_secrets": [],
+              "kubernetes_shared_mem_size": {},
+              "kubernetes_tolerations": [],
+              "mounted_volumes": [],
+              "filename": "Bias.ipynb",
+              "runtime_image": "quay.io/modh/runtime-images@sha256:a6e87550d7f932732b8e52c309d356fb76ae0ba0fd0b8566de0ba4ff49c2db84"
+            },
+            "label": "Bias",
+            "ui_data": {
+              "label": "Bias",
+              "image": "/notebook/generative-ai/wb-alex/static/elyra/notebook.svg",
+              "x_pos": 51,
+              "y_pos": 166,
+              "description": "Run notebook file"
+            }
+          },
+          "inputs": [
+            {
+              "id": "inPort",
+              "app_data": {
+                "ui_data": {
+                  "cardinality": {
+                    "min": 0,
+                    "max": -1
+                  },
+                  "label": "Input Port"
+                }
+              }
+            }
+          ],
+          "outputs": [
+            {
+              "id": "outPort",
+              "app_data": {
+                "ui_data": {
+                  "cardinality": {
+                    "min": 0,
+                    "max": -1
+                  },
+                  "label": "Output Port"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "6e0c516c-65ae-4a99-affd-fcace6eb9c8e",
+          "type": "execution_node",
+          "op": "execute-notebook-node",
+          "app_data": {
+            "component_parameters": {
+              "dependencies": [
+                "helpers/retrieve.py"
+              ],
+              "include_subdirectories": true,
+              "outputs": [],
+              "env_vars": [
+                {
+                  "env_var": "ELASTIC_URL"
+                },
+                {
+                  "env_var": "ELASTIC_AUTH_USER"
+                },
+                {
+                  "env_var": "ELASTIC_AUTH_PASSWORD"
                 }
               ],
               "kubernetes_pod_annotations": [],
@@ -46,13 +145,89 @@
               "kubernetes_tolerations": [],
               "mounted_volumes": [],
               "filename": "Context.ipynb",
-              "runtime_image": "quay.io/modh/runtime-images@sha256:d107b3a514c5df24a5640a4c4d51a580a83cddac2659da2e3855c4a5e9987e1c"
+              "runtime_image": "quay.io/modh/runtime-images@sha256:a6e87550d7f932732b8e52c309d356fb76ae0ba0fd0b8566de0ba4ff49c2db84"
             },
-            "label": "context",
+            "label": "Context",
             "ui_data": {
-              "label": "context",
+              "label": "Context",
               "image": "/notebook/generative-ai/wb-alex/static/elyra/notebook.svg",
-              "x_pos": 392,
+              "x_pos": 255,
+              "y_pos": 243,
+              "description": "Run notebook file"
+            }
+          },
+          "inputs": [
+            {
+              "id": "inPort",
+              "app_data": {
+                "ui_data": {
+                  "cardinality": {
+                    "min": 0,
+                    "max": -1
+                  },
+                  "label": "Input Port"
+                }
+              },
+              "links": [
+                {
+                  "id": "db6ade5b-26f3-426b-bd2d-58acf4823b95",
+                  "node_id_ref": "445fec4c-3946-4a34-8309-e5217093463b",
+                  "port_id_ref": "outPort"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "id": "outPort",
+              "app_data": {
+                "ui_data": {
+                  "cardinality": {
+                    "min": 0,
+                    "max": -1
+                  },
+                  "label": "Output Port"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "52ae47ce-106f-475c-9e64-2ea5927bed34",
+          "type": "execution_node",
+          "op": "execute-notebook-node",
+          "app_data": {
+            "component_parameters": {
+              "dependencies": [
+                "helpers/retrieve.py"
+              ],
+              "include_subdirectories": true,
+              "outputs": [],
+              "env_vars": [
+                {
+                  "env_var": "ELASTIC_URL"
+                },
+                {
+                  "env_var": "ELASTIC_AUTH_USER"
+                },
+                {
+                  "env_var": "ELASTIC_AUTH_PASSWORD"
+                }
+              ],
+              "kubernetes_pod_annotations": [],
+              "kubernetes_pod_labels": [],
+              "kubernetes_secrets": [],
+              "kubernetes_shared_mem_size": {},
+              "kubernetes_tolerations": [],
+              "mounted_volumes": [],
+              "filename": "Conversational.ipynb",
+              "runtime_image": "quay.io/modh/runtime-images@sha256:a6e87550d7f932732b8e52c309d356fb76ae0ba0fd0b8566de0ba4ff49c2db84"
+            },
+            "label": "Conversation",
+            "ui_data": {
+              "label": "Conversation",
+              "image": "/notebook/generative-ai/wb-alex/static/elyra/notebook.svg",
+              "x_pos": 333,
               "y_pos": 335,
               "description": "Run notebook file"
             }
@@ -71,8 +246,8 @@
               },
               "links": [
                 {
-                  "id": "6e8e2488-a28c-435f-a806-db3963a4e493",
-                  "node_id_ref": "fa7226b3-7e91-448c-bad7-d5e9d0b234a8",
+                  "id": "74af36be-51dd-4bdc-8e94-9a1e31b689e0",
+                  "node_id_ref": "6e0c516c-65ae-4a99-affd-fcace6eb9c8e",
                   "port_id_ref": "outPort"
                 }
               ]
@@ -94,201 +269,15 @@
           ]
         },
         {
-          "id": "fa7226b3-7e91-448c-bad7-d5e9d0b234a8",
+          "id": "3c9ce2b7-44b9-476f-9952-8670cc66acc3",
           "type": "execution_node",
           "op": "execute-notebook-node",
           "app_data": {
             "component_parameters": {
-              "pipeline_parameters": [
-                "dataset"
-              ],
               "dependencies": [
-                "helpers/dataset.py",
-                "helpers/runtime.py"
+                "helpers/retrieve.py"
               ],
-              "include_subdirectories": false,
-              "outputs": [
-                "dataset.json"
-              ],
-              "env_vars": [
-                {
-                  "env_var": "ELASTIC_URL"
-                },
-                {
-                  "env_var": "ELASTIC_AUTH_USER"
-                },
-                {
-                  "env_var": "ELASTIC_AUTH_PASSWORD"
-                },
-                {
-                  "env_var": "ALQUIMIA_RUNTIME_URL"
-                },
-                {
-                  "env_var": "ALQUIMIA_TOKEN"
-                },
-                {
-                  "env_var": "AWS_ACCESS_KEY_ID"
-                },
-                {
-                  "env_var": "AWS_SECRET_ACCESS_KEY"
-                },
-                {
-                  "env_var": "AWS_S3_BUCKET"
-                },
-                {
-                  "env_var": "AWS_S3_ENDPOINT"
-                },
-                {
-                  "env_var": "GROQ_API_KEY"
-                }
-              ],
-              "kubernetes_pod_annotations": [],
-              "kubernetes_pod_labels": [],
-              "kubernetes_secrets": [],
-              "kubernetes_shared_mem_size": {},
-              "kubernetes_tolerations": [],
-              "mounted_volumes": [],
-              "runtime_image": "quay.io/modh/runtime-images@sha256:a6e87550d7f932732b8e52c309d356fb76ae0ba0fd0b8566de0ba4ff49c2db84",
-              "filename": "Retrieve.ipynb"
-            },
-            "label": "retrieve_dataset",
-            "ui_data": {
-              "label": "retrieve_dataset",
-              "image": "/notebook/generative-ai/wb-alex/static/elyra/notebook.svg",
-              "x_pos": 117,
-              "y_pos": 337,
-              "description": "Run notebook file"
-            }
-          },
-          "inputs": [
-            {
-              "id": "inPort",
-              "app_data": {
-                "ui_data": {
-                  "cardinality": {
-                    "min": 0,
-                    "max": -1
-                  },
-                  "label": "Input Port"
-                }
-              }
-            }
-          ],
-          "outputs": [
-            {
-              "id": "outPort",
-              "app_data": {
-                "ui_data": {
-                  "cardinality": {
-                    "min": 0,
-                    "max": -1
-                  },
-                  "label": "Output Port"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "f790fb8d-1645-4bac-8bb1-ee62a31e2b72",
-          "type": "execution_node",
-          "op": "execute-notebook-node",
-          "app_data": {
-            "component_parameters": {
-              "pipeline_parameters": [
-                "dataset"
-              ],
-              "dependencies": [
-                "helpers/logos.py",
-                "helpers/dataset.py",
-                "helpers/runtime.py"
-              ],
-              "include_subdirectories": false,
-              "outputs": [],
-              "env_vars": [
-                {
-                  "env_var": "ELASTIC_URL"
-                },
-                {
-                  "env_var": "ELASTIC_AUTH_USER"
-                },
-                {
-                  "env_var": "ELASTIC_AUTH_PASSWORD"
-                },
-                {
-                  "env_var": "GROQ_API_KEY"
-                }
-              ],
-              "kubernetes_pod_annotations": [],
-              "kubernetes_pod_labels": [],
-              "kubernetes_secrets": [],
-              "kubernetes_shared_mem_size": {},
-              "kubernetes_tolerations": [],
-              "mounted_volumes": [],
-              "filename": "Conversational.ipynb",
-              "runtime_image": "quay.io/modh/runtime-images@sha256:a6e87550d7f932732b8e52c309d356fb76ae0ba0fd0b8566de0ba4ff49c2db84"
-            },
-            "label": "conversational",
-            "ui_data": {
-              "label": "conversational",
-              "image": "/notebook/generative-ai/wb-alex/static/elyra/notebook.svg",
-              "x_pos": 392,
-              "y_pos": 445,
-              "description": "Run notebook file"
-            }
-          },
-          "inputs": [
-            {
-              "id": "inPort",
-              "app_data": {
-                "ui_data": {
-                  "cardinality": {
-                    "min": 0,
-                    "max": -1
-                  },
-                  "label": "Input Port"
-                }
-              },
-              "links": [
-                {
-                  "id": "e7fe59d8-d431-406f-a028-70909129599f",
-                  "node_id_ref": "fa7226b3-7e91-448c-bad7-d5e9d0b234a8",
-                  "port_id_ref": "outPort"
-                }
-              ]
-            }
-          ],
-          "outputs": [
-            {
-              "id": "outPort",
-              "app_data": {
-                "ui_data": {
-                  "cardinality": {
-                    "min": 0,
-                    "max": -1
-                  },
-                  "label": "Output Port"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "aa71b163-9d41-4bce-b7c9-ee536f1ddc92",
-          "type": "execution_node",
-          "op": "execute-notebook-node",
-          "app_data": {
-            "component_parameters": {
-              "pipeline_parameters": [
-                "dataset"
-              ],
-              "dependencies": [
-                "helpers/dataset.py",
-                "helpers/runtime.py",
-                "helpers/logos.py",
-                "artifacts/lexicon.csv"
-              ],
-              "include_subdirectories": false,
+              "include_subdirectories": true,
               "outputs": [],
               "env_vars": [
                 {
@@ -310,12 +299,12 @@
               "filename": "Humanity.ipynb",
               "runtime_image": "quay.io/modh/runtime-images@sha256:a6e87550d7f932732b8e52c309d356fb76ae0ba0fd0b8566de0ba4ff49c2db84"
             },
-            "label": "humanity",
+            "label": "Humanity",
             "ui_data": {
-              "label": "humanity",
+              "label": "Humanity",
               "image": "/notebook/generative-ai/wb-alex/static/elyra/notebook.svg",
-              "x_pos": 391,
-              "y_pos": 200,
+              "x_pos": 568,
+              "y_pos": 374,
               "description": "Run notebook file"
             }
           },
@@ -333,184 +322,8 @@
               },
               "links": [
                 {
-                  "id": "0c85346a-c7c1-40fd-b938-7ba2a8ea190b",
-                  "node_id_ref": "fa7226b3-7e91-448c-bad7-d5e9d0b234a8",
-                  "port_id_ref": "outPort"
-                }
-              ]
-            }
-          ],
-          "outputs": [
-            {
-              "id": "outPort",
-              "app_data": {
-                "ui_data": {
-                  "cardinality": {
-                    "min": 0,
-                    "max": -1
-                  },
-                  "label": "Output Port"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "f60e3068-fcd1-45ac-8551-45d6cde1142e",
-          "type": "execution_node",
-          "op": "execute-notebook-node",
-          "app_data": {
-            "component_parameters": {
-              "pipeline_parameters": [
-                "dataset"
-              ],
-              "dependencies": [
-                "helpers/dataset.py",
-                "helpers/runtime.py",
-                "helpers/logos.py",
-                "helpers/guardian.py"
-              ],
-              "include_subdirectories": true,
-              "outputs": [],
-              "env_vars": [
-                {
-                  "env_var": "ELASTIC_URL"
-                },
-                {
-                  "env_var": "ELASTIC_AUTH_USER"
-                },
-                {
-                  "env_var": "ELASTIC_AUTH_PASSWORD"
-                },
-                {
-                  "env_var": "GUARDIAN_URL"
-                },
-                {
-                  "env_var": "GUARDIAN_MODEL_NAME"
-                },
-                {
-                  "env_var": "GUARDIAN_API_KEY"
-                },
-                {
-                  "env_var": "GUARDIAN_MODEL"
-                }
-              ],
-              "kubernetes_pod_annotations": [],
-              "kubernetes_pod_labels": [],
-              "kubernetes_secrets": [],
-              "kubernetes_shared_mem_size": {},
-              "kubernetes_tolerations": [],
-              "mounted_volumes": [],
-              "filename": "Bias.ipynb",
-              "runtime_image": "quay.io/modh/runtime-images@sha256:a6e87550d7f932732b8e52c309d356fb76ae0ba0fd0b8566de0ba4ff49c2db84"
-            },
-            "label": "bias",
-            "ui_data": {
-              "label": "bias",
-              "image": "/notebook/generative-ai/wb-alex/static/elyra/notebook.svg",
-              "x_pos": 387,
-              "y_pos": 537,
-              "description": "Run notebook file"
-            }
-          },
-          "inputs": [
-            {
-              "id": "inPort",
-              "app_data": {
-                "ui_data": {
-                  "cardinality": {
-                    "min": 0,
-                    "max": -1
-                  },
-                  "label": "Input Port"
-                }
-              },
-              "links": [
-                {
-                  "id": "fb389713-4b99-410d-b61a-53d00bfe6785",
-                  "node_id_ref": "fa7226b3-7e91-448c-bad7-d5e9d0b234a8",
-                  "port_id_ref": "outPort"
-                }
-              ]
-            }
-          ],
-          "outputs": [
-            {
-              "id": "outPort",
-              "app_data": {
-                "ui_data": {
-                  "cardinality": {
-                    "min": 0,
-                    "max": -1
-                  },
-                  "label": "Output Port"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "id": "ed8bcf9e-2c77-4ab8-a74d-63c2cf5c55c3",
-          "type": "execution_node",
-          "op": "execute-notebook-node",
-          "app_data": {
-            "component_parameters": {
-              "pipeline_parameters": [
-                "dataset"
-              ],
-              "dependencies": [
-                "helpers/dataset.py",
-                "helpers/runtime.py",
-                "helpers/logos.py",
-                "helpers/guardian.py"
-              ],
-              "include_subdirectories": true,
-              "outputs": [],
-              "env_vars": [
-                {
-                  "env_var": "ELASTIC_URL"
-                },
-                {
-                  "env_var": "ELASTIC_AUTH_USER"
-                },
-                {
-                  "env_var": "ELASTIC_AUTH_PASSWORD"
-                }
-              ],
-              "kubernetes_pod_annotations": [],
-              "kubernetes_pod_labels": [],
-              "kubernetes_secrets": [],
-              "kubernetes_shared_mem_size": {},
-              "kubernetes_tolerations": [],
-              "mounted_volumes": [],
-              "filename": "Agentic.ipynb",
-              "runtime_image": "quay.io/modh/runtime-images@sha256:a6e87550d7f932732b8e52c309d356fb76ae0ba0fd0b8566de0ba4ff49c2db84"
-            },
-            "label": "agentic",
-            "ui_data": {
-              "label": "agentic",
-              "image": "/notebook/generative-ai/wb-alex/static/elyra/notebook.svg",
-              "x_pos": 394,
-              "y_pos": 68,
-              "description": "Run notebook file"
-            }
-          },
-          "inputs": [
-            {
-              "id": "inPort",
-              "app_data": {
-                "ui_data": {
-                  "cardinality": {
-                    "min": 0,
-                    "max": -1
-                  },
-                  "label": "Input Port"
-                }
-              },
-              "links": [
-                {
-                  "id": "7d12f2d8-6a2d-4afc-a46e-6f2e8b92f9af",
-                  "node_id_ref": "fa7226b3-7e91-448c-bad7-d5e9d0b234a8",
+                  "id": "e4d5376f-c015-48e7-b2e5-0e6c08ed9c6a",
+                  "node_id_ref": "52ae47ce-106f-475c-9e64-2ea5927bed34",
                   "port_id_ref": "outPort"
                 }
               ]
@@ -539,36 +352,17 @@
         "version": 8,
         "runtime_type": "KUBEFLOW_PIPELINES",
         "properties": {
-          "name": "logos",
+          "name": "fair-forge",
           "runtime": "Data Science Pipelines",
-          "pipeline_parameters": [
-            {
-              "name": "dataset",
-              "description": "The name of the dataset stored in S3",
-              "default_value": {
-                "type": "String",
-                "value": "asb"
-              },
-              "required": true
-            },
-            {
-              "name": "ngram_w2v",
-              "description": "The ngram used when constructing the word embedding",
-              "default_value": {
-                "type": "Integer",
-                "value": 1
-              },
-              "required": true
-            }
-          ],
+          "pipeline_parameters": [],
           "pipeline_defaults": {
             "kubernetes_shared_mem_size": {},
             "kubernetes_pod_labels": [],
             "mounted_volumes": [],
             "kubernetes_tolerations": [],
             "kubernetes_pod_annotations": [],
-            "env_vars": [],
-            "kubernetes_secrets": []
+            "kubernetes_secrets": [],
+            "env_vars": []
           },
           "description": "This pipeline intended use is to measure the performance of various models using our own humanization principles"
         }
