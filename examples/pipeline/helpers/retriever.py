@@ -21,6 +21,15 @@ class LocalRetriever(Retriever):
         return datasets
     
 class LakeFSRetriever(Retriever):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.lakefs_host= os.environ.get("LAKEFS_HOST")
+        self.lakefs_username= os.environ.get("LAKEFS_USERNAME")
+        self.lakefs_password= os.environ.get("LAKEFS_PASSWORD")
+        self.lakefs_repository= os.environ.get("repository")
+        self.lakefs_branch= os.environ.get("branch")
+        self.lakefs_dataset= os.environ.get("dataset")
+
     def load_dataset(self) -> list[Dataset]:
         """
         Load dataset from LakeFS storage.
@@ -35,12 +44,6 @@ class LakeFSRetriever(Retriever):
             Exception: If required environment variables are missing or if there are issues
                      connecting to LakeFS or reading the dataset.
         """
-        self.lakefs_host = self.kwargs.get("lakefs_host")
-        self.lakefs_username = self.kwargs.get("lakefs_username")
-        self.lakefs_password = self.kwargs.get("lakefs_password")
-        self.lakefs_repository = self.kwargs.get("lakefs_repository")
-        self.lakefs_branch = self.kwargs.get("lakefs_branch")
-        self.lakefs_dataset = self.kwargs.get("lakefs_dataset")
 
         # Validate required environment variables
         required_vars = {
@@ -53,6 +56,8 @@ class LakeFSRetriever(Retriever):
         }
         
         missing_vars = [var for var, value in required_vars.items() if not value]
+
+
         if missing_vars:
             raise Exception(f"Missing required environment variables: {', '.join(missing_vars)}")
         
