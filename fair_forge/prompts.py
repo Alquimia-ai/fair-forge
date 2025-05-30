@@ -13,7 +13,7 @@ You are a Contextual Compliance Analyzer. Your role is to evaluate whether the i
 4. **Generate Insights:**
    Offer any relevant insights regarding the interaction. This could include observations on how well the answer fits the context, potential areas of improvement, or any discrepancies noted.
 
-After your internal reasoning, provide only the final answer strictly in the following JSON format. Do not include any additional text or explanation:
+After your internal reasoning, provide only the final answer ALWAYS STRICTLY in the following JSON format. Do not include any additional text or explanation:
 ```json
 {{
 "score": <probability value>,
@@ -48,7 +48,7 @@ You are a Contextual Compliance Analyzer. Your role is to evaluate whether the i
 5. **Generate Insights:**  
    Offer any relevant insights regarding the interaction. In your reasoning, include relevant points from the Observation to support your evaluation.
 
-After your internal reasoning, provide only the final answer strictly in the following JSON format. Do not include any additional text or explanation:
+After your internal reasoning, provide only the final answer ALWAYS STRICTLY in the following JSON format. Do not include any additional text or explanation:
 
 ```json
 {{
@@ -88,9 +88,9 @@ You are an expert evaluator of conversational dialogue quality. Your task is to 
 - The maxim of manner, when one tries to be as clear, as brief, and as orderly as one can in what one says, and where one avoids obscurity and ambiguity.
 
 9. For the sensibleness metric you should take into account how much does the Actual Answer makes sense from the question. Based on SSA (Sensibleness and specificity Average) metric
-10. Score values must go from a range between 0 and 10, 0 Is the lowest and 10 the highest.
+10. Score values MUST ALWAYS go from a range between 0 and 10, 0 Is the lowest and 10 the highest.
 
-After your internal reasoning, provide only the final answer strictly in the following JSON format. Do not include any additional text or explanation:
+After your internal reasoning, provide only the final answer STRICTLY AND ALWAYS in the following JSON format. Do not include any additional text or explanation:
 
 ```json
 {{ 
@@ -134,9 +134,9 @@ You are an expert evaluator of conversational dialogue quality. Your task is to 
 - The maxim of manner, when one tries to be as clear, as brief, and as orderly as one can in what one says, and where one avoids obscurity and ambiguity.
 
 9. For the sensibleness metric you should take into account how much does the Actual Answer makes sense from the question. Based on SSA (Sensibleness and specificity Average) metric
-10. Score values must go from 0 to 10. Being 0 the lowest and 10 the highest
+10. Score values MUST ALWAYS go from 0 to 10. Being 0 the lowest and 10 the highest
 
-After your internal reasoning, provide only the final answer strictly in the following JSON format. Do not include any additional text or explanation:
+After your internal reasoning, provide only the final answer STRICTLY AND ALWAYS in the following JSON format. Do not include any additional text or explanation:
 
 ```json
 {{ 

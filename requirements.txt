@@ -1,9 +1,14 @@
 langchain-groq
 langchain_openai
 elasticsearch
-scipy
+scipy<=1.14.0
 nltk
 shap
 transformers
 torch
 boto3
+langfair
+umap-learn
+hdbscan
+tqdm>=4.65.0
+lakefs

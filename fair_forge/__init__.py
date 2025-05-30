@@ -1,4 +1,4 @@
-from .schemas import Batch, Dataset
+from .schemas import Batch, Dataset, GuardianBias,ProtectedAttribute, ToxicityDataset
 from abc import ABC, abstractmethod
 from typing import Type
 from typing import Optional
@@ -48,7 +48,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class Retriever:
+class Retriever(ABC):
     """
     Abstract base class for data retrieval from cold storage.
     
@@ -116,7 +116,7 @@ class FairForge(ABC):
         self.verbose = verbose
         self.logger = VerboseLogger(verbose)
         
-        self.dataset = self.retriever().load_dataset()
+        self.dataset = self.retriever(**kwargs).load_dataset()
         self.logger.info(f"Loaded dataset with {len(self.dataset)} batches")
 
     @abstractmethod
@@ -175,8 +175,7 @@ class FairForge(ABC):
         """
         self.logger.info("Starting to process dataset")
         
-        for i, batch in enumerate(self.dataset):
-            self.logger.info(f"Processing batch {i+1}/{len(self.dataset)}")
+        for batch in self.dataset:
             self.logger.info(f"Session ID: {batch.session_id}, Assistant ID: {batch.assistant_id}")
             
             self.batch(
@@ -189,3 +188,97 @@ class FairForge(ABC):
 
         self.logger.info(f"Completed processing all batches. Total metrics collected: {len(self.metrics)}")
         return self.metrics
+    
+
+class Guardian(ABC):
+    """
+    An abstract base class that serves as a framework for implementing bias detection in LLM interactions.
+    
+    This class is designed to be implemented by different bias detection mechanisms that can analyze
+    question-answer pairs for potential biases towards specific attributes. It provides a standardized
+    interface for bias detection across different implementations.
+
+    The class uses a nested BiasInfer model to structure the bias detection results in a consistent format.
+    """
+    def __init__(self,**kwargs):
+        """
+        Initialize the Guardian with a VerboseLogger for detailed logging of bias detection operations.
+        """
+        self.logger = VerboseLogger()
+        
+    @abstractmethod
+    def is_biased(self, question: str, answer: str, attribute: ProtectedAttribute , context: Optional[str] = None) -> GuardianBias:
+        """
+        Analyze a question-answer interaction for potential bias towards specific attributes.
+
+        This abstract method must be implemented by concrete Guardian classes to define their
+        specific bias detection logic. The implementation should analyze the given question and
+        answer pair for potential bias towards the specified attributes.
+
+        Args:
+            question (str): The question being analyzed
+            answer (str): The answer being analyzed
+            attribute (dict): A dictionary specifying the attributes to check for bias
+            context (Optional[str]): Additional context that might be relevant for bias detection
+
+        Returns:
+            GuardianBias: A GuardianBias object containing:
+                - is_biased: Whether bias was detected
+                - attribute: The specific attribute(s) that showed bias
+                - certainty: Optional confidence score for the detection
+
+        Raises:
+            NotImplementedError: If the concrete class does not implement this method
+        """
+        raise NotImplementedError("You should implement this method.")
+    
+
+
+class ToxicityLoader(ABC):
+    """Abstract base class for loading toxicity datasets.
+
+    This class serves as a template for implementing custom toxicity dataset loaders.
+    It provides a standardized interface for loading toxicity-related datasets that
+    can be used for training or evaluation of toxicity detection models.
+
+    The class is designed to be extended by concrete implementations that handle
+    specific data sources or formats. Each implementation must provide its own
+    logic for loading and processing the toxicity data.
+
+    Attributes:
+        kwargs (dict): Configuration parameters passed during initialization.
+            These parameters can be used by concrete implementations to customize
+            the loading behavior.
+
+    Example:
+        To create a custom loader:
+        ```python
+        class CustomToxicityLoader(ToxicityLoader):
+            def load(self,language:str) -> list[ToxicityDataset]:
+                # Implementation specific to your data source
+                pass
+        ```
+    """
+    def __init__(self, **kwargs):
+        """
+        Initialize the ToxicityLoader with optional configuration parameters.
+        
+        Args:
+            **kwargs: Arbitrary keyword arguments for configuration.
+        """
+        self.kwargs = kwargs
+
+    @abstractmethod
+    def load(self,language:str) -> list[ToxicityDataset]:
+        """Load and return a list of toxicity datasets.
+
+        This method must be implemented by concrete subclasses to provide
+        the actual dataset loading logic.
+
+        Returns:
+            list[ToxicityDataset]: A list of loaded toxicity datasets.
+
+        Raises:
+            NotImplementedError: If the concrete class does not implement this method.
+        """
+        raise NotImplementedError
