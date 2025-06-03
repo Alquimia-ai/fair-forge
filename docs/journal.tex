@@ -68,6 +68,125 @@ The correlation coefficient $\rho$ ranges from -1 to 1, where:
 
 The evaluation of AI assistant interactions requires robust mechanisms to detect and mitigate potential biases and risks. This section presents a comprehensive framework for bias assessment and risk detection using the Granite Guardian model \cite{ibm2024granite} and AI ATLAS risk framework \cite{ibm2024atlas}.
 
+\subsection{Bias Metric Implementation}
+
+The bias metric implementation follows a flexible guardian-based approach, where different guardian models can be used to assess bias in AI responses. The core bias assessment is defined as:
+
+\begin{equation}
+    B(R) = \sum_{i=1}^{n} w_i G_i(R)
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $B(R)$ is the total bias score for response $R$
+    \item $G_i(R)$ represents the assessment from the $i$th guardian
+    \item $w_i$ are the weights assigned to each guardian
+    \item $n$ is the number of guardians used
+\end{itemize}
+
+Each guardian $G_i$ provides a bias assessment across multiple dimensions:
+
+\begin{equation}
+    G_i(R) = \frac{1}{m}\sum_{j=1}^{m} d_{ij}(R)
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $d_{ij}(R)$ represents the $j$th dimension score from guardian $i$
+    \item $m$ is the number of bias dimensions assessed
+\end{itemize}
+
+The bias dimensions include:
+\begin{enumerate}
+    \item \textbf{Demographic Bias}: Assessment of unfair treatment based on demographic characteristics
+    \item \textbf{Cultural Bias}: Evaluation of cultural insensitivity or stereotyping
+    \item \textbf{Language Bias}: Detection of discriminatory language patterns
+    \item \textbf{Content Bias}: Analysis of biased content or viewpoints
+\end{enumerate}
+
+\subsection{Confidence Intervals and Statistical Analysis}
+
+The bias assessment employs Clopper-Pearson confidence intervals to provide statistically robust estimates of bias probabilities. For each protected attribute, we model the bias detection as a Bernoulli distribution, where each guardian assessment represents a binary outcome (biased or not biased).
+
+Given $n$ samples and $k$ successful outcomes (non-biased responses), the Clopper-Pearson confidence interval is calculated as:
+
+\begin{equation}
+    [p_l, p_u] = [\beta_{\alpha/2}(k, n-k+1), \beta_{1-\alpha/2}(k+1, n-k)]
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $p_l$ is the lower bound of the confidence interval
+    \item $p_u$ is the upper bound of the confidence interval
+    \item $\beta_{\alpha}(a,b)$ is the $\alpha$ quantile of the Beta distribution with parameters $a$ and $b$
+    \item $\alpha$ is the significance level (1 - confidence level)
+\end{itemize}
+
+The true probability of a non-biased response is estimated as:
+
+\begin{equation}
+    p_{truth} = \frac{k}{n}
+\end{equation}
+
+\subsection{Clustering Analysis and Latent Space Representation}
+
+The bias analysis incorporates a sophisticated clustering approach to identify patterns in assistant responses. The process involves several key steps:
+
+\subsubsection{Embedding Generation}
+
+Responses are first converted into dense vector representations using a sentence transformer model:
+
+\begin{equation}
+    E = \text{Transformer}(R)
+\end{equation}
+
+where $R$ represents the set of assistant responses and $E$ is the resulting embedding matrix.
+
+\subsubsection{Dimensionality Reduction}
+
+The high-dimensional embeddings are reduced to a lower-dimensional space using UMAP (Uniform Manifold Approximation and Projection):
+
+\begin{equation}
+    L = \text{UMAP}(E, n_{components}, n_{neighbors}, min_{dist})
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $L$ is the reduced latent space representation
+    \item $n_{components}$ is the target dimensionality (default: 2)
+    \item $n_{neighbors}$ is the number of neighbors for local structure preservation
+    \item $min_{dist}$ is the minimum distance between points in the embedding
+\end{itemize}
+
+\subsubsection{Cluster Detection}
+
+The latent space is then analyzed using HDBSCAN (Hierarchical Density-Based Spatial Clustering of Applications with Noise):
+
+\begin{equation}
+    C = \text{HDBSCAN}(L, min_{cluster\_size}, \epsilon)
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $C$ represents the cluster assignments
+    \item $min_{cluster\_size}$ is the minimum number of samples in a cluster
+    \item $\epsilon$ is the cluster selection epsilon parameter
+\end{itemize}
+
+\subsubsection{Toxicity Scoring}
+
+Each cluster is evaluated for potential toxicity using a Laplace-smoothed scoring mechanism:
+
+\begin{equation}
+    \text{Score}(c) = \frac{n_{toxic} + 1}{n_{total} + 2}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $n_{toxic}$ is the count of toxic words in the cluster
+    \item $n_{total}$ is the total word count in the cluster
+\end{itemize}
+
 \subsection{Risk Detection Framework}
 
 The risk assessment framework operates across three primary dimensions:

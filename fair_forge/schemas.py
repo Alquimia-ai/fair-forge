@@ -1,6 +1,10 @@
 from pydantic import BaseModel
 from typing import Optional
-
+from enum import Enum
+from typing import Type
+from abc import ABC, abstractmethod
+from functools import partial
+from transformers import AutoTokenizer
 
 class Logprobs(BaseModel):
     """
@@ -55,37 +59,78 @@ class Dataset(BaseModel):
     conversation: list[Batch]
 
 
-class Metric(BaseModel):
+class BaseMetric(BaseModel):
     """
     A metric represents a specific evaluation or measurement of the assistant's performance.
     """
     session_id: str
-    qa_id: str
     assistant_id: str
 
-class Risk(BaseModel):
-    risk_name: str
-    risk_score: float
-    is_risk: bool
 
-class BiasMetric(Metric):
+class GuardianBias(BaseModel):
+    """
+    A data model that represents the result of a bias detection analysis.
+
+    Attributes:
+            is_biased (bool): Indicates whether bias was detected in the interaction
+            attribute (dict): The specific attribute(s) that were analyzed for bias
+            certainty (Optional[float]): A confidence score for the bias detection, if available
+    """
+    is_biased: bool
+    attribute: str
+    certainty: Optional[float]
+
+class BiasMetric(BaseMetric):
     """
     Bias metric for evaluating the bias of the assistant's responses.
     """
-    risks: list[Risk]
+    class ConfidenceInterval(BaseModel):
+        lower_bound: float
+        upper_bound: float
+        probability: float
+        samples:int
+        k_success:int
+        alpha: float
+        confidence_level: float
+        protected_attribute: str
+
+    class GuardianInteraction(GuardianBias):
+        qa_id:str
+
+    class AssistantSpace(BaseModel):
+        latent_space: list
+        embeddings: list
+        cluster_labels: list
+
+    confidence_intervals: list[ConfidenceInterval]
+    guardian_interactions: dict[str,list[GuardianInteraction]]
+    cluster_profiling: dict[float,float]    
+    assistant_space: AssistantSpace
 
 
-class ContextMetric(Metric):
+class ProtectedAttribute(BaseModel):
+    class Attribute(str,Enum):
+        age = "age"
+        gender = "gender"
+        race = "race"
+        religion = "religion"
+        nationality = "nationality"
+        sexual_orientation = "sexual_orientation"
+        
+    attribute: Attribute
+    description: str
+
+class ContextMetric(BaseMetric):
     context_insight: str
     context_awareness: float
     context_thinkings: str
+    qa_id: str
 
 
-class ConversationalMetric(Metric):
+class ConversationalMetric(BaseMetric):
     """
     Conversational metric for evaluating the assistant's conversational abilities.
     """
-
     conversational_memory: float
     conversational_insight: str
     conversational_language: float
@@ -95,9 +140,11 @@ class ConversationalMetric(Metric):
     conversational_manner_maxim: float
     conversational_sensibleness: float
     conversational_thinkings: str
+    qa_id: str
 
 
-class HumanityMetric(Metric):
+
+class HumanityMetric(BaseMetric):
     humanity_assistant_emotional_entropy: float
     humanity_ground_truth_spearman: float
     humanity_assistant_anger: float
@@ -108,6 +155,53 @@ class HumanityMetric(Metric):
     humanity_assistant_sadness: float
     humanity_assistant_surprise: float
     humanity_assistant_trust: float
+    qa_id: str
 
-class AgenticMetric(Metric):
+
+
+class LLMGuardianProviderInfer(BaseModel):
+    is_bias: bool
+    probability: float
+
+class LLMGuardianProvider(ABC):
+    def __init__(self,
+                 model:str,
+                 tokenizer:AutoTokenizer,
+                 api_key:Optional[str] = None,
+                 url:Optional[str] = None,
+                 temperature:float=0.0,
+                 safe_token: str = "No",
+                 unsafe_token: str = "Yes",
+                 max_tokens:int = 5 ,
+                 logprobs:bool=True,
+                 
+                 **kwargs):
+        
+        self.model = model
+        self.api_key = api_key
+        self.url = url
+        self.temperature = temperature
+        self.safe_token = safe_token
+        self.unsafe_token = unsafe_token
+        self.max_tokens = max_tokens
+        self.tokenizer = tokenizer
+        self.logprobs = logprobs
+        
+    @abstractmethod
+    def infer(self,prompt: partial) -> LLMGuardianProviderInfer:
+        raise NotImplementedError("Subclass must implement this method")
+
+class GuardianLLMConfig(BaseModel):
+    model:str
+    api_key:Optional[str] = None
+    url:Optional[str] = None
+    temperature:float
+    logprobs:bool = False
+    provider:Type[LLMGuardianProvider]
+
+class AgenticMetric(BaseMetric):
     pass
+
+class ToxicityDataset(BaseModel):
+    word:str
+    category: Optional[str] = None
