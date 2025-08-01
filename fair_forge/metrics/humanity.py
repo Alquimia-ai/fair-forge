@@ -122,5 +122,5 @@ class Humanity(FairForge):
             self.logger.debug(f"Spearman value: {metric.humanity_ground_truth_spearman}")
             self.logger.debug(f"Emotional entropy: {metric.humanity_assistant_emotional_entropy}")
             for key in self.emotion_columns:
-                self.logger.debug(f"{key}: {metric[f'humanity_assistant_{key.lower()}']}")
+                self.logger.debug(f"{key}: {getattr(metric, f'humanity_assistant_{key.lower()}')}")
             self.metrics.append(metric)
