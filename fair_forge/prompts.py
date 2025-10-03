@@ -157,3 +157,35 @@ Observation:
 Assistant (Actual Answer):
 {assistant_answer}
 """
+
+
+
+bestOf_contestant_format = """
+{% for conversation in conversations %}
+Query: {{ conversation.query }}
+Answer: {{ conversation.assistant }}
+Expected answer: {{ conversation.ground_truth_assistant }}
+
+{% endfor %}
+"""
+
+
+bestOf_judge_prompt = f"""
+You are a judge that will judge the quality of the responder's response.
+
+After your internal reasoning, provide only the final answer strictly in the following JSON format. Do not include any additional text or explanation:
+
+```json
+{{
+   "winner": "Name of the winner",
+   "verdict": "Verdict of the judge",
+   "uncertainty": "Your uncertainty about the winner, if there is any type of uncertainty give a 50% chance"
+}}
+```
+
+First contestant ({left_contestant}):
+{left_contestant_conv}
+
+Second contestant ({right_contestant}):
+{right_contestant_conv}  
+"""

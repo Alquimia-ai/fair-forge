@@ -3,7 +3,8 @@ langchain_openai
 elasticsearch
 scipy
 nltk
-shap
 transformers
 torch
 boto3
+pandas
+jinja2
