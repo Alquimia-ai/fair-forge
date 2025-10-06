@@ -129,11 +129,9 @@ class BestOf(FairForge):
         
         while len(current_contestants) > 1:
             self.logger.info(f"[BestOf] Round {round_number}: {len(current_contestants)} contestants remaining")
-            # Pair contestants in bracket order to avoid duplicate/self matchups
             pairs = []
             round_winners = []
             num_contestants = len(current_contestants)
-            # If odd number, give the last contestant a bye to next round
             if num_contestants % 2 == 1:
                 bye_contestant = current_contestants[-1]
                 self.logger.info(f"[BestOf] Round {round_number}: {bye_contestant} receives a bye")
@@ -141,7 +139,6 @@ class BestOf(FairForge):
                 iterable_limit = num_contestants - 1
             else:
                 iterable_limit = num_contestants
-            # Create adjacent pairs: (0,1), (2,3), ...
             for i in range(0, iterable_limit, 2):
                 pairs.append((current_contestants[i], current_contestants[i + 1]))
             self.logger.info(f"[BestOf] Round {round_number}: Comparing {len(pairs)} pairs")
@@ -159,7 +156,6 @@ class BestOf(FairForge):
                         f"[FAIR FORGE/CONTEXT] No JSON found {self.judge_bos_json_clause} {self.judge_eos_json_clause} "
                     )
                 
-                # Track the winner
                 winner = json.get("winner", "")
                 
                 if winner == left_id:
@@ -167,7 +163,6 @@ class BestOf(FairForge):
                 elif winner == right_id:
                     round_winners.append(right_id)
                 elif isinstance(winner, str) and winner.lower() == "tie":
-                    # In case of tie, advance both contestants to the next round
                     round_winners.append(left_id)
                     round_winners.append(right_id)
                 else:
@@ -205,7 +200,6 @@ class BestOf(FairForge):
             )
             self.metrics.append(tournament_metric)
         else:
-            # If more than one contestant remains, consider it a tie outcome for the tournament
             self.logger.warning("[BestOf] Tournament ended in a tie or unresolved state; marking final winner as 'tie'")
             tournament_metric = BestOfMetric(
                 session_id="bestof",
