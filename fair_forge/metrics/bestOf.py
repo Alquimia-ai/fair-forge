@@ -1,7 +1,6 @@
 from fair_forge import FairForge, Retriever
 from typing import Type, Optional
-import itertools
-from fair_forge.schemas import Batch
+from fair_forge.schemas import Batch, BestOfMetric, BestOfContest
 from fair_forge.helpers.judge import Judge
 from fair_forge.prompts import bestOf_contestant_format, bestOf_judge_prompt
 from pydantic import SecretStr
@@ -126,15 +125,26 @@ class BestOf(FairForge):
         # tournament
         round_number = 1
         records = []
+        contests: list[BestOfContest] = []
         
         while len(current_contestants) > 1:
             self.logger.info(f"[BestOf] Round {round_number}: {len(current_contestants)} contestants remaining")
-            
-            # then we create pairs for this round
-            pairs = list(itertools.combinations(current_contestants, 2))
-            self.logger.info(f"[BestOf] Round {round_number}: Comparing {len(pairs)} pairs")
-            
+            # Pair contestants in bracket order to avoid duplicate/self matchups
+            pairs = []
             round_winners = []
+            num_contestants = len(current_contestants)
+            # If odd number, give the last contestant a bye to next round
+            if num_contestants % 2 == 1:
+                bye_contestant = current_contestants[-1]
+                self.logger.info(f"[BestOf] Round {round_number}: {bye_contestant} receives a bye")
+                round_winners.append(bye_contestant)
+                iterable_limit = num_contestants - 1
+            else:
+                iterable_limit = num_contestants
+            # Create adjacent pairs: (0,1), (2,3), ...
+            for i in range(0, iterable_limit, 2):
+                pairs.append((current_contestants[i], current_contestants[i + 1]))
+            self.logger.info(f"[BestOf] Round {round_number}: Comparing {len(pairs)} pairs")
             
             for pair in pairs:
                 left_id, right_id = pair
@@ -143,7 +153,7 @@ class BestOf(FairForge):
                 right_contestant = self._build_conversation_batch(right_id)
                 
                 self.logger.debug(f"Round {round_number}: Comparing {left_id} and {right_id} contestants")
-                thinking, json = judge.check(bestOf_judge_prompt, self.criteria, {"left_contestant": left_contestant, "right_contestant": right_contestant})
+                thinking, json = judge.check(bestOf_judge_prompt, self.criteria, {"left_contestant": left_id, "right_contestant": right_id, "left_contestant_conv": left_contestant, "right_contestant_conv": right_contestant})
                 if json is None:
                     raise ValueError(
                         f"[FAIR FORGE/CONTEXT] No JSON found {self.judge_bos_json_clause} {self.judge_eos_json_clause} "
@@ -156,10 +166,26 @@ class BestOf(FairForge):
                     round_winners.append(left_id)
                 elif winner == right_id:
                     round_winners.append(right_id)
+                elif isinstance(winner, str) and winner.lower() == "tie":
+                    # In case of tie, advance both contestants to the next round
+                    round_winners.append(left_id)
+                    round_winners.append(right_id)
                 else:
                     raise ValueError(f"[FAIR FORGE/CONTEXT] Winner name doesn't match {winner} {left_id} {right_id}")
                 
                 self.logger.debug(f"Round {round_number}: Winner is {winner}")
+                contests.append(
+                    BestOfContest(
+                        round=round_number,
+                        left_id=left_id,
+                        right_id=right_id,
+                        winner_id=winner if winner in (left_id, right_id) else "tie",
+                        confidence=json.get("confidence"),
+                        verdict=json.get("verdict"),
+                        reasoning=json.get("reasoning"),
+                        thinkings=thinking,
+                    )
+                )
                 records.append({"thinking":thinking, **json})
             
             self.logger.info(f"[BestOf] Round {round_number} winners: {round_winners}")
@@ -170,7 +196,24 @@ class BestOf(FairForge):
         if len(current_contestants) == 1:
             final_winner = current_contestants[0]
             self.logger.info(f"[BestOf] Tournament complete! Final winner: {final_winner}")
+            tournament_metric = BestOfMetric(
+                session_id="bestof",
+                qa_id="bestof_tournament",
+                assistant_id=final_winner,
+                bestof_winner_id=final_winner,
+                bestof_contests=contests,
+            )
+            self.metrics.append(tournament_metric)
         else:
-            self.logger.warning("[BestOf] No winners found!")
+            # If more than one contestant remains, consider it a tie outcome for the tournament
+            self.logger.warning("[BestOf] Tournament ended in a tie or unresolved state; marking final winner as 'tie'")
+            tournament_metric = BestOfMetric(
+                session_id="bestof",
+                qa_id="bestof_tournament",
+                assistant_id="tie",
+                bestof_winner_id="tie",
+                bestof_contests=contests,
+            )
+            self.metrics.append(tournament_metric)
         
         return self.metrics

@@ -5,6 +5,7 @@ import re
 import logging
 import json
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
 
 
 class Judge:
@@ -32,6 +33,12 @@ class Judge:
         else:
             self.cot = None
             self.chat_history = []
+            self.model = ChatOpenAI(
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+            temperature=temperature,
+            )
         self.bos_json_clause = bos_json_clause
         self.eos_json_clause = eos_json_clause
 
@@ -40,7 +47,8 @@ class Judge:
         prompt = ChatPromptTemplate.from_messages(
             [("system", system_prompt), *self.chat_history]
         )
-        chain = prompt | self.reasoning_model
+        
+        chain = prompt | self.model
         response = chain.invoke(kwargs)
         return ChainOfThought(thought="", answer=response.content)
 

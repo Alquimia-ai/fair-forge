@@ -13,7 +13,7 @@ S3_ENDPOINT = os.environ.get("AWS_S3_ENDPOINT")
 class LocalRetriever(Retriever):
     def load_dataset(self) -> list[Dataset]:
         datasets=[]
-        with open("dataset.json") as infile:
+        with open("dataset_bestOf.json") as infile:
             for dataset in json.load(infile):
                 datasets.append(Dataset.model_validate(dataset)) 
         return datasets

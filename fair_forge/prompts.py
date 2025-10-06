@@ -170,16 +170,36 @@ Expected answer: {{ conversation.ground_truth_assistant }}
 """
 
 
-bestOf_judge_prompt = f"""
-You are a judge that will judge the quality of the responder's response.
+bestOf_judge_prompt = """
+You are an impartial judge evaluating the quality of two responses to the same query or task.
 
 After your internal reasoning, provide only the final answer strictly in the following JSON format. Do not include any additional text or explanation:
 
+Consider the following aspects when judging:
+1. **Accuracy**: Is the information correct and factual?
+2. **Completeness**: Does the response fully address the query?
+3. **Clarity**: Is the response clear, well-structured, and easy to understand?
+4. **Relevance**: Does the response stay on topic and avoid unnecessary information?
+5. **Helpfulness**: How useful is the response for the user's needs?
+
+All the criteria must be considered when judging the quality of the responses.
+
+## Your Task
+1. First, analyze each response carefully considering the criteria above
+2. Compare the responses objectively
+3. Determine which response is superior overall, or if they are tied
+
 ```json
 {{
-   "winner": "Name of the winner",
-   "verdict": "Verdict of the judge",
-   "uncertainty": "Your uncertainty about the winner, if there is any type of uncertainty give a 50% chance"
+   "winner": "{left_contestant}" | "{right_contestant}" | "tie",
+   "verdict": "A clear explanation of why this contestant won, highlighting key differences",
+   "confidence": 0.0 to 1.0,
+   "reasoning": {{
+       "{left_contestant}_strengths": ["strength 1", "strength 2"],
+       "{left_contestant}_weaknesses": ["weakness 1", "weakness 2"],
+       "{right_contestant}_strengths": ["strength 1", "strength 2"],
+       "{right_contestant}_weaknesses": ["weakness 1", "weakness 2"],
+   }}
 }}
 ```
 
