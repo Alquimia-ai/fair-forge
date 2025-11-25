@@ -4,11 +4,9 @@ from pydantic import BaseModel, SecretStr
 from langchain_core.prompts import ChatPromptTemplate
 import re
 
-
 class ChainOfThought(BaseModel):
     thought: str
     answer: str
-
 
 class CoT:
     def __init__(

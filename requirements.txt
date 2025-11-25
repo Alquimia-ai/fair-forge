@@ -3,10 +3,11 @@ langchain_openai
 elasticsearch
 scipy<=1.14.0
 nltk
-shap
 transformers
 torch
 boto3
+pandas
+jinja2
 langfair
 umap-learn
 hdbscan
