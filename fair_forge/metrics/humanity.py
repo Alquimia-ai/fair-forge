@@ -10,6 +10,12 @@ from scipy.stats import spearmanr
 import pkg_resources
 
 
+# TODO:
+# - Implement Emotion matching
+# - Implement Language Style Matching, LSM
+# - Implement Agreeableness
+# - Implement Empathy, Empathic Concern
+
 class Humanity(FairForge):
     def __init__(self, retriever: Type[Retriever], **kwargs):
         super().__init__(retriever, **kwargs)
@@ -122,5 +128,6 @@ class Humanity(FairForge):
             self.logger.debug(f"Spearman value: {metric.humanity_ground_truth_spearman}")
             self.logger.debug(f"Emotional entropy: {metric.humanity_assistant_emotional_entropy}")
             for key in self.emotion_columns:
-                self.logger.debug(f"{key}: {getattr(metric, f'humanity_assistant_{key.lower()}')}")
+                emotion_key = f"humanity_assistant_{key.lower()}"
+                self.logger.debug(f"{key}: {getattr(metric, emotion_key)}")
             self.metrics.append(metric)
