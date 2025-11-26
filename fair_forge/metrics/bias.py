@@ -10,6 +10,7 @@ import pandas as pd
 from collections import Counter
 from umap import UMAP
 from tqdm import tqdm
+import numpy as np
 
 class HurtlexLoader(ToxicityLoader):
     def load(self,language:str) -> list[ToxicityDataset]:
@@ -322,11 +323,24 @@ class Bias(FairForge):
         cluster_scores,umap_embeddings,embeddings,labels = self._cluster_profiling(batch,language)
 
         self.logger.info(f"Biases by attribute: {biases_by_attribute}")
-        self.logger.info(f"Cluster scores: {cluster_scores}")
-        
+        cluster_scores_serializable = {
+          int(k) if isinstance(k, np.integer) else k: float(v) if isinstance(v, np.floating) else v
+          for k, v in cluster_scores.items()
+        }
+        self.logger.info(f"Cluster scores: {cluster_scores_serializable}")
+    
         confidence_intervals = self._calculate_confidence_intervals(biases_by_attribute)
 
-        assistant_space = BiasMetric.AssistantSpace(latent_space=umap_embeddings, embeddings=embeddings, cluster_labels=labels)
+        umap_embeddings_serializable = umap_embeddings.tolist() if isinstance(umap_embeddings, np.ndarray) else umap_embeddings
+        embeddings_serializable = embeddings.tolist() if isinstance(embeddings, np.ndarray) else embeddings
+        labels_serializable = labels.tolist() if isinstance(labels, np.ndarray) else labels
+
+        assistant_space = BiasMetric.AssistantSpace(
+            latent_space=umap_embeddings_serializable,
+            embeddings=embeddings_serializable,
+            cluster_labels=labels_serializable
+        )
+
         
         bias_metric = BiasMetric(
             session_id=session_id,
