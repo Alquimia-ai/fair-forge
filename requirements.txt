@@ -1,6 +1,5 @@
 langchain-groq
 langchain_openai
-elasticsearch
 scipy>=1.14.1
 nltk
 transformers
@@ -8,8 +7,6 @@ torch
 boto3
 pandas
 jinja2
-langfair
 umap-learn
 hdbscan
 tqdm>=4.65.0
-lakefs

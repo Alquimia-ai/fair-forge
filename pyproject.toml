@@ -1,0 +1,87 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "alquimia-fair-forge"
+version = "0.0.1"
+description = "Alquimia Fair Forge library - Performance measurement for AI models and assistants"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Alquimia AI"}
+]
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+dependencies = [
+    "langchain-groq",
+    "langchain-openai",
+    "scipy>=1.14.1",
+    "nltk",
+    "transformers",
+    "torch",
+    "boto3",
+    "pandas",
+    "jinja2",
+    "umap-learn",
+    "hdbscan",
+    "tqdm>=4.65.0",
+    "lakefs",
+    "sentence-transformers",
+    "pydantic>=2.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Alquimia-ai/fair-forge"
+Repository = "https://github.com/Alquimia-ai/fair-forge.git"
+Documentation = "https://github.com/Alquimia-ai/fair-forge#readme"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+    "ipykernel>=6.0.0",
+    "jupyter>=1.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["fair_forge"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "fair_forge/**/*.py",
+    "fair_forge/artifacts/**/*",
+    "README.md",
+    "LICENSE",
+]
+
+[tool.black]
+line-length = 120
+target-version = ['py310', 'py311', 'py312', 'py313']
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false

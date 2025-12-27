@@ -128,64 +128,6 @@ The true probability of a non-biased response is estimated as:
     p_{truth} = \frac{k}{n}
 \end{equation}
 
-\subsection{Clustering Analysis and Latent Space Representation}
-
-The bias analysis incorporates a sophisticated clustering approach to identify patterns in assistant responses. The process involves several key steps:
-
-\subsubsection{Embedding Generation}
-
-Responses are first converted into dense vector representations using a sentence transformer model:
-
-\begin{equation}
-    E = \text{Transformer}(R)
-\end{equation}
-
-where $R$ represents the set of assistant responses and $E$ is the resulting embedding matrix.
-
-\subsubsection{Dimensionality Reduction}
-
-The high-dimensional embeddings are reduced to a lower-dimensional space using UMAP (Uniform Manifold Approximation and Projection):
-
-\begin{equation}
-    L = \text{UMAP}(E, n_{components}, n_{neighbors}, min_{dist})
-\end{equation}
-
-where:
-\begin{itemize}
-    \item $L$ is the reduced latent space representation
-    \item $n_{components}$ is the target dimensionality (default: 2)
-    \item $n_{neighbors}$ is the number of neighbors for local structure preservation
-    \item $min_{dist}$ is the minimum distance between points in the embedding
-\end{itemize}
-
-\subsubsection{Cluster Detection}
-
-The latent space is then analyzed using HDBSCAN (Hierarchical Density-Based Spatial Clustering of Applications with Noise):
-
-\begin{equation}
-    C = \text{HDBSCAN}(L, min_{cluster\_size}, \epsilon)
-\end{equation}
-
-where:
-\begin{itemize}
-    \item $C$ represents the cluster assignments
-    \item $min_{cluster\_size}$ is the minimum number of samples in a cluster
-    \item $\epsilon$ is the cluster selection epsilon parameter
-\end{itemize}
-
-\subsubsection{Toxicity Scoring}
-
-Each cluster is evaluated for potential toxicity using a Laplace-smoothed scoring mechanism:
-
-\begin{equation}
-    \text{Score}(c) = \frac{n_{toxic} + 1}{n_{total} + 2}
-\end{equation}
-
-where:
-\begin{itemize}
-    \item $n_{toxic}$ is the count of toxic words in the cluster
-    \item $n_{total}$ is the total word count in the cluster
-\end{itemize}
 
 \subsection{Risk Detection Framework}
 
@@ -337,6 +279,167 @@ The context adherence evaluation complements other metrics by providing:
     \item Continuous improvement feedback
 \end{itemize}
 
+\section{Toxicity Detection Through Clustering Analysis}
+
+The toxicity metric provides automated detection and quantification of toxic language patterns in AI assistant responses. Unlike the bias metric which focuses on fairness across protected attributes, the toxicity metric specifically identifies harmful, offensive, or inappropriate language through advanced clustering techniques and lexicon-based analysis.
+
+\subsection{Clustering Analysis and Latent Space Representation}
+
+The toxicity analysis incorporates a sophisticated clustering approach to identify patterns of toxic language in assistant responses. The process involves several key steps:
+
+\subsubsection{Embedding Generation}
+
+Responses are first converted into dense vector representations using a sentence transformer model:
+
+\begin{equation}
+    E = \text{Transformer}(R)
+\end{equation}
+
+where $R$ represents the set of assistant responses and $E$ is the resulting embedding matrix.
+
+\subsubsection{Dimensionality Reduction}
+
+The high-dimensional embeddings are reduced to a lower-dimensional space using UMAP (Uniform Manifold Approximation and Projection) \cite{mcinnes2018umap}:
+
+\begin{equation}
+    L = \text{UMAP}(E, n_{components}, n_{neighbors}, min_{dist})
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $L$ is the reduced latent space representation
+    \item $n_{components}$ is the target dimensionality (default: 2)
+    \item $n_{neighbors}$ is the number of neighbors for local structure preservation
+    \item $min_{dist}$ is the minimum distance between points in the embedding
+\end{itemize}
+
+\subsubsection{Cluster Detection}
+
+The latent space is then analyzed using HDBSCAN (Hierarchical Density-Based Spatial Clustering of Applications with Noise) \cite{mcinnes2017hdbscan}:
+
+\begin{equation}
+    C = \text{HDBSCAN}(L, min_{cluster\_size}, \epsilon)
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $C$ represents the cluster assignments
+    \item $min_{cluster\_size}$ is the minimum number of samples in a cluster
+    \item $\epsilon$ is the cluster selection epsilon parameter
+\end{itemize}
+
+\subsection{Toxicity Scoring}
+
+Each cluster is evaluated for potential toxicity using lexicon-based analysis combined with a Laplace-smoothed scoring mechanism. The toxicity score for cluster $c$ is calculated as:
+
+\begin{equation}
+    \text{ToxicityScore}(c) = \frac{n_{toxic}}{n_{total}}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $n_{toxic}$ is the count of toxic words from the lexicon found in cluster $c$
+    \item $n_{total}$ is the total word count in cluster $c$
+\end{itemize}
+
+The toxicity lexicon used is the HurtLex database \cite{bassignana2018hurtlex}, which categorizes offensive terms across multiple dimensions including:
+\begin{enumerate}
+    \item Negative stereotypes ethnic slurs
+    \item Profanity and vulgarity
+    \item Animal metaphors
+    \item Physical disabilities and diversity
+    \item Cognitive disabilities and diversity
+    \item Moral and behavioral defects
+\end{enumerate}
+
+\subsection{Clustering Validation}
+
+The quality of the clustering is assessed using silhouette scores:
+
+\begin{equation}
+    s(i) = \frac{b(i) - a(i)}{\max\{a(i), b(i)\}}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $a(i)$ is the mean distance between sample $i$ and all other points in the same cluster
+    \item $b(i)$ is the mean distance between sample $i$ and all points in the nearest cluster
+\end{itemize}
+
+\section{Best-of-N Evaluation Through Tournament Selection}
+
+The BestOf metric implements a tournament-style evaluation framework to determine the optimal response among multiple candidates. This approach mirrors human evaluation processes and provides robust, comparative assessment of response quality.
+
+\subsection{Tournament Structure}
+
+For a set of $n$ candidate responses $\mathcal{R} = \{r_1, r_2, \ldots, r_n\}$, the tournament is organized as a single-elimination bracket:
+
+\begin{equation}
+    \text{Rounds} = \lceil \log_2(n) \rceil
+\end{equation}
+
+Each match in round $k$ is defined as:
+
+\begin{equation}
+    M_k^{(i,j)} = \text{Judge}(r_i, r_j, q, c)
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $q$ is the user query
+    \item $c$ is the conversation context
+    \item $\text{Judge}$ is an LLM-based evaluation function
+\end{itemize}
+
+\subsection{Pairwise Comparison}
+
+For each match, the judge evaluates both responses according to multiple criteria:
+
+\begin{equation}
+    \text{Score}(r_i, r_j) = \sum_{k=1}^{m} w_k \cdot f_k(r_i, r_j)
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $f_k$ represents individual evaluation criteria (relevance, accuracy, coherence, helpfulness)
+    \item $w_k$ are the weights assigned to each criterion
+    \item $m$ is the total number of criteria
+\end{itemize}
+
+\subsection{Winner Selection}
+
+The winner of each match is determined by:
+
+\begin{equation}
+    \text{Winner}(r_i, r_j) = \begin{cases}
+        r_i & \text{if } \text{Score}(r_i, r_j) > \text{Score}(r_j, r_i) \\
+        r_j & \text{otherwise}
+    \end{cases}
+\end{equation}
+
+Each evaluation includes:
+\begin{itemize}
+    \item Confidence score $\in [0, 1]$
+    \item Detailed verdict explanation
+    \item Structured reasoning chain
+    \item Comparative analysis of strengths and weaknesses
+\end{itemize}
+
+\subsection{Metrics Output}
+
+The final BestOf metric produces:
+
+\begin{equation}
+    \text{BestOfMetric} = \{w_{final}, \mathcal{C}, \theta\}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $w_{final}$ is the tournament winner
+    \item $\mathcal{C}$ is the complete set of contests with verdicts
+    \item $\theta$ is the aggregate confidence score
+\end{itemize}
+
 \begin{thebibliography}{9}
 \bibitem{plutchik2001nature}
 Plutchik, R. (2001).
@@ -367,6 +470,21 @@ Adolphs, L., et al. (2020).
 DeepSeek. (2024).
 \newblock DeepSeek-R1: Advanced reasoning model.
 \newblock {\em DeepSeek AI Documentation}.
+
+\bibitem{mcinnes2018umap}
+McInnes, L., Healy, J., \& Melville, J. (2018).
+\newblock UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction.
+\newblock {\em arXiv preprint arXiv:1802.03426}.
+
+\bibitem{mcinnes2017hdbscan}
+McInnes, L., Healy, J., \& Astels, S. (2017).
+\newblock hdbscan: Hierarchical density based clustering.
+\newblock {\em The Journal of Open Source Software}, 2(11), 205.
+
+\bibitem{bassignana2018hurtlex}
+Bassignana, E., Basile, V., \& Patti, V. (2018).
+\newblock Hurtlex: A multilingual lexicon of words to hurt.
+\newblock {\em Proceedings of the Fifth Italian Conference on Computational Linguistics (CLiC-it 2018)}.
 \end{thebibliography}
 
 \end{document}

@@ -88,24 +88,17 @@ class BiasMetric(BaseMetric):
         lower_bound: float
         upper_bound: float
         probability: float
-        samples:int
-        k_success:int
+        samples: int
+        k_success: int
         alpha: float
         confidence_level: float
         protected_attribute: str
 
     class GuardianInteraction(GuardianBias):
-        qa_id:str
-
-    class AssistantSpace(BaseModel):
-        latent_space: list
-        embeddings: list
-        cluster_labels: list
+        qa_id: str
 
     confidence_intervals: list[ConfidenceInterval]
-    guardian_interactions: dict[str,list[GuardianInteraction]]
-    cluster_profiling: dict[float,float]    
-    assistant_space: AssistantSpace
+    guardian_interactions: dict[str, list[GuardianInteraction]]
 
 
 class ProtectedAttribute(BaseModel):
@@ -229,3 +222,16 @@ class BestOfMetric(BaseMetric):
 class ToxicityDataset(BaseModel):
     word:str
     category: Optional[str] = None
+
+
+class ToxicityMetric(BaseMetric):
+    """
+    Toxicity metric for evaluating toxic language in assistant responses.
+    """
+    class AssistantSpace(BaseModel):
+        latent_space: list
+        embeddings: list
+        cluster_labels: list
+
+    cluster_profiling: dict[float,float]
+    assistant_space: AssistantSpace
