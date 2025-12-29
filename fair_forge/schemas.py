@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Any, Dict, List, Literal, Optional
 from enum import Enum
 from typing import Type
 from abc import ABC, abstractmethod
@@ -224,6 +224,46 @@ class ToxicityDataset(BaseModel):
     category: Optional[str] = None
 
 
+
+class GroupProfilingFrequentist(BaseModel):
+    DR: float
+    ASB: float
+    DTO: float
+    DIDT: float
+
+
+class BayesianSummary(BaseModel):
+    mean: float
+    ci_low: float
+    ci_high: float
+
+
+class GroupProfilingBayesian(BaseModel):
+    priors: Dict[str, float]
+    mc_samples: int
+    ci_level: float
+    q_i: Optional[Dict[str, float]] = None
+    summary: Dict[str, BayesianSummary]  # keys: DR/ASB/DTO/DIDT
+
+
+class GroupProfiling(BaseModel):
+    MetricMode = Literal["frequentist", "bayesian"]
+    mode: MetricMode
+    weights: Dict[str, float]  # w_DR, w_ASB, w_DTO
+    groups: List[str]
+
+    N_i: Dict[str, int]
+    K_i: Dict[str, int]
+    p_i: Dict[str, float]
+    q_i: Dict[str, float]
+    T_i: Dict[str, float]
+
+    frequentist: GroupProfilingFrequentist
+    bayesian: Optional[GroupProfilingBayesian] = None
+
+    toxicity_threshold: float = 0.0
+
+
 class ToxicityMetric(BaseMetric):
     """
     Toxicity metric for evaluating toxic language in assistant responses.
@@ -234,4 +274,71 @@ class ToxicityMetric(BaseMetric):
         cluster_labels: list
 
     cluster_profiling: dict[float,float]
+    group_profiling: Optional[GroupProfiling] = None
     assistant_space: AssistantSpace
+
+
+class GroupDetection(BaseModel):
+    """Result for a single group."""
+    present: bool
+    score: float
+    best_prototype: str
+    best_prototype_index: int
+
+
+class BaseGroupExtractor(ABC):
+    """
+    Abstract base class for group extractors.
+    
+    Group extractors detect whether texts mention specific groups using
+    various detection methods (e.g., embedding similarity, keyword matching, etc.).
+    """
+    
+    @abstractmethod
+    def detect_one(self, text: str) -> Dict[str, GroupDetection]:
+        """
+        Detect groups in a single text.
+
+        Args:
+            text: The text to analyze
+
+        Returns:
+            dict[group -> GroupDetection]
+        """
+        raise NotImplementedError("Subclass must implement detect_one")
+    
+    @abstractmethod
+    def detect_batch(self, texts: List[str]) -> List[Dict[str, GroupDetection]]:
+        """
+        Detect groups for a batch of texts.
+
+        Args:
+            texts: List of texts to analyze
+
+        Returns:
+            list of dicts, aligned with `texts`. Each dict maps group -> GroupDetection
+        """
+        raise NotImplementedError("Subclass must implement detect_batch")
+    
+    def to_presence_table(self, detections: List[Dict[str, GroupDetection]]) -> List[Dict[str, Any]]:
+        """
+        Converts detections into row dicts:
+          {"group": ..., "present": ..., "score": ..., "best_prototype": ...}
+
+        Args:
+            detections: Output of detect_batch()
+
+        Returns:
+            list of per-text dictionaries (one per input text) mapping group->fields
+        """
+        rows: List[Dict[str, Any]] = []
+        for det in detections:
+            row: Dict[str, Any] = {}
+            for g, r in det.items():
+                row[f"{g}_present"] = r.present
+                row[f"{g}_score"] = r.score
+                row[f"{g}_best_prototype"] = r.best_prototype
+            rows.append(row)
+        return rows
+
+
