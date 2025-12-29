@@ -1,4 +1,4 @@
-from fair_forge import FairForge, Retriever
+from fair_forge.core import FairForge, Retriever
 from typing import Type, Optional
 from pydantic import SecretStr
 from fair_forge.schemas import Batch, ConversationalMetric

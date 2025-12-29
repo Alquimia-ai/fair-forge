@@ -1,8 +1,8 @@
 from collections import defaultdict
-from fair_forge import FairForge, Retriever
 from typing import Type, Optional, Any
-from fair_forge.schemas import Batch, HumanityMetric
 import pandas as pd
+from fair_forge.core import FairForge, Retriever
+from fair_forge.schemas import Batch, HumanityMetric
 import re
 import math
 import numpy as np
