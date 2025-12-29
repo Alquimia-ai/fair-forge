@@ -2,11 +2,11 @@ from fair_forge.core import FairForge, Retriever
 from typing import Optional, Type
 from pydantic import SecretStr
 from fair_forge.schemas import Batch, ContextMetric
-from fair_forge.prompts import (
+from fair_forge.llm.prompts import (
     context_reasoning_system_prompt,
     context_reasoning_system_prompt_observation,
 )
-from fair_forge.helpers.judge import Judge
+from fair_forge.llm import Judge
 
 
 class Context(FairForge):

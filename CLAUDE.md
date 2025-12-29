@@ -69,20 +69,15 @@ fair_forge/
 │   ├── __init__.py
 │   └── embedding.py              # EmbeddingGroupExtractor
 │
-├── llm/                          # (To be created) LLM utilities
-│   ├── judge.py                  # (Currently in helpers/)
-│   ├── cot.py                    # (Currently in helpers/)
-│   └── prompts.py                # (Currently in root)
+├── llm/                          # ✨ LLM utilities (MIGRATED!)
+│   ├── __init__.py
+│   ├── judge.py                  # LLM judge interface
+│   ├── cot.py                    # Chain-of-Thought reasoning
+│   └── prompts.py                # LLM system prompts
 │
-├── utils/                        # ✨ NEW! General utilities
+├── utils/                        # ✨ General utilities
 │   ├── __init__.py
 │   └── logging.py                # VerboseLogger
-│
-├── helpers/                      # Legacy (to be migrated to llm/)
-│   ├── judge.py
-│   └── cot.py
-│
-├── prompts.py                    # LLM prompts (to be moved to llm/)
 │
 └── artifacts/                    # Static data files
     ├── lexicons/

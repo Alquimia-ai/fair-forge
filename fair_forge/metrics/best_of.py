@@ -1,8 +1,8 @@
 from fair_forge.core import FairForge, Retriever
 from typing import Type, Optional
 from fair_forge.schemas import Batch, BestOfMetric, BestOfContest
-from fair_forge.helpers.judge import Judge
-from fair_forge.prompts import bestOf_contestant_format, bestOf_judge_prompt
+from fair_forge.llm import Judge
+from fair_forge.llm.prompts import bestOf_contestant_format, bestOf_judge_prompt
 from pydantic import SecretStr
 from jinja2 import Template
 
