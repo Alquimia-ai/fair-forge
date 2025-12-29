@@ -10,33 +10,177 @@
 - **License**: MIT
 - **Repository**: https://github.com/Alquimia-ai/fair-forge
 
-## Architecture at a Glance
+## Architecture at a Glance (NEW MODULAR STRUCTURE)
 
 ```
 fair_forge/
-├── __init__.py              # Core abstractions: FairForge, Retriever, Guardian, ToxicityLoader
-├── schemas.py               # Pydantic data models (Dataset, Batch, all metric outputs)
-├── prompts.py              # LLM system prompts for metrics
-├── metrics/                # 7 metric implementations
-│   ├── humanity.py         # Emotional analysis (NRC lexicon)
-│   ├── conversational.py   # Grice's maxims evaluation
-│   ├── context.py          # Context awareness
-│   ├── bias.py            # Protected attributes analysis
-│   ├── toxicity.py        # Toxic language detection (HurtLex + clustering)
-│   ├── bestOf.py          # Tournament-style response evaluation
-│   └── agentic.py         # Placeholder for agentic evaluation
-├── guardians/             # Bias detection systems
-│   ├── llms/providers.py  # HuggingFace & OpenAI providers
-│   ├── IBMGranite.py      # IBM Granite guardian
-│   └── LLamaGuard.py      # Meta LLamaGuard
-├── helpers/
-│   ├── judge.py           # LLM judge interface (Groq/Deepseek)
-│   └── cot.py            # Chain-of-Thought reasoning
-└── artifacts/            # Pre-trained data
-    ├── lexicon.csv       # NRC emotion lexicon
-    ├── ibm_ai_risk_atlas.yml
-    └── toxicity/         # HurtLex datasets
+├── __init__.py                   # Public API exports
+│
+├── core/                         # Core abstractions & base classes
+│   ├── __init__.py
+│   ├── base.py                   # FairForge base class
+│   ├── retriever.py              # Retriever ABC
+│   ├── guardian.py               # Guardian ABC
+│   ├── loader.py                 # ToxicityLoader ABC
+│   ├── extractor.py              # BaseGroupExtractor ABC
+│   └── exceptions.py             # Custom exceptions
+│
+├── schemas/                      # Pydantic models (organized by domain)
+│   ├── __init__.py
+│   ├── common.py                 # Dataset, Batch, Logprobs
+│   ├── metrics.py                # BaseMetric
+│   ├── bias.py                   # BiasMetric, GuardianBias, ProtectedAttribute
+│   ├── toxicity.py               # ToxicityMetric, GroupProfiling, etc.
+│   ├── conversational.py         # ConversationalMetric
+│   ├── humanity.py               # HumanityMetric
+│   ├── context.py                # ContextMetric
+│   ├── best_of.py                # BestOfMetric
+│   └── agentic.py                # AgenticMetric
+│
+├── metrics/                      # Metric implementations
+│   ├── __init__.py
+│   ├── humanity.py
+│   ├── conversational.py
+│   ├── context.py
+│   ├── bias.py
+│   ├── toxicity.py               # ✨ NOW USES STATISTICAL MODES!
+│   ├── best_of.py                # Renamed from bestOf.py
+│   └── agentic.py
+│
+├── statistical/                  # ✨ NEW! Statistical computation modes
+│   ├── __init__.py
+│   ├── base.py                   # StatisticalMode ABC
+│   ├── frequentist.py            # FrequentistMode
+│   └── bayesian.py               # BayesianMode
+│
+├── guardians/                    # Bias detection guardians
+│   ├── __init__.py               # IBMGranite, LLamaGuard
+│   └── providers/
+│       ├── __init__.py
+│       ├── base.py               # Provider ABC
+│       ├── huggingface.py
+│       └── openai.py
+│
+├── loaders/                      # ✨ NEW! Data loaders
+│   ├── __init__.py
+│   └── hurtlex.py                # HurtlexLoader
+│
+├── extractors/                   # ✨ NEW! Feature/group extractors
+│   ├── __init__.py
+│   └── embedding.py              # EmbeddingGroupExtractor
+│
+├── llm/                          # (To be created) LLM utilities
+│   ├── judge.py                  # (Currently in helpers/)
+│   ├── cot.py                    # (Currently in helpers/)
+│   └── prompts.py                # (Currently in root)
+│
+├── utils/                        # ✨ NEW! General utilities
+│   ├── __init__.py
+│   └── logging.py                # VerboseLogger
+│
+├── helpers/                      # Legacy (to be migrated to llm/)
+│   ├── judge.py
+│   └── cot.py
+│
+├── prompts.py                    # LLM prompts (to be moved to llm/)
+│
+└── artifacts/                    # Static data files
+    ├── lexicons/
+    │   └── nrc_emotion.csv       # NRC emotion lexicon
+    ├── risk_atlases/
+    │   └── ibm_ai_risk_atlas.yml
+    └── toxicity/
+        └── hurtlex_*.tsv
 ```
+
+## NEW: Statistical Modes (Strategy Pattern)
+
+Fair-Forge now implements pluggable statistical computation modes using the **Strategy Pattern**. This allows metrics to use either frequentist or Bayesian statistics without coupling to specific implementations.
+
+### StatisticalMode Interface
+
+```python
+from fair_forge.statistical import StatisticalMode, FrequentistMode, BayesianMode
+
+# All modes provide these generic primitives:
+mode.distribution_divergence(observed, reference)  # Compute divergence between distributions
+mode.rate_estimation(successes, trials)            # Estimate rates with uncertainty
+mode.aggregate_metrics(metrics, weights)           # Aggregate multiple metrics
+mode.dispersion_metric(values, center="mean")      # Compute dispersion/spread
+mode.get_result_type()                             # Returns "point_estimate" or "distribution"
+```
+
+### FrequentistMode
+
+Returns point estimates (floats):
+
+```python
+from fair_forge.statistical import FrequentistMode
+
+mode = FrequentistMode()
+divergence = mode.distribution_divergence(
+    observed={'A': 0.3, 'B': 0.7},
+    reference={'A': 0.5, 'B': 0.5}
+)
+# Returns: 0.2 (float)
+```
+
+### BayesianMode
+
+Returns full posterior distributions with credible intervals:
+
+```python
+from fair_forge.statistical import BayesianMode
+
+mode = BayesianMode(
+    mc_samples=5000,
+    ci_level=0.95,
+    dirichlet_prior=1.0,
+    beta_prior_a=1.0,
+    beta_prior_b=1.0
+)
+
+divergence = mode.distribution_divergence(
+    observed_counts={'A': 30, 'B': 70},  # Note: counts, not proportions
+    reference={'A': 0.5, 'B': 0.5}
+)
+# Returns: {'mean': 0.21, 'ci_low': 0.15, 'ci_high': 0.27, 'samples': array([...])}
+```
+
+### Using Statistical Modes in Toxicity Metric
+
+```python
+from fair_forge.metrics import Toxicity
+from fair_forge.statistical import BayesianMode
+from fair_forge.retrievers import LocalRetriever
+
+# Use Bayesian mode
+toxicity = Toxicity.run(
+    LocalRetriever,
+    statistical_mode=BayesianMode(mc_samples=10000, ci_level=0.95),
+    group_prototypes={
+        'gender': ['man', 'woman', 'non-binary'],
+        'race': ['white', 'black', 'asian', 'latino'],
+    },
+    verbose=True
+)
+
+# Or use Frequentist mode (default)
+toxicity = Toxicity.run(
+    LocalRetriever,
+    # statistical_mode defaults to FrequentistMode()
+    group_prototypes={...},
+    verbose=True
+)
+```
+
+### Benefits of Strategy Pattern
+
+1. **Decoupling**: Toxicity metric doesn't know about frequentist/Bayesian details
+2. **Extensibility**: Easy to add new modes (Bootstrap, Permutation, etc.) without modifying Toxicity
+3. **Reusability**: Statistical modes can be used in ANY metric, not just Toxicity
+4. **Testability**: Each mode is independently testable
+5. **Consistency**: All metrics can use the same statistical framework
 
 ## Core Abstractions
 
