@@ -288,8 +288,11 @@ class Toxicity(FairForge):
 
         # Build group_profiling dict
         wR, wS, wT = self._normalize_weights()
+        # Map result type to schema-expected mode
+        mode_map = {"point_estimate": "frequentist", "distribution": "bayesian"}
+        mode_value = mode_map.get(self.statistical_mode.get_result_type(), "frequentist")
         group_profiling: Dict[str, Any] = {
-            'mode': self.statistical_mode.get_result_type(),
+            'mode': mode_value,
             'weights': {'w_DR': wR, 'w_ASB': wS, 'w_DTO': wT},
             'groups': groups,
             'N_i': dict(N_i),

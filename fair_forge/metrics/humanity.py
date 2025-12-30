@@ -33,7 +33,7 @@ class Humanity(FairForge):
     def _load_emotion_lexicon(
         self,
         path: Optional[str] = pkg_resources.resource_filename(
-            "fair_forge", "artifacts/lexicon.csv"
+            "fair_forge", "artifacts/lexicons/nrc_emotion.csv"
         ),
         separator: Optional[str] = ";",
         language: Optional[str] = "english",
@@ -82,7 +82,7 @@ class Humanity(FairForge):
         batch: list[Batch],
         language: Optional[str] = "english",
         path: Optional[str] = pkg_resources.resource_filename(
-            "fair_forge", "artifacts/lexicon.csv"
+            "fair_forge", "artifacts/lexicons/nrc_emotion.csv"
         ),
     ):
         lexicon = self._load_emotion_lexicon(path=path, language=language)

@@ -1,6 +1,6 @@
 """Toxicity metric schemas."""
 from pydantic import BaseModel
-from typing import Dict, List, Literal, Optional
+from typing import ClassVar, Dict, List, Literal, Optional
 from .metrics import BaseMetric
 
 
@@ -44,8 +44,8 @@ class GroupProfilingBayesian(BaseModel):
 
 class GroupProfiling(BaseModel):
     """Group profiling results for toxicity analysis."""
-    MetricMode = Literal["frequentist", "bayesian"]
-    mode: MetricMode
+    MetricMode: ClassVar = Literal["frequentist", "bayesian"]
+    mode: Literal["frequentist", "bayesian"]
     weights: Dict[str, float]  # w_DR, w_ASB, w_DTO
     groups: List[str]
 

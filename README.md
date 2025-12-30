@@ -166,8 +166,9 @@ To use Alquimia AI Fair Forge, you need to provide a dataset in the following JS
 To use your dataset with Fair Forge metrics, you need to create a custom retriever:
 
 ```python
-from fair_forge.schemas import Dataset
-from fair_forge import Retriever
+import json
+from fair_forge.schemas.common import Dataset
+from fair_forge.core.retriever import Retriever
 
 class CustomRetriever(Retriever):
     def load_dataset(self) -> list[Dataset]:
@@ -184,6 +185,7 @@ class CustomRetriever(Retriever):
 
 ```python
 from getpass import getpass
+from pydantic import SecretStr
 from fair_forge.metrics import Context
 
 judge_api_key = SecretStr(getpass("Please enter your Judge API key: "))
@@ -210,6 +212,7 @@ metrics = Humanity.run(
 
 ```python
 from getpass import getpass
+from pydantic import SecretStr
 from fair_forge.metrics import Conversational
 
 judge_api_key = SecretStr(getpass("Please enter your Judge API key: "))
@@ -233,9 +236,9 @@ The metric is highly flexible and allows you to implement your own bias detectio
 You can also create your own guardian by implementing the Guardian interface:
 
 ```python
-from fair_forge import Guardian
-from fair_forge.schemas import ProtectedAttribute, GuardianBias
 from typing import Optional
+from fair_forge.core.guardian import Guardian
+from fair_forge.schemas.bias import ProtectedAttribute, GuardianBias
 
 class MyCustomGuardian(Guardian):
     def is_biased(self, question: str, answer: str, attribute: ProtectedAttribute, context: Optional[str] = None) -> GuardianBias:
@@ -250,10 +253,11 @@ class MyCustomGuardian(Guardian):
 Here's an example using the built-in IBMGranite guardian:
 
 ```python
+import os
 from getpass import getpass
+from pydantic import SecretStr
 from fair_forge.metrics import Bias
 from fair_forge.guardians import IBMGranite, GuardianLLMConfig, OpenAIGuardianProvider
-from fair_forge.retrievers import LocalRetriever
 
 # Set up your environment variables
 GUARDIAN_URL = os.environ.get("GUARDIAN_URL")
@@ -262,7 +266,7 @@ GUARDIAN_API_KEY = SecretStr(getpass("Please enter your Guardian API key: "))
 
 # Configure and run the Bias metric
 metrics = Bias.run(
-    LocalRetriever,
+    CustomRetriever,  # Use your custom retriever
     guardian=IBMGranite,
     confidence_level=0.80,
     config=GuardianLLMConfig(
@@ -281,11 +285,10 @@ And here's an example using your custom guardian:
 
 ```python
 from fair_forge.metrics import Bias
-from fair_forge.retrievers import LocalRetriever
 
 # Run the Bias metric with your custom guardian
 metrics = Bias.run(
-    LocalRetriever,
+    CustomRetriever,  # Use your custom retriever
     guardian=MyCustomGuardian,
     confidence_level=0.80,
     verbose=True
@@ -299,51 +302,133 @@ The Bias metric supports the following configuration options:
 
 #### Toxicity Metric
 
-The Toxicity metric detects and quantifies toxic language patterns in AI responses using clustering techniques and toxicity lexicons. It analyzes responses to identify patterns of harmful or offensive content across different clusters.
+The Toxicity metric detects and quantifies toxic language patterns in AI responses with a focus on **fairness across demographic groups**. It combines clustering analysis, lexicon-based detection, and the DIDT fairness framework (Demographic Representation, Directed Toxicity, Associated Sentiment Bias) with pluggable statistical computation modes.
+
+**Key Features:**
+- **Statistical Modes**: Choose between Frequentist (point estimates) or Bayesian (full posterior distributions)
+- **DIDT Framework**: Comprehensive fairness analysis across demographic groups
+- **Group Detection**: Automatic detection of demographic group mentions via embedding similarity
+- **Clustering**: HDBSCAN+UMAP clustering to identify toxic patterns
+
+**Example with Frequentist Mode (Default):**
 
 ```python
-from fair_forge.metrics import Toxicity, HurtlexLoader
-from fair_forge.retrievers import LocalRetriever
+from fair_forge.metrics import Toxicity
+from fair_forge.loaders import HurtlexLoader
+from fair_forge.statistical import FrequentistMode
 
-# Run the Toxicity metric
+# Run Toxicity with frequentist statistics (returns point estimates)
 metrics = Toxicity.run(
-    LocalRetriever,
+    CustomRetriever,  # Use your custom retriever
     embedding_model="all-MiniLM-L6-v2",
     toxicity_loader=HurtlexLoader,
+    statistical_mode=FrequentistMode(),  # Optional: this is the default
+    group_prototypes={
+        'gender': ['man', 'woman', 'non-binary'],
+        'race': ['white', 'black', 'asian', 'latino'],
+        'religion': ['christian', 'muslim', 'jewish', 'hindu', 'buddhist']
+    },
+    # Clustering parameters
     toxicity_min_cluster_size=5,
     toxicity_cluster_selection_epsilon=0.01,
-    toxicity_cluster_selection_method="euclidean",
     toxicity_cluster_use_latent_space=True,
+    # UMAP parameters
     umap_n_components=2,
     umap_n_neighbors=15,
     umap_min_dist=0.1,
     umap_random_state=42,
     umap_metric="cosine",
+    # DIDT weights (default: 1/3 each)
+    w_DR=1.0/3.0,
+    w_ASB=1.0/3.0,
+    w_DTO=1.0/3.0,
     verbose=True
 )
 ```
 
-The Toxicity metric supports various configuration options:
+**Example with Bayesian Mode:**
 
-- `embedding_model`: Model for generating text embeddings (default: "all-MiniLM-L6-v2")
-- `toxicity_loader`: Loader for toxicity data (default: HurtlexLoader)
-- `toxicity_min_cluster_size`: Minimum size for clusters in HDBSCAN (default: 5)
-- `toxicity_cluster_selection_epsilon`: Epsilon value for cluster selection (default: 0.01)
-- `toxicity_cluster_selection_method`: Method used for cluster selection (default: "euclidean")
-- `toxicity_cluster_use_latent_space`: Whether to use latent space for clustering (default: True)
-- `umap_n_components`: Number of components for UMAP dimensionality reduction (default: 2)
-- `umap_n_neighbors`: Number of neighbors for UMAP (default: 15)
-- `umap_min_dist`: Minimum distance parameter for UMAP (default: 0.1)
-- `umap_random_state`: Random state for UMAP reproducibility (default: 42)
-- `umap_metric`: Metric used for UMAP (default: "cosine")
+```python
+from fair_forge.metrics import Toxicity
+from fair_forge.loaders import HurtlexLoader
+from fair_forge.statistical import BayesianMode
+
+# Run Toxicity with Bayesian statistics (returns posterior distributions with credible intervals)
+metrics = Toxicity.run(
+    CustomRetriever,
+    embedding_model="all-MiniLM-L6-v2",
+    toxicity_loader=HurtlexLoader,
+    statistical_mode=BayesianMode(
+        mc_samples=10000,      # Number of Monte Carlo samples
+        ci_level=0.95,         # Credible interval level (95%)
+        dirichlet_prior=1.0,   # Dirichlet prior for distribution divergence
+        beta_prior_a=1.0,      # Beta prior alpha for rate estimation
+        beta_prior_b=1.0       # Beta prior beta for rate estimation
+    ),
+    group_prototypes={
+        'gender': ['man', 'woman', 'non-binary'],
+        'race': ['white', 'black', 'asian', 'latino']
+    },
+    verbose=True
+)
+```
+
+**Configuration Parameters:**
+
+Core Parameters:
+- `group_prototypes` (required): Dictionary mapping group categories to prototype words for detection
+- `statistical_mode`: FrequentistMode() or BayesianMode() (default: FrequentistMode())
+- `embedding_model`: Model for text embeddings (default: "all-MiniLM-L6-v2")
+- `toxicity_loader`: Loader for toxicity lexicon (default: HurtlexLoader)
+
+DIDT Framework Weights:
+- `w_DR`: Weight for Demographic Representation (default: 1/3)
+- `w_DTO`: Weight for Directed Toxicity per Group (default: 1/3)
+- `w_ASB`: Weight for Associated Sentiment Bias (default: 1/3)
+
+Group Detection Parameters:
+- `group_thresholds`: Custom similarity thresholds per group (default: 0.5 for all)
+- `group_default_threshold`: Default threshold for group detection (default: 0.5)
+- `group_toxicity_threshold`: Minimum toxicity score to count as toxic (default: 0.0)
+
+Clustering Parameters:
+- `toxicity_min_cluster_size`: Minimum cluster size for HDBSCAN (default: 5)
+- `toxicity_cluster_selection_epsilon`: Epsilon for cluster selection (default: 0.01)
+- `toxicity_cluster_selection_method`: Distance metric (default: "euclidean")
+- `toxicity_cluster_use_latent_space`: Use latent space for clustering (default: True)
+
+UMAP Parameters:
+- `umap_n_components`: Dimensionality of latent space (default: 2)
+- `umap_n_neighbors`: Number of neighbors for local structure (default: 15)
+- `umap_min_dist`: Minimum distance between points (default: 0.1)
+- `umap_random_state`: Random seed for reproducibility (default: 42)
+- `umap_metric`: Distance metric (default: "cosine")
+
+**Output Structure:**
+
+The Toxicity metric returns results containing:
+
+For **Frequentist Mode**:
+- `cluster_profiling`: Toxicity scores per cluster
+- `group_profiling.frequentist`: Point estimates for DR, DTO, ASB, DIDT
+- `group_profiling.N_i`: Count of mentions per group
+- `group_profiling.K_i`: Count of toxic mentions per group
+- `group_profiling.p_i`: Observed proportions per group
+- `group_profiling.T_i`: Toxicity rates per group
+
+For **Bayesian Mode**:
+- `cluster_profiling`: Toxicity scores per cluster
+- `group_profiling.bayesian.summary`: Posterior means and 95% credible intervals for DR, DTO, ASB, DIDT
+- `group_profiling.bayesian.priors`: Prior parameters used
+- `group_profiling.bayesian.mc_samples`: Number of Monte Carlo samples
 
 **Custom Toxicity Loaders**
 
 You can create your own toxicity dataset loader by implementing the ToxicityLoader interface:
 
 ```python
-from fair_forge import ToxicityLoader
-from fair_forge.schemas import ToxicityDataset
+from fair_forge.core.loader import ToxicityLoader
+from fair_forge.schemas.toxicity import ToxicityDataset
 
 class MyCustomToxicityLoader(ToxicityLoader):
     def load(self, language: str) -> list[ToxicityDataset]:
@@ -361,8 +446,9 @@ Then use your custom loader with the Toxicity metric:
 
 ```python
 metrics = Toxicity.run(
-    LocalRetriever,
+    CustomRetriever,
     toxicity_loader=MyCustomToxicityLoader,
+    group_prototypes={'gender': ['man', 'woman']},
     verbose=True
 )
 ```
@@ -373,14 +459,14 @@ The BestOf metric implements a tournament-style evaluation to determine the best
 
 ```python
 from getpass import getpass
+from pydantic import SecretStr
 from fair_forge.metrics import BestOf
-from fair_forge.retrievers import LocalRetriever
 
 judge_api_key = SecretStr(getpass("Please enter your Judge API key: "))
 
 # Run the BestOf metric
 metrics = BestOf.run(
-    LocalRetriever,
+    CustomRetriever,  # Use your custom retriever
     judge_api_key=judge_api_key,
     verbose=True
 )
@@ -430,9 +516,10 @@ To contribute a new metric to Fair Forge, follow these steps:
 2. Follow the basic structure:
 
 ```python
-from fair_forge import FairForge, Retriever
 from typing import Type, Optional
-from fair_forge.schemas import Batch
+from fair_forge.core.base import FairForge
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Batch
 
 class MyMetric(FairForge):
     def __init__(self, retriever: Type[Retriever], **kwargs):
@@ -449,6 +536,7 @@ class MyMetric(FairForge):
         # Implement your metric logic here
         for interaction in batch:
             # Process each interaction
+            # Append results to self.metrics
             pass
 ```
 
