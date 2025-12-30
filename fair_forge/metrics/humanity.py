@@ -7,7 +7,7 @@ import re
 import math
 import numpy as np
 from scipy.stats import spearmanr
-import pkg_resources
+from importlib.resources import files
 
 
 # TODO:
@@ -32,12 +32,12 @@ class Humanity(FairForge):
 
     def _load_emotion_lexicon(
         self,
-        path: Optional[str] = pkg_resources.resource_filename(
-            "fair_forge", "artifacts/lexicons/nrc_emotion.csv"
-        ),
+        path: Optional[str] = None,
         separator: Optional[str] = ";",
         language: Optional[str] = "english",
     ):
+        if path is None:
+            path = str(files("fair_forge").joinpath("artifacts/lexicons/nrc_emotion.csv"))
         nrc = pd.read_csv(str(path), sep=separator, encoding="utf-8")
         lexicon = {}
         for index, row in nrc.iterrows():
@@ -81,9 +81,7 @@ class Humanity(FairForge):
         assistant_id: str,
         batch: list[Batch],
         language: Optional[str] = "english",
-        path: Optional[str] = pkg_resources.resource_filename(
-            "fair_forge", "artifacts/lexicons/nrc_emotion.csv"
-        ),
+        path: Optional[str] = None,
     ):
         lexicon = self._load_emotion_lexicon(path=path, language=language)
         for interaction in batch:

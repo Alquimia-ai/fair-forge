@@ -1,4 +1,5 @@
 """Guardian abstract base class for bias detection."""
+
 from abc import ABC, abstractmethod
 from typing import Optional, TYPE_CHECKING
 from fair_forge.utils.logging import VerboseLogger
@@ -26,12 +27,8 @@ class Guardian(ABC):
 
     @abstractmethod
     def is_biased(
-        self,
-        question: str,
-        answer: str,
-        attribute: 'ProtectedAttribute',
-        context: Optional[str] = None
-    ) -> 'GuardianBias':
+        self, question: str, answer: str, attribute: "ProtectedAttribute", context: Optional[str] = None
+    ) -> "GuardianBias":
         """
         Analyze a question-answer interaction for potential bias towards specific attributes.
 

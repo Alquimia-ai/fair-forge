@@ -1,4 +1,5 @@
 """Toxicity metric implementation."""
+
 from __future__ import annotations
 
 from typing import Optional, Type, Dict, List, Tuple, Any
@@ -6,8 +7,8 @@ from collections import Counter, defaultdict
 import re
 
 from sentence_transformers import SentenceTransformer
-from hdbscan import HDBSCAN
-from umap import UMAP
+import hdbscan
+import umap
 import numpy as np
 
 from fair_forge.core.base import FairForge
@@ -171,10 +172,10 @@ class Toxicity(FairForge):
         else:
             # Return zero distribution for Bayesian
             return {
-                'mean': 0.0,
-                'ci_low': 0.0,
-                'ci_high': 0.0,
-                'samples': np.zeros(getattr(self.statistical_mode, 'mc_samples', 1000))
+                "mean": 0.0,
+                "ci_low": 0.0,
+                "ci_high": 0.0,
+                "samples": np.zeros(getattr(self.statistical_mode, "mc_samples", 1000)),
             }
 
     # -------------------------
@@ -196,7 +197,11 @@ class Toxicity(FairForge):
         DR (Demographic Representation) using the statistical mode primitive.
         """
         if not groups:
-            return 0.0 if self.statistical_mode.get_result_type() == "point_estimate" else {'mean': 0.0, 'ci_low': 0.0, 'ci_high': 0.0}
+            return (
+                0.0
+                if self.statistical_mode.get_result_type() == "point_estimate"
+                else {"mean": 0.0, "ci_low": 0.0, "ci_high": 0.0}
+            )
 
         # Setup reference distribution
         if self.group_reference_q is None:
@@ -224,15 +229,16 @@ class Toxicity(FairForge):
         DTO (Directed Toxicity) using rate_estimation + dispersion_metric primitives.
         """
         if not groups:
-            return 0.0 if self.statistical_mode.get_result_type() == "point_estimate" else {'mean': 0.0, 'ci_low': 0.0, 'ci_high': 0.0}
+            return (
+                0.0
+                if self.statistical_mode.get_result_type() == "point_estimate"
+                else {"mean": 0.0, "ci_low": 0.0, "ci_high": 0.0}
+            )
 
         # Estimate toxicity rate per group
         rates = {}
         for group in groups:
-            rates[group] = self.statistical_mode.rate_estimation(
-                successes=K_i[group],
-                trials=N_i[group]
-            )
+            rates[group] = self.statistical_mode.rate_estimation(successes=K_i[group], trials=N_i[group])
 
         # Compute dispersion
         return self.statistical_mode.dispersion_metric(rates, center="mean")
@@ -242,9 +248,9 @@ class Toxicity(FairForge):
     # -------------------------
     def _compute_DIDT(self, DR: Any, DTO: Any, ASB: Any) -> Any:
         """DIDT aggregation using aggregate_metrics primitive."""
-        metrics = {'DR': DR, 'DTO': DTO, 'ASB': ASB}
+        metrics = {"DR": DR, "DTO": DTO, "ASB": ASB}
         wR, wS, wT = self._normalize_weights()
-        weights = {'DR': wR, 'DTO': wT, 'ASB': wS}
+        weights = {"DR": wR, "DTO": wT, "ASB": wS}
 
         return self.statistical_mode.aggregate_metrics(metrics, weights)
 
@@ -292,12 +298,12 @@ class Toxicity(FairForge):
         mode_map = {"point_estimate": "frequentist", "distribution": "bayesian"}
         mode_value = mode_map.get(self.statistical_mode.get_result_type(), "frequentist")
         group_profiling: Dict[str, Any] = {
-            'mode': mode_value,
-            'weights': {'w_DR': wR, 'w_ASB': wS, 'w_DTO': wT},
-            'groups': groups,
-            'N_i': dict(N_i),
-            'K_i': dict(K_i),
-            'toxicity_threshold': float(self.group_toxicity_threshold),
+            "mode": mode_value,
+            "weights": {"w_DR": wR, "w_ASB": wS, "w_DTO": wT},
+            "groups": groups,
+            "N_i": dict(N_i),
+            "K_i": dict(K_i),
+            "toxicity_threshold": float(self.group_toxicity_threshold),
         }
 
         # Add results based on mode type
@@ -313,40 +319,44 @@ class Toxicity(FairForge):
                 q_i = {g: raw[i] / s if s > 0 else 1.0 / len(groups) for i, g in enumerate(groups)}
             T_i = {g: K_i[g] / N_i[g] if N_i[g] > 0 else 0.0 for g in groups}
 
-            group_profiling.update({
-                'p_i': p_i,
-                'q_i': q_i,
-                'T_i': T_i,
-                'frequentist': {
-                    'DR': float(DR),
-                    'ASB': float(ASB),
-                    'DTO': float(DTO),
-                    'DIDT': float(DIDT),
-                },
-                'bayesian': None,
-            })
+            group_profiling.update(
+                {
+                    "p_i": p_i,
+                    "q_i": q_i,
+                    "T_i": T_i,
+                    "frequentist": {
+                        "DR": float(DR),
+                        "ASB": float(ASB),
+                        "DTO": float(DTO),
+                        "DIDT": float(DIDT),
+                    },
+                    "bayesian": None,
+                }
+            )
         else:
             # Bayesian mode
-            group_profiling.update({
-                'p_i': {},  # Not directly computed in Bayesian (comes from posterior)
-                'q_i': DR.get('q_i', {}),
-                'T_i': {},  # Not directly computed in Bayesian (comes from posterior)
-                'frequentist': None,
-                'bayesian': {
-                    'priors': getattr(self.statistical_mode, 'dirichlet_prior', 1.0),
-                    'mc_samples': getattr(self.statistical_mode, 'mc_samples', 5000),
-                    'ci_level': getattr(self.statistical_mode, 'ci_level', 0.95),
-                    'summary': {
-                        'DR': {'mean': DR['mean'], 'ci_low': DR['ci_low'], 'ci_high': DR['ci_high']},
-                        'DTO': {'mean': DTO['mean'], 'ci_low': DTO['ci_low'], 'ci_high': DTO['ci_high']},
-                        'ASB': {'mean': ASB['mean'], 'ci_low': ASB['ci_low'], 'ci_high': ASB['ci_high']},
-                        'DIDT': {'mean': DIDT['mean'], 'ci_low': DIDT['ci_low'], 'ci_high': DIDT['ci_high']},
+            group_profiling.update(
+                {
+                    "p_i": {},  # Not directly computed in Bayesian (comes from posterior)
+                    "q_i": DR.get("q_i", {}),
+                    "T_i": {},  # Not directly computed in Bayesian (comes from posterior)
+                    "frequentist": None,
+                    "bayesian": {
+                        "priors": getattr(self.statistical_mode, "dirichlet_prior", 1.0),
+                        "mc_samples": getattr(self.statistical_mode, "mc_samples", 5000),
+                        "ci_level": getattr(self.statistical_mode, "ci_level", 0.95),
+                        "summary": {
+                            "DR": {"mean": DR["mean"], "ci_low": DR["ci_low"], "ci_high": DR["ci_high"]},
+                            "DTO": {"mean": DTO["mean"], "ci_low": DTO["ci_low"], "ci_high": DTO["ci_high"]},
+                            "ASB": {"mean": ASB["mean"], "ci_low": ASB["ci_low"], "ci_high": ASB["ci_high"]},
+                            "DIDT": {"mean": DIDT["mean"], "ci_low": DIDT["ci_low"], "ci_high": DIDT["ci_high"]},
+                        },
                     },
-                },
-            })
+                }
+            )
 
         # Clustering (unchanged)
-        reducer = UMAP(
+        reducer = umap.UMAP(
             n_components=self.umap_n_components,
             random_state=self.umap_random_state,
             n_neighbors=self.umap_n_neighbors,
@@ -355,15 +365,13 @@ class Toxicity(FairForge):
         )
         clusterable_embeddings = reducer.fit_transform(embeddings)
 
-        clusterer = HDBSCAN(
+        clusterer = hdbscan.HDBSCAN(
             min_cluster_size=self.min_cluster_size,
             metric=self.cluster_selection_method,
             cluster_selection_epsilon=self.cluster_selection_epsilon,
             prediction_data=True,
         )
-        labels = clusterer.fit_predict(
-            clusterable_embeddings if self.toxicity_cluster_use_latent_space else embeddings
-        )
+        labels = clusterer.fit_predict(clusterable_embeddings if self.toxicity_cluster_use_latent_space else embeddings)
 
         # Cluster toxicity score reusing the same toxic_set
         score_cluster: Dict[float, float] = {}
@@ -386,9 +394,7 @@ class Toxicity(FairForge):
         language: Optional[str] = "english",
         context: str = "",  # Added to match signature
     ):
-        score_cluster, umap_embeddings, embeddings, labels, group_profiling = self._profile(
-            batch, language
-        )
+        score_cluster, umap_embeddings, embeddings, labels, group_profiling = self._profile(batch, language)
 
         # Serialize for JSON
         cluster_scores_serializable = {

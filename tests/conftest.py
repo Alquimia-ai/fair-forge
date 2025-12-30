@@ -1,7 +1,33 @@
 """Pytest configuration and shared fixtures for Fair-Forge tests."""
+
+import warnings
+import sys
+
+# Suppress all problematic warnings from third-party libraries before importing
+warnings.filterwarnings("ignore", category=SyntaxWarning)
+warnings.filterwarnings("ignore", category=ImportWarning)
+warnings.filterwarnings("ignore", message=".*Tensorflow not installed.*")
+warnings.filterwarnings("ignore", message=".*ParametricUMAP will be unavailable.*")
+
+try:
+    import hdbscan  # noqa: F401
+    import umap  # noqa: F401
+except Exception:
+    pass
+
 import pytest
 from pydantic import SecretStr
 from fair_forge.schemas.common import Dataset, Batch
+
+
+def pytest_configure(config):
+    """Configure pytest to skip assertion rewriting for problematic modules."""
+    assertrewrite = config.pluginmanager.get_plugin("assertion")
+    if assertrewrite and hasattr(assertrewrite, "_dont_rewrite"):
+        assertrewrite._dont_rewrite.add("hdbscan")
+        assertrewrite._dont_rewrite.add("umap")
+
+
 from tests.fixtures.mock_retriever import (
     MockRetriever,
     EmptyRetriever,

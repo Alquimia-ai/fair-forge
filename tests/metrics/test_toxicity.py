@@ -417,8 +417,8 @@ class TestToxicityMetric:
         assert ASB == 0.0
 
     @patch('fair_forge.metrics.toxicity.SentenceTransformer')
-    @patch('fair_forge.metrics.toxicity.HDBSCAN')
-    @patch('fair_forge.metrics.toxicity.UMAP')
+    @patch('fair_forge.metrics.toxicity.hdbscan')
+    @patch('fair_forge.metrics.toxicity.umap')
     def test_batch_processing(self, mock_umap, mock_hdbscan, mock_transformer):
         """Test batch processing with mocked dependencies."""
         from tests.fixtures.mock_retriever import MockRetriever
@@ -430,11 +430,11 @@ class TestToxicityMetric:
 
         mock_umap_instance = MagicMock()
         mock_umap_instance.fit_transform.return_value = np.array([[0.1, 0.2], [0.3, 0.4]])
-        mock_umap.return_value = mock_umap_instance
+        mock_umap.UMAP.return_value = mock_umap_instance
 
         mock_hdbscan_instance = MagicMock()
         mock_hdbscan_instance.fit_predict.return_value = np.array([0, 0])
-        mock_hdbscan.return_value = mock_hdbscan_instance
+        mock_hdbscan.HDBSCAN.return_value = mock_hdbscan_instance
 
         # Create test data
         batch_data = [
@@ -470,7 +470,6 @@ class TestToxicityMetric:
     def test_metric_attributes(self, mock_transformer):
         """Test that all expected attributes exist in ToxicityMetric."""
         from tests.fixtures.mock_retriever import MockRetriever
-        from fair_forge.metrics.toxicity import HDBSCAN, UMAP
 
         # Setup mocks
         mock_model = MagicMock()
@@ -487,17 +486,17 @@ class TestToxicityMetric:
             'load_dataset': lambda self: [dataset]
         })
 
-        with patch('fair_forge.metrics.toxicity.HDBSCAN') as mock_hdbscan, \
-             patch('fair_forge.metrics.toxicity.UMAP') as mock_umap, \
+        with patch('fair_forge.metrics.toxicity.hdbscan') as mock_hdbscan, \
+             patch('fair_forge.metrics.toxicity.umap') as mock_umap, \
              patch('fair_forge.metrics.toxicity.EmbeddingGroupExtractor', MockGroupExtractor):
 
             mock_umap_instance = MagicMock()
             mock_umap_instance.fit_transform.return_value = np.array([[0.1, 0.2], [0.3, 0.4]])
-            mock_umap.return_value = mock_umap_instance
+            mock_umap.UMAP.return_value = mock_umap_instance
 
             mock_hdbscan_instance = MagicMock()
             mock_hdbscan_instance.fit_predict.return_value = np.array([0, 0])
-            mock_hdbscan.return_value = mock_hdbscan_instance
+            mock_hdbscan.HDBSCAN.return_value = mock_hdbscan_instance
 
             toxicity = Toxicity(
                 retriever,
