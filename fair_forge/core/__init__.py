@@ -4,6 +4,7 @@ from .retriever import Retriever
 from .guardian import Guardian
 from .loader import ToxicityLoader
 from .extractor import BaseGroupExtractor
+from .sentiment import SentimentAnalyzer
 from .exceptions import (
     FairForgeError,
     RetrieverError,
@@ -19,6 +20,7 @@ __all__ = [
     'Guardian',
     'ToxicityLoader',
     'BaseGroupExtractor',
+    'SentimentAnalyzer',
     'FairForgeError',
     'RetrieverError',
     'MetricError',

@@ -10,6 +10,7 @@ from .bias import (
     GuardianLLMConfig,
 )
 from .toxicity import (
+    SentimentScore,
     ToxicityDataset,
     GroupDetection,
     GroupProfilingFrequentist,
@@ -39,6 +40,7 @@ __all__ = [
     'LLMGuardianProvider',
     'GuardianLLMConfig',
     # Toxicity
+    'SentimentScore',
     'ToxicityDataset',
     'GroupDetection',
     'GroupProfilingFrequentist',

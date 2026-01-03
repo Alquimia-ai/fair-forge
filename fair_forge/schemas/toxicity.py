@@ -1,7 +1,34 @@
 """Toxicity metric schemas."""
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import ClassVar, Dict, List, Literal, Optional
 from .metrics import BaseMetric
+
+
+class SentimentScore(BaseModel):
+    """Sentiment analysis result for individual text.
+
+    Used in ASB (Associated Sentiment Bias) calculation.
+    The metric will aggregate individual scores to compute:
+    - S_i: average sentiment for group g_i
+    - S̄: global average sentiment across all groups
+    - ASB = (1/n) Σ |S_i - S̄|
+    """
+    score: float = Field(
+        ...,
+        ge=-1.0,
+        le=1.0,
+        description="Sentiment score in range [-1, 1] where -1 is most negative, 0 is neutral, and 1 is most positive"
+    )
+    confidence: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Confidence/probability of the sentiment prediction"
+    )
+    label: Optional[str] = Field(
+        None,
+        description="Categorical sentiment label (e.g., 'positive', 'negative', 'neutral')"
+    )
 
 
 class ToxicityDataset(BaseModel):
