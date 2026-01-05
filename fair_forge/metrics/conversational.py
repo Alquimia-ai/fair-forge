@@ -1,9 +1,9 @@
-from fair_forge import FairForge, Retriever
+from fair_forge.core import FairForge, Retriever
 from typing import Type, Optional
 from pydantic import SecretStr
 from fair_forge.schemas import Batch, ConversationalMetric
-from fair_forge.helpers.judge import Judge
-from fair_forge.prompts import (
+from fair_forge.llm import Judge
+from fair_forge.llm.prompts import (
     conversational_reasoning_system_prompt,
     conversational_reasoning_system_prompt_observation,
 )

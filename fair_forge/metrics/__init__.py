@@ -1,18 +1,18 @@
+"""Fair Forge metrics."""
 from .humanity import Humanity
-from .bias import Bias
-from .toxicity import Toxicity, HurtlexLoader
-from .context import Context
 from .conversational import Conversational
+from .context import Context
+from .bias import Bias
+from .toxicity import Toxicity
+from .best_of import BestOf
 from .agentic import Agentic
-from .bestOf import BestOf
 
 __all__ = [
     'Humanity',
+    'Conversational',
+    'Context',
     'Bias',
     'Toxicity',
-    'HurtlexLoader',
-    'Context',
-    'Conversational',
+    'BestOf',
     'Agentic',
-    'BestOf'
 ]

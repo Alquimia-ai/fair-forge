@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from fair_forge import FairForge, Retriever, Guardian
+from fair_forge.core import FairForge, Retriever, Guardian
 from typing import Type
 from fair_forge.schemas import Batch, ProtectedAttribute, BiasMetric
 import scipy.stats as st

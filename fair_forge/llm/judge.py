@@ -1,6 +1,6 @@
 from typing import Optional
 from pydantic import SecretStr
-from fair_forge.helpers.cot import ChainOfThought, CoT
+from fair_forge.llm.cot import ChainOfThought, CoT
 import re
 import logging
 import json
