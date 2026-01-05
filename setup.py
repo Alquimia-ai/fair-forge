@@ -6,7 +6,7 @@ from distutils.core import setup
 import setuptools
 from setuptools.command.install import install
 
-VERSION = "v0.0.1"
+VERSION = "v0.1.0"
 
 
 with open("requirements.txt") as f:

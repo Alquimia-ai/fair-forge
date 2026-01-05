@@ -24,7 +24,7 @@ from .schemas import (
 from .statistical import StatisticalMode, FrequentistMode, BayesianMode
 
 # Version
-__version__ = '0.0.1'
+__version__ = '0.1.0'
 
 __all__ = [
     # Core
