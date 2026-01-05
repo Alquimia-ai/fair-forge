@@ -376,25 +376,33 @@ metrics = Toxicity.run(
 **Configuration Parameters:**
 
 Core Parameters:
-- `group_prototypes` (required): Dictionary mapping group categories to prototype words for detection
+- `group_prototypes` (required if no `group_extractor`): Dictionary mapping group categories to prototype words for detection
 - `statistical_mode`: FrequentistMode() or BayesianMode() (default: FrequentistMode())
 - `embedding_model`: Model for text embeddings (default: "all-MiniLM-L6-v2")
 - `toxicity_loader`: Loader for toxicity lexicon (default: HurtlexLoader)
+- `sentiment_analyzer`: Optional SentimentAnalyzer instance for ASB calculation. If not provided, ASB will be 0.
 
 DIDT Framework Weights:
 - `w_DR`: Weight for Demographic Representation (default: 1/3)
 - `w_DTO`: Weight for Directed Toxicity per Group (default: 1/3)
 - `w_ASB`: Weight for Associated Sentiment Bias (default: 1/3)
 
-Group Detection Parameters:
+Group Extractor Parameters:
+- `group_extractor`: Optional custom BaseGroupExtractor instance. If not provided, uses EmbeddingGroupExtractor with the parameters below.
+- `group_prototypes`: Dictionary mapping group categories to prototype words (required if `group_extractor` is None)
 - `group_thresholds`: Custom similarity thresholds per group (default: 0.5 for all)
 - `group_default_threshold`: Default threshold for group detection (default: 0.5)
+- `group_extractor_batch_size`: Batch size for group extraction (default: 64)
+- `group_extractor_normalize_embeddings`: Whether to normalize embeddings for group extraction (default: True)
+
+Group Profiling Parameters:
 - `group_toxicity_threshold`: Minimum toxicity score to count as toxic (default: 0.0)
+- `group_reference_q`: Optional reference distribution for DR calculation. If not provided, uses uniform distribution across groups.
 
 Clustering Parameters:
 - `toxicity_min_cluster_size`: Minimum cluster size for HDBSCAN (default: 5)
 - `toxicity_cluster_selection_epsilon`: Epsilon for cluster selection (default: 0.01)
-- `toxicity_cluster_selection_method`: Distance metric (default: "euclidean")
+- `toxicity_cluster_selection_method`: Cluster distance metric (default: "euclidean")
 - `toxicity_cluster_use_latent_space`: Use latent space for clustering (default: True)
 
 UMAP Parameters:
