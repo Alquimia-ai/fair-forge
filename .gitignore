@@ -5,6 +5,7 @@ venv/
 .venv/
 env/
 ENV/
+test_runner/.env
 
 # Build artifacts
 dist/
@@ -14,6 +15,7 @@ alquimia_fair_forge.egg-info/
 
 # Python cache
 __pycache__/
+test_runner/__pycache__/
 *.pyc
 *.pyo
 *.pyd
@@ -44,3 +46,6 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude
+.claude
