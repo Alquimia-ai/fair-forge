@@ -35,6 +35,7 @@ test_runner/__pycache__/
 # Jupyter
 .ipynb_checkpoints
 *.ipynb_checkpoints/
+examples/pipeline/.virtual_documents/
 
 # IDEs
 .vscode/

@@ -1,28 +1,28 @@
-# test_runner/storage/local_storage.py
-
+"""Local filesystem storage implementation."""
 import json
 from pathlib import Path
 from datetime import datetime
 from loguru import logger
+
 from fair_forge.schemas.common import Dataset
-from .base import TestStorage
+from fair_forge.schemas.storage import BaseStorage
 
 
-class LocalTestStorage(TestStorage):
+class LocalStorage(BaseStorage):
     """Local filesystem implementation for test storage."""
 
-    def __init__(self, tests_dir: Path, results_dir: Path, enabled_suites: list[str]):
+    def __init__(self, tests_dir: Path, results_dir: Path, enabled_suites: list[str] | None = None):
         """
         Initialize local storage.
 
         Args:
             tests_dir: Directory containing test dataset JSON files
             results_dir: Directory for saving test results
-            enabled_suites: List of enabled test suite names (empty = all)
+            enabled_suites: List of enabled test suite names (None or empty = all)
         """
         self.tests_dir = Path(tests_dir)
         self.results_dir = Path(results_dir)
-        self.enabled_suites = enabled_suites
+        self.enabled_suites = enabled_suites or []
 
     def load_datasets(self) -> list[Dataset]:
         """
@@ -53,13 +53,13 @@ class LocalTestStorage(TestStorage):
 
             # Skip if we have a filter and this suite is not in it
             if self.enabled_suites and file_name not in self.enabled_suites:
-                logger.info(f"Skipping test suite: {file_name} (not in ENABLED_TEST_SUITES)")
+                logger.info(f"Skipping test suite: {file_name} (not in enabled_suites)")
                 continue
 
             logger.info(f"Loading test dataset: {file_name}")
 
             try:
-                with open(json_file, "r", encoding="utf-8") as f:
+                with open(json_file, encoding="utf-8") as f:
                     data = json.load(f)
 
                 # Support loading multiple datasets from a single file
@@ -122,3 +122,6 @@ class LocalTestStorage(TestStorage):
         except Exception as e:
             logger.error(f"Failed to save results locally: {e}")
             raise
+
+
+__all__ = ["LocalStorage"]

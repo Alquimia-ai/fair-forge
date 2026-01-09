@@ -1,12 +1,17 @@
-# test_runner/storage/base.py
-
+"""Storage interfaces for Fair Forge."""
 from abc import ABC, abstractmethod
 from datetime import datetime
-from fair_forge.schemas.common import Dataset
+
+from .common import Dataset
 
 
-class TestStorage(ABC):
-    """Abstract base class for test suite loading and result storage."""
+class BaseStorage(ABC):
+    """
+    Abstract base class for test dataset loading and result storage.
+
+    Storage implementations handle loading test datasets from various sources
+    (local filesystem, cloud storage, etc.) and saving execution results.
+    """
 
     @abstractmethod
     def load_datasets(self) -> list[Dataset]:
@@ -14,7 +19,7 @@ class TestStorage(ABC):
         Load test datasets from storage.
 
         Returns:
-            list[Dataset]: List of test datasets
+            list[Dataset]: List of test datasets loaded from storage
         """
         pass
 
@@ -29,6 +34,9 @@ class TestStorage(ABC):
             timestamp: Timestamp of test execution
 
         Returns:
-            str: Path where results were saved
+            str: Path or identifier where results were saved
         """
         pass
+
+
+__all__ = ["BaseStorage"]

@@ -1,18 +1,28 @@
-# test_runner/storage/lakefs_storage.py
-
+"""LakeFS storage implementation."""
 import json
 import lakefs
 from datetime import datetime
 from lakefs.client import Client as lakefs_client_class
 from loguru import logger
+
 from fair_forge.schemas.common import Dataset
-from .base import TestStorage
+from fair_forge.schemas.storage import BaseStorage
 
 
-class LakeFSTestStorage(TestStorage):
+class LakeFSStorage(BaseStorage):
     """LakeFS implementation for test storage."""
 
-    def __init__(self, host: str, username: str, password: str, repo_id: str, enabled_suites: list[str]):
+    def __init__(
+        self,
+        host: str,
+        username: str,
+        password: str,
+        repo_id: str,
+        enabled_suites: list[str] | None = None,
+        tests_prefix: str = "tests/",
+        results_prefix: str = "results/",
+        branch_name: str = "main",
+    ):
         """
         Initialize LakeFS storage.
 
@@ -21,12 +31,14 @@ class LakeFSTestStorage(TestStorage):
             username: LakeFS username
             password: LakeFS password
             repo_id: LakeFS repository ID
-            enabled_suites: List of enabled test suite names (empty = all)
+            enabled_suites: List of enabled test suite names (None or empty = all)
+            tests_prefix: Path prefix for test datasets in LakeFS
+            results_prefix: Path prefix for results in LakeFS
+            branch_name: Branch name to use (default: "main")
         """
         if not all([host, username, password, repo_id]):
             raise ValueError(
-                "LakeFS credentials are incomplete. Required: "
-                "LAKEFS_HOST, LAKEFS_USERNAME, LAKEFS_PASSWORD, LAKEFS_REPO_ID"
+                "LakeFS credentials are incomplete. Required: host, username, password, repo_id"
             )
 
         self.client = lakefs_client_class(
@@ -35,9 +47,11 @@ class LakeFSTestStorage(TestStorage):
             host=host,
         )
         self.repo = lakefs.Repository(repository_id=repo_id, client=self.client)
-        self.ref = self.repo.ref("main")
-        self.branch = self.repo.branch("main")
-        self.enabled_suites = enabled_suites
+        self.ref = self.repo.ref(branch_name)
+        self.branch = self.repo.branch(branch_name)
+        self.enabled_suites = enabled_suites or []
+        self.tests_prefix = tests_prefix
+        self.results_prefix = results_prefix
 
     def load_datasets(self) -> list[Dataset]:
         """
@@ -47,15 +61,14 @@ class LakeFSTestStorage(TestStorage):
             list[Dataset]: List of test datasets
         """
         datasets: list[Dataset] = []
-        base_path = "tests/"
 
-        logger.info("Loading test datasets from lakeFS...")
+        logger.info("Loading test datasets from LakeFS...")
 
         try:
-            all_objects = list(self.ref.objects(prefix=base_path))
-            json_files = [obj for obj in all_objects if obj.path.endswith('.json')]
+            all_objects = list(self.ref.objects(prefix=self.tests_prefix))
+            json_files = [obj for obj in all_objects if obj.path.endswith(".json")]
 
-            logger.info(f"Found {len(json_files)} JSON test file(s) in lakeFS")
+            logger.info(f"Found {len(json_files)} JSON test file(s) in LakeFS")
 
             for obj in json_files:
                 remote_path = obj.path
@@ -63,7 +76,7 @@ class LakeFSTestStorage(TestStorage):
 
                 # Skip if we have a filter and this suite is not in it
                 if self.enabled_suites and file_name not in self.enabled_suites:
-                    logger.info(f"Skipping test suite: {file_name} (not in ENABLED_TEST_SUITES)")
+                    logger.info(f"Skipping test suite: {file_name} (not in enabled_suites)")
                     continue
 
                 logger.info(f"Loading test dataset: {file_name}")
@@ -96,7 +109,7 @@ class LakeFSTestStorage(TestStorage):
                 logger.info(f"Loaded {len(datasets)} dataset(s) with {total_batches} total test case(s)")
 
         except Exception as e:
-            logger.error(f"Failed to list objects from lakeFS: {e}")
+            logger.error(f"Failed to list objects from LakeFS: {e}")
             raise
 
         return datasets
@@ -115,16 +128,16 @@ class LakeFSTestStorage(TestStorage):
         """
         timestamp_str = timestamp.strftime("%Y%m%d_%H%M%S")
         file_name = f"test_run_{timestamp_str}_{run_id}.json"
-        remote_path = f"results/{file_name}"
+        remote_path = f"{self.results_prefix}{file_name}"
 
-        logger.info(f"Saving results to lakeFS: {remote_path}")
+        logger.info(f"Saving results to LakeFS: {remote_path}")
 
         try:
             # Convert datasets to JSON
             results_data = [dataset.model_dump() for dataset in datasets]
             results_json = json.dumps(results_data, indent=2, ensure_ascii=False)
 
-            # Write to lakeFS
+            # Write to LakeFS
             with self.branch.object(remote_path).writer(mode="wb") as writer:
                 writer.write(results_json.encode("utf-8"))
 
@@ -132,5 +145,8 @@ class LakeFSTestStorage(TestStorage):
             return remote_path
 
         except Exception as e:
-            logger.error(f"Failed to save results to lakeFS: {e}")
+            logger.error(f"Failed to save results to LakeFS: {e}")
             raise
+
+
+__all__ = ["LakeFSStorage"]
