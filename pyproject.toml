@@ -26,7 +26,7 @@ keywords = [
     "assistant",
     "nlp",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -64,9 +64,18 @@ dependencies = [
     "jinja2>=3.1.0",
     "umap-learn>=0.5.6,<0.6.0",
     "hdbscan>=0.8.41",
+    # Core
+    "alquimia-client>=0.1.0",
+    "lakefs>=0.11.1",
+    "python-dotenv>=1.0.0",
+    "loguru>=0.7.3",
+    # Async / runtime
+    "httpx>=0.28.1",
+    "aiosseclient>=0.1.8"
 ]
 
 [project.optional-dependencies]
+# Cloud storage support (includes LakeFSStorage for runners module)
 cloud = [
     "boto3>=1.28.0",
     "lakefs>=0.14.0",
@@ -75,6 +84,12 @@ cloud = [
 all = [
     "alquimia-fair-forge[cloud]",
 ]
+
+# Note: The runners module is included in the base installation with the following dependencies:
+# - alquimia-client (for AlquimiaRunner)
+# - loguru (for logging)
+# - python-dotenv (for configuration)
+# Install with cloud extras for LakeFSStorage support: pip install alquimia-fair-forge[cloud]
 
 # Development tools
 dev = [
@@ -144,6 +159,8 @@ packages = ["fair_forge"]
 include = [
     "fair_forge/**/*.py",
     "fair_forge/artifacts/**/*",
+    "fair_forge/runners/**/*.py",
+    "fair_forge/storage/**/*.py",
     "README.md",
     "LICENSE",
     "CONTRIBUTING.md",
@@ -155,6 +172,7 @@ exclude = [
     "**/.DS_Store",
     "**/test_*.py",
     "tests/**",
+    "test_runner/**",
 ]
 
 # Ruff configuration - Modern, fast Python linter & formatter

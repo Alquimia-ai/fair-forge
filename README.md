@@ -515,6 +515,256 @@ For practical examples of how to use Alquimia AI Fair Forge, please refer to our
 
 Each example includes detailed comments and explanations to help you understand the implementation details. Feel free to use these examples as a starting point for your own implementations.
 
+## Runners Module
+
+Fair Forge includes a modular **runners** system for executing test suites against AI systems. The runners module provides a flexible architecture for testing agents, models, and APIs with comprehensive storage backends.
+
+### Architecture
+
+The runners module consists of 2 main components:
+
+1. **Runners** (`fair_forge.runners`): Execute test batches against AI systems
+   - `BaseRunner`: Abstract interface for custom runner implementations
+   - `AlquimiaRunner`: Built-in implementation for Alquimia AI agents
+
+2. **Storage** (`fair_forge.storage`): Load test datasets and save results
+   - `LocalStorage`: Local filesystem storage
+   - `LakeFSStorage`: Cloud-based version control with LakeFS
+
+### Quick Start with AlquimiaRunner
+
+```python
+import asyncio
+from pathlib import Path
+from datetime import datetime
+from fair_forge.runners import AlquimiaRunner
+from fair_forge.storage import create_local_storage
+
+# 1. Configure storage
+storage = create_local_storage(
+    tests_dir=Path("./test_datasets"),
+    results_dir=Path("./test_results"),
+)
+
+# 2. Configure runner
+runner = AlquimiaRunner(
+    base_url="https://api.alquimia.ai",
+    api_key="your-api-key",
+    agent_id="your-agent-id",
+    channel_id="your-channel-id",
+)
+
+# 3. Load and execute tests
+async def run_tests():
+    datasets = storage.load_datasets()
+
+    for dataset in datasets:
+        updated_dataset, summary = await runner.run_dataset(dataset)
+        print(f"Completed: {summary['successes']}/{summary['total_batches']} passed")
+
+        # Save results
+        storage.save_results([updated_dataset], "run_001", datetime.now())
+
+asyncio.run(run_tests())
+```
+
+### Storage Backends
+
+#### Local Storage
+
+Store test datasets and results on local filesystem:
+
+```python
+from fair_forge.storage import create_local_storage
+
+storage = create_local_storage(
+    tests_dir="./test_datasets",
+    results_dir="./test_results",
+    enabled_suites=None,  # None = load all suites
+)
+```
+
+**Directory Structure**:
+```
+test_datasets/
+├── prompt_injection.json
+├── toxicity.json
+└── general_qa.json
+
+test_results/
+└── test_run_20260108_143022_abc123.json
+```
+
+#### LakeFS Storage
+
+Store test datasets and results in LakeFS for version control:
+
+```python
+from fair_forge.storage import create_lakefs_storage
+
+storage = create_lakefs_storage(
+    host="https://lakefs.example.com",
+    username="admin",
+    password="your-password",
+    repo_id="fair-forge-tests",
+    enabled_suites=None,
+    tests_prefix="tests/",
+    results_prefix="results/",
+    branch_name="main",
+)
+```
+
+#### Storage Factory
+
+Use the factory function for dynamic backend selection:
+
+```python
+from fair_forge.storage import create_storage
+
+# Local storage
+storage = create_storage(
+    backend="local",
+    tests_dir="./tests",
+    results_dir="./results",
+)
+
+# LakeFS storage
+storage = create_storage(
+    backend="lakefs",
+    host="https://lakefs.example.com",
+    username="admin",
+    password="password",
+    repo_id="my-repo",
+)
+```
+
+### Tests Format
+
+Test suites use Fair Forge's standard Dataset schema:
+
+```json
+{
+  "session_id": "test_suite_001",
+  "assistant_id": "my_agent",
+  "language": "english",
+  "context": "Test suite description",
+  "conversation": [
+    {
+      "qa_id": "test_001",
+      "query": "What is AI?",
+      "assistant": "",
+      "ground_truth_assistant": "AI is artificial intelligence",
+      "observation": "Basic knowledge test",
+      "agentic": {},
+      "ground_truth_agentic": {}
+    }
+  ]
+}
+```
+
+### Test Suite Filtering
+
+Filter which test suites to load using the `enabled_suites` parameter:
+
+```python
+# Load only specific test suites
+storage = create_local_storage(
+    tests_dir="./test_datasets",
+    results_dir="./test_results",
+    enabled_suites=["prompt_injection", "toxicity"],
+)
+
+# Load all test suites
+storage = create_local_storage(
+    tests_dir="./test_datasets",
+    results_dir="./test_results",
+    enabled_suites=None,
+)
+```
+
+The `enabled_suites` filter matches against JSON filenames without extension.
+
+### Creating Custom Runners
+
+Implement custom runners by extending the `BaseRunner` interface:
+
+```python
+from fair_forge.schemas.runner import BaseRunner
+from fair_forge.schemas.common import Batch, Dataset
+from typing import Any
+
+class CustomRunner(BaseRunner):
+    """Custom runner for your AI system."""
+
+    def __init__(self, api_key: str, endpoint: str):
+        self.api_key = api_key
+        self.endpoint = endpoint
+
+    async def run_batch(
+        self,
+        batch: Batch,
+        session_id: str,
+        **kwargs: Any
+    ) -> tuple[Batch, bool, float]:
+        """Execute a single test case."""
+        import time
+        start = time.time()
+
+        try:
+            # Call your AI system API
+            response = await self._call_api(batch.query, session_id)
+
+            # Update batch with response
+            updated_batch = batch.model_copy(
+                update={"assistant": response}
+            )
+
+            exec_time = (time.time() - start) * 1000
+            return updated_batch, True, exec_time
+
+        except Exception as e:
+            exec_time = (time.time() - start) * 1000
+            error_batch = batch.model_copy(
+                update={"assistant": f"[ERROR] {str(e)}"}
+            )
+            return error_batch, False, exec_time
+
+    async def run_dataset(
+        self,
+        dataset: Dataset,
+        **kwargs: Any
+    ) -> tuple[Dataset, dict[str, Any]]:
+        """Execute all test cases in a dataset."""
+        # Implement dataset execution logic
+        # See AlquimiaRunner for reference implementation
+        pass
+```
+
+### Integration with Fair Forge Metrics
+
+Test results are fully compatible with Fair Forge metrics for comprehensive analysis:
+
+```python
+from fair_forge.metrics import Toxicity, Bias, Context
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Dataset
+import json
+
+# Create a custom retriever for your test results
+class TestResultsRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        with open("test_results/test_run_latest.json") as f:
+            data = json.load(f)
+            return [Dataset.model_validate(d) for d in data]
+
+# Analyze test results with metrics
+toxicity_metrics = Toxicity.run(TestResultsRetriever)
+bias_metrics = Bias.run(TestResultsRetriever, ...)
+context_metrics = Context.run(TestResultsRetriever, ...)
+```
+
+This enables comprehensive evaluation of agent behavior using toxicity, bias, conversational quality, and other metrics on your test execution results.
+
 ## Contributing
 
 To contribute a new metric to Fair Forge, follow these steps:
