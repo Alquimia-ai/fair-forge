@@ -1,7 +1,8 @@
 from pydantic import BaseModel
 from fair_forge.core import FairForge, Retriever, Guardian
 from typing import Type
-from fair_forge.schemas import Batch, ProtectedAttribute, BiasMetric
+from fair_forge.schemas import Batch
+from fair_forge.schemas.bias import BiasMetric, ProtectedAttribute
 import scipy.stats as st
 from tqdm import tqdm
 

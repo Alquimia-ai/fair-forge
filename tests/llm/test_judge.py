@@ -1,229 +1,305 @@
 """Tests for Judge module."""
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from pydantic import SecretStr
+from pydantic import BaseModel, Field
+
 from fair_forge.llm.judge import Judge
-from fair_forge.llm.cot import ChainOfThought
+from fair_forge.llm.schemas import ContextJudgeOutput
+
+
+class MockResponseSchema(BaseModel):
+    """Mock schema for testing structured output."""
+
+    score: float = Field(ge=0, le=1)
+    message: str
 
 
 class TestJudge:
     """Test suite for Judge class."""
 
-    @patch('fair_forge.llm.judge.ChatOpenAI')
-    def test_initialization_without_cot(self, mock_chat_openai):
-        """Test Judge initialization without Chain of Thought."""
-        judge = Judge()
-        assert judge.cot is None
-        assert judge.chat_history == []
+    @pytest.fixture
+    def mock_model(self):
+        """Create a mock BaseChatModel."""
+        return MagicMock()
+
+    def test_initialization_default(self, mock_model):
+        """Test Judge initialization with defaults."""
+        judge = Judge(model=mock_model)
+        assert judge.model == mock_model
+        assert judge.use_structured_output is False
+        assert judge.bos_think_token is None
+        assert judge.eos_think_token is None
         assert judge.bos_json_clause == "```json"
         assert judge.eos_json_clause == "```"
-        mock_chat_openai.assert_called_once()
+        assert judge.chat_history == []
 
-    @patch('fair_forge.llm.judge.CoT')
-    def test_initialization_with_cot(self, mock_cot):
-        """Test Judge initialization with Chain of Thought tokens."""
-        judge = Judge(bos_think_token="<think>", eos_think_token="</think>")
-        assert judge.cot is not None
-        mock_cot.assert_called_once_with(
-            bos_think_token="<think>",
-            eos_think_token="</think>",
-            base_url="https://api.groq.com/openai",
-            api_key=SecretStr(""),
-            model="deepseek-r1-distill-llama-70b",
-            temperature=0,
+    def test_initialization_with_structured_output(self, mock_model):
+        """Test Judge initialization with structured output enabled."""
+        judge = Judge(model=mock_model, use_structured_output=True)
+        assert judge.use_structured_output is True
+
+    def test_initialization_with_think_tokens(self, mock_model):
+        """Test Judge initialization with think tokens."""
+        judge = Judge(
+            model=mock_model, bos_think_token="<think>", eos_think_token="</think>"
         )
+        assert judge.bos_think_token == "<think>"
+        assert judge.eos_think_token == "</think>"
 
-    @patch('fair_forge.llm.judge.ChatOpenAI')
-    def test_initialization_custom_json_clauses(self, mock_chat_openai):
+    def test_initialization_custom_json_clauses(self, mock_model):
         """Test Judge initialization with custom JSON clauses."""
-        judge = Judge(bos_json_clause="<json>", eos_json_clause="</json>")
+        judge = Judge(
+            model=mock_model, bos_json_clause="<json>", eos_json_clause="</json>"
+        )
         assert judge.bos_json_clause == "<json>"
         assert judge.eos_json_clause == "</json>"
 
-    @patch('fair_forge.llm.judge.ChatOpenAI')
-    @patch('fair_forge.llm.judge.ChatPromptTemplate')
-    def test_direct_inference(self, mock_template, mock_chat_openai):
-        """Test direct_inference method."""
-        mock_model = MagicMock()
-        mock_chain = MagicMock()
-        mock_chat_openai.return_value = mock_model
-        mock_template.from_messages.return_value.__or__ = Mock(return_value=mock_chain)
-
+    @patch("fair_forge.llm.judge.ChatPromptTemplate")
+    def test_check_regex_mode_valid_json(self, mock_template, mock_model):
+        """Test check method in regex mode with valid JSON."""
         mock_response = MagicMock()
-        mock_response.content = "This is the response"
+        mock_response.content = (
+            'Here is the result:\n```json\n{"score": 0.85, "valid": true}\n```'
+        )
+
+        mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response
 
-        judge = Judge()
-        result = judge.direct_inference("System prompt", "User query")
+        mock_prompt = MagicMock()
+        mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+        mock_template.from_messages.return_value = mock_prompt
 
-        assert isinstance(result, ChainOfThought)
-        assert result.thought == ""
-        assert result.answer == "This is the response"
-        assert ("human", "User query") in judge.chat_history
-
-    @patch('fair_forge.llm.judge.ChatOpenAI')
-    @patch('fair_forge.llm.judge.ChatPromptTemplate')
-    def test_check_without_cot_valid_json(self, mock_template, mock_chat_openai):
-        """Test check method without CoT returning valid JSON."""
-        mock_model = MagicMock()
-        mock_chain = MagicMock()
-        mock_chat_openai.return_value = mock_model
-        mock_template.from_messages.return_value.__or__ = Mock(return_value=mock_chain)
-
-        mock_response = MagicMock()
-        mock_response.content = 'Here is the result:\n```json\n{"score": 0.85, "valid": true}\n```'
-        mock_chain.invoke.return_value = mock_response
-
-        judge = Judge()
+        judge = Judge(model=mock_model)
         thought, json_data = judge.check("System prompt", "Query", {"key": "value"})
 
         assert thought == ""
         assert json_data == {"score": 0.85, "valid": True}
 
-    @patch('fair_forge.llm.judge.CoT')
-    def test_check_with_cot_valid_json(self, mock_cot):
-        """Test check method with CoT returning valid JSON."""
-        mock_cot_instance = MagicMock()
-        mock_cot.return_value = mock_cot_instance
-        mock_cot_instance.reason.return_value = ChainOfThought(
-            thought="I need to analyze this",
-            answer='```json\n{"result": "success"}\n```'
-        )
-
-        judge = Judge(bos_think_token="<think>", eos_think_token="</think>")
-        thought, json_data = judge.check("System", "Query", {})
-
-        assert thought == "I need to analyze this"
-        assert json_data == {"result": "success"}
-
-    @patch('fair_forge.llm.judge.ChatOpenAI')
-    @patch('fair_forge.llm.judge.ChatPromptTemplate')
-    def test_check_no_json_found(self, mock_template, mock_chat_openai, caplog):
-        """Test check method when no JSON is found."""
-        mock_model = MagicMock()
-        mock_chain = MagicMock()
-        mock_chat_openai.return_value = mock_model
-        mock_template.from_messages.return_value.__or__ = Mock(return_value=mock_chain)
-
+    @patch("fair_forge.llm.judge.ChatPromptTemplate")
+    def test_check_regex_mode_no_json_found(self, mock_template, mock_model):
+        """Test check method in regex mode when no JSON found."""
         mock_response = MagicMock()
         mock_response.content = "Response without JSON"
+
+        mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response
 
-        judge = Judge()
+        mock_prompt = MagicMock()
+        mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+        mock_template.from_messages.return_value = mock_prompt
+
+        judge = Judge(model=mock_model)
         thought, json_data = judge.check("System", "Query", {})
 
         assert thought == ""
         assert json_data is None
 
-    @patch('fair_forge.llm.judge.ChatOpenAI')
-    @patch('fair_forge.llm.judge.ChatPromptTemplate')
-    def test_check_invalid_json(self, mock_template, mock_chat_openai, caplog):
-        """Test check method with invalid JSON."""
-        mock_model = MagicMock()
-        mock_chain = MagicMock()
-        mock_chat_openai.return_value = mock_model
-        mock_template.from_messages.return_value.__or__ = Mock(return_value=mock_chain)
-
+    @patch("fair_forge.llm.judge.ChatPromptTemplate")
+    def test_check_regex_mode_invalid_json(self, mock_template, mock_model):
+        """Test check method in regex mode with invalid JSON."""
         mock_response = MagicMock()
-        mock_response.content = '```json\n{invalid json}\n```'
+        mock_response.content = "```json\n{invalid json}\n```"
+
+        mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response
 
-        judge = Judge()
+        mock_prompt = MagicMock()
+        mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+        mock_template.from_messages.return_value = mock_prompt
+
+        judge = Judge(model=mock_model)
         thought, json_data = judge.check("System", "Query", {})
 
         assert thought == ""
         assert json_data is None
 
-    @patch('fair_forge.llm.judge.ChatOpenAI')
-    @patch('fair_forge.llm.judge.ChatPromptTemplate')
-    def test_check_custom_json_clauses(self, mock_template, mock_chat_openai):
+    @patch("fair_forge.llm.judge.ChatPromptTemplate")
+    def test_check_regex_mode_custom_json_clauses(self, mock_template, mock_model):
         """Test check method with custom JSON clauses."""
-        mock_model = MagicMock()
-        mock_chain = MagicMock()
-        mock_chat_openai.return_value = mock_model
-        mock_template.from_messages.return_value.__or__ = Mock(return_value=mock_chain)
-
         mock_response = MagicMock()
         mock_response.content = 'Result: <json>{"value": 42}</json>'
+
+        mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response
 
-        judge = Judge(bos_json_clause="<json>", eos_json_clause="</json>")
+        mock_prompt = MagicMock()
+        mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+        mock_template.from_messages.return_value = mock_prompt
+
+        judge = Judge(
+            model=mock_model, bos_json_clause="<json>", eos_json_clause="</json>"
+        )
         thought, json_data = judge.check("System", "Query", {})
 
         assert json_data == {"value": 42}
 
-    @patch('fair_forge.llm.judge.ChatOpenAI')
-    @patch('fair_forge.llm.judge.ChatPromptTemplate')
-    def test_direct_inference_with_kwargs(self, mock_template, mock_chat_openai):
-        """Test direct_inference passes kwargs to invoke."""
-        mock_model = MagicMock()
-        mock_chain = MagicMock()
-        mock_chat_openai.return_value = mock_model
-        mock_template.from_messages.return_value.__or__ = Mock(return_value=mock_chain)
-
+    @patch("fair_forge.llm.judge.ChatPromptTemplate")
+    def test_check_regex_mode_with_think_tokens(self, mock_template, mock_model):
+        """Test check method extracts thinking content."""
         mock_response = MagicMock()
-        mock_response.content = "Response"
+        mock_response.content = '<think>Let me analyze this</think>\n```json\n{"result": "done"}\n```'
+
+        mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response
 
-        judge = Judge()
-        judge.direct_inference("System", "Query", custom_key="custom_value")
+        mock_prompt = MagicMock()
+        mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+        mock_template.from_messages.return_value = mock_prompt
 
-        mock_chain.invoke.assert_called_once_with({'custom_key': 'custom_value'})
+        judge = Judge(
+            model=mock_model, bos_think_token="<think>", eos_think_token="</think>"
+        )
+        thought, json_data = judge.check("System", "Query", {})
 
-    @patch('fair_forge.llm.judge.ChatOpenAI')
-    def test_chat_history_accumulates(self, mock_chat_openai):
-        """Test that chat history accumulates across calls."""
-        mock_model = MagicMock()
-        mock_chat_openai.return_value = mock_model
+        assert thought == "Let me analyze this"
+        assert json_data == {"result": "done"}
 
-        with patch('fair_forge.llm.judge.ChatPromptTemplate') as mock_template:
-            mock_chain = MagicMock()
-            mock_template.from_messages.return_value.__or__ = Mock(return_value=mock_chain)
-            mock_response = MagicMock()
-            mock_response.content = "Response"
-            mock_chain.invoke.return_value = mock_response
+    @patch("fair_forge.llm.judge.ChatPromptTemplate")
+    def test_check_structured_mode(self, mock_template, mock_model):
+        """Test check method in structured output mode."""
+        expected_result = ContextJudgeOutput(score=0.9, insight="Good context")
 
-            judge = Judge()
-            assert len(judge.chat_history) == 0
+        mock_structured_model = MagicMock()
+        mock_model.with_structured_output.return_value = mock_structured_model
 
-            judge.direct_inference("System", "Query 1")
-            assert len(judge.chat_history) == 1
-
-            judge.direct_inference("System", "Query 2")
-            assert len(judge.chat_history) == 2
-
-    @patch('fair_forge.llm.judge.ChatOpenAI')
-    @patch('fair_forge.llm.judge.ChatPromptTemplate')
-    def test_check_json_with_whitespace(self, mock_template, mock_chat_openai):
-        """Test check handles JSON with extra whitespace."""
-        mock_model = MagicMock()
         mock_chain = MagicMock()
-        mock_chat_openai.return_value = mock_model
-        mock_template.from_messages.return_value.__or__ = Mock(return_value=mock_chain)
+        mock_chain.invoke.return_value = expected_result
 
+        mock_prompt = MagicMock()
+        mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+        mock_template.from_messages.return_value = mock_prompt
+
+        judge = Judge(model=mock_model, use_structured_output=True)
+        thought, result = judge.check(
+            "System", "Query", {}, output_schema=ContextJudgeOutput
+        )
+
+        assert thought == ""
+        assert result == expected_result
+        mock_model.with_structured_output.assert_called_once_with(ContextJudgeOutput)
+
+    @patch("fair_forge.llm.judge.ChatPromptTemplate")
+    def test_check_structured_mode_fallback_to_regex(self, mock_template, mock_model):
+        """Test check falls back to regex when no schema provided in structured mode."""
+        mock_response = MagicMock()
+        mock_response.content = '```json\n{"score": 0.5}\n```'
+
+        mock_chain = MagicMock()
+        mock_chain.invoke.return_value = mock_response
+
+        mock_prompt = MagicMock()
+        mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+        mock_template.from_messages.return_value = mock_prompt
+
+        judge = Judge(model=mock_model, use_structured_output=True)
+        thought, result = judge.check("System", "Query", {}, output_schema=None)
+
+        assert result == {"score": 0.5}
+
+    @patch("fair_forge.llm.judge.ChatPromptTemplate")
+    def test_chat_history_accumulates(self, mock_template, mock_model):
+        """Test that chat history accumulates across calls."""
+        mock_response = MagicMock()
+        mock_response.content = '```json\n{"result": 1}\n```'
+
+        mock_chain = MagicMock()
+        mock_chain.invoke.return_value = mock_response
+
+        mock_prompt = MagicMock()
+        mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+        mock_template.from_messages.return_value = mock_prompt
+
+        judge = Judge(model=mock_model)
+        assert len(judge.chat_history) == 0
+
+        judge.check("System", "Query 1", {})
+        assert len(judge.chat_history) == 1
+        assert judge.chat_history[0] == ("human", "Query 1")
+
+        judge.check("System", "Query 2", {})
+        assert len(judge.chat_history) == 2
+        assert judge.chat_history[1] == ("human", "Query 2")
+
+    @patch("fair_forge.llm.judge.ChatPromptTemplate")
+    def test_check_json_with_whitespace(self, mock_template, mock_model):
+        """Test check handles JSON with extra whitespace."""
         mock_response = MagicMock()
         mock_response.content = '```json   \n  {"key": "value"}  \n  ```'
+
+        mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response
 
-        judge = Judge()
+        mock_prompt = MagicMock()
+        mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+        mock_template.from_messages.return_value = mock_prompt
+
+        judge = Judge(model=mock_model)
         thought, json_data = judge.check("System", "Query", {})
 
         assert json_data == {"key": "value"}
 
-    @patch('fair_forge.llm.judge.ChatOpenAI')
-    @patch('fair_forge.llm.judge.ChatPromptTemplate')
-    def test_check_nested_json(self, mock_template, mock_chat_openai):
+    @patch("fair_forge.llm.judge.ChatPromptTemplate")
+    def test_check_nested_json(self, mock_template, mock_model):
         """Test check handles nested JSON."""
-        mock_model = MagicMock()
-        mock_chain = MagicMock()
-        mock_chat_openai.return_value = mock_model
-        mock_template.from_messages.return_value.__or__ = Mock(return_value=mock_chain)
-
         mock_response = MagicMock()
         mock_response.content = '```json\n{"outer": {"inner": [1, 2, 3]}}\n```'
+
+        mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response
 
-        judge = Judge()
+        mock_prompt = MagicMock()
+        mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+        mock_template.from_messages.return_value = mock_prompt
+
+        judge = Judge(model=mock_model)
         thought, json_data = judge.check("System", "Query", {})
 
         assert json_data == {"outer": {"inner": [1, 2, 3]}}
+
+    def test_get_json_schema_for_prompt(self, mock_model):
+        """Test JSON schema generation for prompt."""
+        judge = Judge(model=mock_model)
+        schema_str = judge._get_json_schema_for_prompt(ContextJudgeOutput)
+
+        assert "score" in schema_str
+        assert "insight" in schema_str
+        assert "```json" in schema_str
+
+    @patch("fair_forge.llm.judge.ChatPromptTemplate")
+    def test_check_with_schema_in_regex_mode(self, mock_template, mock_model):
+        """Test check appends schema to prompt in regex mode."""
+        mock_response = MagicMock()
+        mock_response.content = '```json\n{"score": 0.7, "insight": "test"}\n```'
+
+        mock_chain = MagicMock()
+        mock_chain.invoke.return_value = mock_response
+
+        mock_prompt = MagicMock()
+        mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+        mock_template.from_messages.return_value = mock_prompt
+
+        judge = Judge(model=mock_model, use_structured_output=False)
+        thought, result = judge.check(
+            "System", "Query", {}, output_schema=ContextJudgeOutput
+        )
+
+        assert result == {"score": 0.7, "insight": "test"}
+
+    def test_extract_json_basic(self, mock_model):
+        """Test _extract_json with basic JSON."""
+        judge = Judge(model=mock_model)
+        result = judge._extract_json('some text ```json\n{"key": "value"}\n``` more text')
+        assert result == {"key": "value"}
+
+    def test_extract_json_not_found(self, mock_model):
+        """Test _extract_json when no JSON found."""
+        judge = Judge(model=mock_model)
+        result = judge._extract_json("no json here")
+        assert result is None
+
+    def test_extract_json_invalid(self, mock_model):
+        """Test _extract_json with invalid JSON."""
+        judge = Judge(model=mock_model)
+        result = judge._extract_json("```json\n{invalid}\n```")
+        assert result is None

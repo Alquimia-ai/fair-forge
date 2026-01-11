@@ -103,7 +103,7 @@ class BestOfDatasetRetriever(Retriever):
 
     def load_dataset(self) -> list[Dataset]:
         """Return best-of testing dataset."""
-        return [create_bestof_dataset()]
+        return create_bestof_dataset()
 
 
 class ErrorRetriever(Retriever):
