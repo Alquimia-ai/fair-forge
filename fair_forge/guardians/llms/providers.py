@@ -7,7 +7,7 @@ import math
 import requests
 from typing import Any
 import torch
-from fair_forge.schemas import LLMGuardianProviderInfer,LLMGuardianProvider
+from fair_forge.schemas.bias import LLMGuardianProviderInfer, LLMGuardianProvider
 
 
 

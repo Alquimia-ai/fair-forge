@@ -62,7 +62,7 @@ class BayesianSummary(BaseModel):
 
 class GroupProfilingBayesian(BaseModel):
     """Bayesian statistics for group profiling."""
-    priors: Dict[str, float]
+    priors: float
     mc_samples: int
     ci_level: float
     q_i: Optional[Dict[str, float]] = None
@@ -82,7 +82,7 @@ class GroupProfiling(BaseModel):
     q_i: Dict[str, float]
     T_i: Dict[str, float]
 
-    frequentist: GroupProfilingFrequentist
+    frequentist: Optional[GroupProfilingFrequentist] = None
     bayesian: Optional[GroupProfilingBayesian] = None
 
     toxicity_threshold: float = 0.0

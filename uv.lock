@@ -196,6 +196,7 @@ all = [
     { name = "httpx" },
     { name = "lakefs" },
     { name = "nltk" },
+    { name = "numba" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "python-dotenv" },
@@ -205,13 +206,7 @@ all = [
     { name = "umap-learn" },
 ]
 bias = [
-    { name = "hdbscan" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "scikit-learn" },
-    { name = "sentence-transformers" },
     { name = "torch" },
-    { name = "umap-learn" },
 ]
 cloud = [
     { name = "boto3" },
@@ -240,6 +235,7 @@ humanity = [
 metrics = [
     { name = "hdbscan" },
     { name = "nltk" },
+    { name = "numba" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "scikit-learn" },
@@ -256,6 +252,7 @@ runners = [
 toxicity = [
     { name = "hdbscan" },
     { name = "nltk" },
+    { name = "numba" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "scikit-learn" },
@@ -289,7 +286,6 @@ requires-dist = [
     { name = "alquimia-fair-forge", extras = ["context", "conversational", "bestof", "humanity", "toxicity", "bias"], marker = "extra == 'metrics'" },
     { name = "alquimia-fair-forge", extras = ["metrics", "runners", "cloud"], marker = "extra == 'all'" },
     { name = "boto3", marker = "extra == 'cloud'", specifier = ">=1.28.0" },
-    { name = "hdbscan", marker = "extra == 'bias'", specifier = ">=0.8.41" },
     { name = "hdbscan", marker = "extra == 'toxicity'", specifier = ">=0.8.41" },
     { name = "httpx", marker = "extra == 'runners'", specifier = ">=0.28.1" },
     { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.0.0" },
@@ -301,10 +297,9 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8.0" },
     { name = "nltk", marker = "extra == 'toxicity'", specifier = ">=3.8.0" },
     { name = "notebook", marker = "extra == 'dev'", specifier = ">=7.0.0" },
-    { name = "numpy", marker = "extra == 'bias'", specifier = ">=1.24.0" },
+    { name = "numba", marker = "extra == 'toxicity'", specifier = ">=0.57.0" },
     { name = "numpy", marker = "extra == 'humanity'", specifier = ">=1.24.0" },
     { name = "numpy", marker = "extra == 'toxicity'", specifier = ">=1.24.0" },
-    { name = "pandas", marker = "extra == 'bias'", specifier = ">=2.0.0" },
     { name = "pandas", marker = "extra == 'humanity'", specifier = ">=2.0.0" },
     { name = "pandas", marker = "extra == 'toxicity'", specifier = ">=2.0.0" },
     { name = "pandas-stubs", marker = "extra == 'dev'", specifier = ">=2.0.0" },
@@ -316,10 +311,8 @@ requires-dist = [
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.5.0" },
     { name = "python-dotenv", marker = "extra == 'runners'", specifier = ">=1.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
-    { name = "scikit-learn", marker = "extra == 'bias'", specifier = ">=1.3.0,<1.8" },
     { name = "scikit-learn", marker = "extra == 'toxicity'", specifier = ">=1.3.0,<1.8" },
     { name = "scipy", specifier = ">=1.14.1" },
-    { name = "sentence-transformers", marker = "extra == 'bias'", specifier = ">=5.0.0" },
     { name = "sentence-transformers", marker = "extra == 'toxicity'", specifier = ">=5.0.0" },
     { name = "sphinx", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "sphinx-rtd-theme", marker = "extra == 'dev'", specifier = ">=2.0.0" },
@@ -328,7 +321,6 @@ requires-dist = [
     { name = "tqdm", specifier = ">=4.65.0" },
     { name = "transformers", specifier = ">=4.35.0" },
     { name = "types-tqdm", marker = "extra == 'dev'", specifier = ">=4.66.0" },
-    { name = "umap-learn", marker = "extra == 'bias'", specifier = ">=0.5.6,<0.6.0" },
     { name = "umap-learn", marker = "extra == 'toxicity'", specifier = ">=0.5.6,<0.6.0" },
 ]
 provides-extras = ["context", "conversational", "bestof", "humanity", "toxicity", "bias", "metrics", "runners", "cloud", "all", "dev"]
