@@ -184,34 +184,38 @@ def create_context_dataset() -> Dataset:
     )
 
 
-def create_bestof_dataset() -> Dataset:
-    """Create a dataset for BestOf metric testing with multiple responses."""
-    conversation = [
-        create_sample_batch(
-            qa_id="qa_001",
-            query="Explain photosynthesis.",
-            assistant="Photosynthesis is the process by which plants convert sunlight into energy.",
-            ground_truth_assistant="Plants use photosynthesis to convert light energy into chemical energy.",
+def create_bestof_dataset() -> list[Dataset]:
+    """Create datasets for BestOf metric testing with multiple assistants."""
+    return [
+        Dataset(
+            session_id="bestof_session",
+            assistant_id="assistant_a",
+            language="english",
+            context="Comparing multiple responses for quality",
+            conversation=[
+                create_sample_batch(
+                    qa_id="qa_001",
+                    query="Explain photosynthesis.",
+                    assistant="Photosynthesis is the process by which plants convert sunlight into energy.",
+                    ground_truth_assistant="Plants use photosynthesis to convert light energy into chemical energy.",
+                ),
+            ],
         ),
-        create_sample_batch(
-            qa_id="qa_001",
-            query="Explain photosynthesis.",
-            assistant="Plants use chlorophyll to capture sunlight and produce glucose and oxygen.",
-            ground_truth_assistant="Plants use photosynthesis to convert light energy into chemical energy.",
-        ),
-        create_sample_batch(
-            qa_id="qa_001",
-            query="Explain photosynthesis.",
-            assistant="It's a complex biochemical process where plants make their own food using light.",
-            ground_truth_assistant="Plants use photosynthesis to convert light energy into chemical energy.",
+        Dataset(
+            session_id="bestof_session",
+            assistant_id="assistant_b",
+            language="english",
+            context="Comparing multiple responses for quality",
+            conversation=[
+                create_sample_batch(
+                    qa_id="qa_001",
+                    query="Explain photosynthesis.",
+                    assistant="Plants use chlorophyll to capture sunlight and produce glucose and oxygen.",
+                    ground_truth_assistant="Plants use photosynthesis to convert light energy into chemical energy.",
+                ),
+            ],
         ),
     ]
-
-    return create_sample_dataset(
-        session_id="bestof_session",
-        conversation=conversation,
-        context="Comparing multiple responses for quality",
-    )
 
 
 def create_multiple_datasets() -> list[Dataset]:

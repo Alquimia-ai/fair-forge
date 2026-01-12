@@ -13,14 +13,6 @@ You are a Contextual Compliance Analyzer. Your role is to evaluate whether the i
 4. **Generate Insights:**
    Offer any relevant insights regarding the interaction. This could include observations on how well the answer fits the context, potential areas of improvement, or any discrepancies noted.
 
-After your internal reasoning, provide only the final answer ALWAYS STRICTLY in the following JSON format. Do not include any additional text or explanation:
-```json
-{{
-"score": <probability value>,
-"insight": "<your insight>"
-}}
-```
-
 Context:
 {context}
 
@@ -47,15 +39,6 @@ You are a Contextual Compliance Analyzer. Your role is to evaluate whether the i
 
 5. **Generate Insights:**  
    Offer any relevant insights regarding the interaction. In your reasoning, include relevant points from the Observation to support your evaluation.
-
-After your internal reasoning, provide only the final answer ALWAYS STRICTLY in the following JSON format. Do not include any additional text or explanation:
-
-```json
-{{
-"score": <probability value>,
-"insight": "<your insight>"
-}}
-```
 
 Context:
 {context}
@@ -90,21 +73,6 @@ You are an expert evaluator of conversational dialogue quality. Your task is to 
 9. For the sensibleness metric you should take into account how much does the Actual Answer makes sense from the question. Based on SSA (Sensibleness and specificity Average) metric
 10. Score values MUST ALWAYS go from a range between 0 and 10, 0 Is the lowest and 10 the highest.
 
-After your internal reasoning, provide only the final answer STRICTLY AND ALWAYS in the following JSON format. Do not include any additional text or explanation:
-
-```json
-{{ 
-     "memory": <score value>, 
-     "language": <score value>, 
-     "insight": "<your insight>",
-     "quality_maxim": <score value>,
-     "quantity_maxim": <score value>,
-     "relation_maxim": <score value>,
-     "manner_maxim": <score value>,
-     "sensibleness": <score value>
-}}
-```
-
 Assistant (Actual Answer):
 {assistant_answer}
 
@@ -136,21 +104,6 @@ You are an expert evaluator of conversational dialogue quality. Your task is to 
 9. For the sensibleness metric you should take into account how much does the Actual Answer makes sense from the question. Based on SSA (Sensibleness and specificity Average) metric
 10. Score values MUST ALWAYS go from 0 to 10. Being 0 the lowest and 10 the highest
 
-After your internal reasoning, provide only the final answer STRICTLY AND ALWAYS in the following JSON format. Do not include any additional text or explanation:
-
-```json
-{{ 
-     "memory": <score value>, 
-     "language": <score value>, 
-     "insight": "<your insight>",
-     "quality_maxim": "<score value>",
-     "quantity_maxim": "<score value>",
-     "relation_maxim": "<score value>",
-     "manner_maxim": "<score value>",
-     "sensibleness": "<score value>"
-}}
-```
-
 Observation:
 {observation}
 
@@ -173,8 +126,6 @@ Expected answer: {{ conversation.ground_truth_assistant }}
 bestOf_judge_prompt = """
 You are an impartial judge evaluating the quality of two responses to the same query or task.
 
-After your internal reasoning, provide only the final answer strictly in the following JSON format. Do not include any additional text or explanation:
-
 Consider the following aspects when judging:
 1. **Accuracy**: Is the information correct and factual?
 2. **Completeness**: Does the response fully address the query?
@@ -188,20 +139,6 @@ All the criteria must be considered when judging the quality of the responses.
 1. First, analyze each response carefully considering the criteria above
 2. Compare the responses objectively
 3. Determine which response is superior overall, or if they are tied
-
-```json
-{{
-   "winner": "{left_contestant}" | "{right_contestant}" | "tie",
-   "verdict": "A clear explanation of why this contestant won, highlighting key differences",
-   "confidence": 0.0 to 1.0,
-   "reasoning": {{
-       "{left_contestant}_strengths": ["strength 1", "strength 2"],
-       "{left_contestant}_weaknesses": ["weakness 1", "weakness 2"],
-       "{right_contestant}_strengths": ["strength 1", "strength 2"],
-       "{right_contestant}_weaknesses": ["weakness 1", "weakness 2"],
-   }}
-}}
-```
 
 First contestant ({left_contestant}):
 {left_contestant_conv}

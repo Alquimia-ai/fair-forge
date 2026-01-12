@@ -1,8 +1,10 @@
-from fair_forge.core import Guardian
-from fair_forge.schemas import ProtectedAttribute, GuardianBias, GuardianLLMConfig
 from functools import partial
 from typing import Optional
+
 from transformers import AutoTokenizer
+
+from fair_forge.core import Guardian
+from fair_forge.schemas.bias import GuardianBias, GuardianLLMConfig, ProtectedAttribute
 
 class IBMGranite(Guardian):
     """

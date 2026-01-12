@@ -1,5 +1,10 @@
 """LLM integration utilities for Fair Forge."""
 from .judge import Judge
-from .cot import CoT
+from .schemas import BestOfJudgeOutput, ContextJudgeOutput, ConversationalJudgeOutput
 
-__all__ = ['Judge', 'CoT']
+__all__ = [
+    "Judge",
+    "ContextJudgeOutput",
+    "ConversationalJudgeOutput",
+    "BestOfJudgeOutput",
+]

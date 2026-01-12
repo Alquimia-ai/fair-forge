@@ -1,63 +1,28 @@
-"""Pydantic schemas for Fair Forge."""
-from .common import Logprobs, Batch, Dataset
+"""Pydantic schemas for Fair Forge.
+
+Core schemas are imported directly. Metric-specific schemas should be imported
+from their modules to avoid loading unnecessary dependencies:
+
+    from fair_forge.schemas.bias import BiasMetric, GuardianLLMConfig
+    from fair_forge.schemas.toxicity import ToxicityMetric
+    from fair_forge.schemas.humanity import HumanityMetric
+    from fair_forge.schemas.conversational import ConversationalMetric
+    from fair_forge.schemas.context import ContextMetric
+    from fair_forge.schemas.best_of import BestOfMetric
+"""
+from .common import Batch, Dataset, Logprobs
 from .metrics import BaseMetric
-from .bias import (
-    GuardianBias,
-    ProtectedAttribute,
-    BiasMetric,
-    LLMGuardianProviderInfer,
-    LLMGuardianProvider,
-    GuardianLLMConfig,
-)
-from .toxicity import (
-    SentimentScore,
-    ToxicityDataset,
-    GroupDetection,
-    GroupProfilingFrequentist,
-    BayesianSummary,
-    GroupProfilingBayesian,
-    GroupProfiling,
-    ToxicityMetric,
-)
-from .conversational import ConversationalMetric
-from .humanity import HumanityMetric
-from .context import ContextMetric
-from .best_of import BestOfContest, BestOfMetric
-from .agentic import AgenticMetric
 from .runner import BaseRunner
 from .storage import BaseStorage
 
 __all__ = [
     # Common
-    'Logprobs',
-    'Batch',
-    'Dataset',
+    "Logprobs",
+    "Batch",
+    "Dataset",
     # Base
-    'BaseMetric',
-    # Bias
-    'GuardianBias',
-    'ProtectedAttribute',
-    'BiasMetric',
-    'LLMGuardianProviderInfer',
-    'LLMGuardianProvider',
-    'GuardianLLMConfig',
-    # Toxicity
-    'SentimentScore',
-    'ToxicityDataset',
-    'GroupDetection',
-    'GroupProfilingFrequentist',
-    'BayesianSummary',
-    'GroupProfilingBayesian',
-    'GroupProfiling',
-    'ToxicityMetric',
-    # Other metrics
-    'ConversationalMetric',
-    'HumanityMetric',
-    'ContextMetric',
-    'BestOfContest',
-    'BestOfMetric',
-    'AgenticMetric',
+    "BaseMetric",
     # Runners and Storage
-    'BaseRunner',
-    'BaseStorage',
+    "BaseRunner",
+    "BaseStorage",
 ]

@@ -1,37 +1,47 @@
+"""Conversational metric for evaluating dialogue quality using Grice's maxims."""
+from typing import Optional, Type
+
+from langchain_core.language_models.chat_models import BaseChatModel
+
 from fair_forge.core import FairForge, Retriever
-from typing import Type, Optional
-from pydantic import SecretStr
-from fair_forge.schemas import Batch, ConversationalMetric
-from fair_forge.llm import Judge
+from fair_forge.llm import ConversationalJudgeOutput, Judge
 from fair_forge.llm.prompts import (
     conversational_reasoning_system_prompt,
     conversational_reasoning_system_prompt_observation,
 )
+from fair_forge.schemas import Batch
+from fair_forge.schemas.conversational import ConversationalMetric
 
 
 class Conversational(FairForge):
+    """Metric for evaluating conversational quality using Grice's maxims.
+
+    Evaluates memory recall, language appropriateness, and Grice's maxims:
+    quality, quantity, relation, manner, and sensibleness.
+
+    Args:
+        retriever: Retriever class for loading datasets
+        model: LangChain BaseChatModel instance for evaluation
+        use_structured_output: If True, use LangChain's with_structured_output()
+        bos_json_clause: Opening marker for JSON blocks
+        eos_json_clause: Closing marker for JSON blocks
+        **kwargs: Additional arguments passed to FairForge base class
+    """
+
     def __init__(
         self,
         retriever: Type[Retriever],
-        judge_bos_think_token: str = "<think>",
-        judege_eos_think_token: str = "</think>",
-        judge_base_url: str = "https://api.groq.com/openai/v1",
-        judge_api_key: SecretStr = SecretStr(""),
-        judge_model: str = "deepseek-r1-distill-llama-70b",
-        judge_temperature: float = 0,
-        judge_bos_json_clause: str = "```json",
-        judge_eos_json_clause: str = "```",
+        model: BaseChatModel,
+        use_structured_output: bool = False,
+        bos_json_clause: str = "```json",
+        eos_json_clause: str = "```",
         **kwargs,
     ):
         super().__init__(retriever, **kwargs)
-        self.judge_url = judge_base_url
-        self.judge_api_key = judge_api_key
-        self.judge_model = judge_model
-        self.judge_temperature = judge_temperature
-        self.judge_bos_think_token = judge_bos_think_token
-        self.judge_eos_think_token = judege_eos_think_token
-        self.judge_bos_json_clause = judge_bos_json_clause
-        self.judge_eos_json_clause = judge_eos_json_clause
+        self.model = model
+        self.use_structured_output = use_structured_output
+        self.bos_json_clause = bos_json_clause
+        self.eos_json_clause = eos_json_clause
 
     def batch(
         self,
@@ -42,14 +52,10 @@ class Conversational(FairForge):
         language: Optional[str] = "english",
     ):
         judge = Judge(
-            bos_think_token=self.judge_bos_think_token,
-            eos_think_token=self.judge_eos_think_token,
-            base_url=self.judge_url,
-            api_key=self.judge_api_key,
-            model=self.judge_model,
-            temperature=self.judge_temperature,
-            bos_json_clause=self.judge_bos_json_clause,
-            eos_json_clause=self.judge_eos_json_clause,
+            model=self.model,
+            use_structured_output=self.use_structured_output,
+            bos_json_clause=self.bos_json_clause,
+            eos_json_clause=self.eos_json_clause,
         )
         for interaction in batch:
             self.logger.debug(f"QA ID: {interaction.qa_id}")
@@ -59,35 +65,56 @@ class Conversational(FairForge):
                 "assistant_answer": interaction.assistant,
             }
             if interaction.observation:
-                thinking, json = judge.check(
+                reasoning, result = judge.check(
                     conversational_reasoning_system_prompt_observation,
                     interaction.query,
                     {"observation": interaction.observation, **data},
+                    output_schema=ConversationalJudgeOutput,
                 )
             else:
-                thinking, json = judge.check(
+                reasoning, result = judge.check(
                     conversational_reasoning_system_prompt,
                     interaction.query,
                     {"ground_truth_assistant": interaction.assistant, **data},
+                    output_schema=ConversationalJudgeOutput,
                 )
-            if json is None:
+
+            if result is None:
                 raise ValueError(
-                    f"[FAIR FORGE/CONVERSATIONAL] No JSON found {self.judge_bos_json_clause} {self.judge_eos_json_clause} "
+                    f"[FAIR FORGE/CONVERSATIONAL] No valid response from judge for QA ID: {interaction.qa_id}"
                 )
-            metric = ConversationalMetric(
+
+            if self.use_structured_output:
+                metric = ConversationalMetric(
                     session_id=session_id,
                     qa_id=interaction.qa_id,
                     assistant_id=assistant_id,
-                    conversational_insight=json["insight"],
-                    conversational_memory=json["memory"],
-                    conversational_language=json["language"],
-                    conversational_quality_maxim=json["quality_maxim"],
-                    conversational_quantity_maxim=json["quantity_maxim"],
-                    conversational_relation_maxim=json["relation_maxim"],
-                    conversational_manner_maxim=json["manner_maxim"],
-                    conversational_sensibleness=json["sensibleness"],
-                    conversational_thinkings=thinking,
+                    conversational_insight=result.insight,
+                    conversational_memory=result.memory,
+                    conversational_language=result.language,
+                    conversational_quality_maxim=result.quality_maxim,
+                    conversational_quantity_maxim=result.quantity_maxim,
+                    conversational_relation_maxim=result.relation_maxim,
+                    conversational_manner_maxim=result.manner_maxim,
+                    conversational_sensibleness=result.sensibleness,
+                    conversational_thinkings=reasoning,
                 )
+            else:
+                metric = ConversationalMetric(
+                    session_id=session_id,
+                    qa_id=interaction.qa_id,
+                    assistant_id=assistant_id,
+                    conversational_insight=result["insight"],
+                    conversational_memory=result["memory"],
+                    conversational_language=result["language"],
+                    conversational_quality_maxim=result["quality_maxim"],
+                    conversational_quantity_maxim=result["quantity_maxim"],
+                    conversational_relation_maxim=result["relation_maxim"],
+                    conversational_manner_maxim=result["manner_maxim"],
+                    conversational_sensibleness=result["sensibleness"],
+                    conversational_thinkings=reasoning,
+                )
+
             self.logger.debug(f"Conversational memory: {metric.conversational_memory}")
             self.logger.debug(f"Conversational language: {metric.conversational_language}")
             self.logger.debug(f"Conversational quality maxim: {metric.conversational_quality_maxim}")

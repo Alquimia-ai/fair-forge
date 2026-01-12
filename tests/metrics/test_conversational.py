@@ -1,50 +1,48 @@
 """Tests for Conversational metric."""
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from pydantic import SecretStr
+
 from fair_forge.metrics.conversational import Conversational
-from fair_forge.schemas import ConversationalMetric
-from tests.fixtures.mock_retriever import MockRetriever, ConversationalDatasetRetriever
+from fair_forge.schemas.conversational import ConversationalMetric
 from tests.fixtures.mock_data import create_sample_batch
+from tests.fixtures.mock_retriever import ConversationalDatasetRetriever, MockRetriever
 
 
 class TestConversationalMetric:
     """Test suite for Conversational metric."""
 
-    def test_initialization_default(self):
+    @pytest.fixture
+    def mock_model(self):
+        """Create a mock BaseChatModel."""
+        return MagicMock()
+
+    def test_initialization_default(self, mock_model):
         """Test Conversational initialization with default parameters."""
-        conv = Conversational(retriever=MockRetriever)
+        conv = Conversational(retriever=MockRetriever, model=mock_model)
 
-        assert conv.judge_url == "https://api.groq.com/openai/v1"
-        assert conv.judge_model == "deepseek-r1-distill-llama-70b"
-        assert conv.judge_temperature == 0
-        assert conv.judge_bos_think_token == "<think>"
-        assert conv.judge_eos_think_token == "</think>"
-        assert conv.judge_bos_json_clause == "```json"
-        assert conv.judge_eos_json_clause == "```"
+        assert conv.model == mock_model
+        assert conv.use_structured_output is False
+        assert conv.bos_json_clause == "```json"
+        assert conv.eos_json_clause == "```"
 
-    def test_initialization_custom(self):
+    def test_initialization_custom(self, mock_model):
         """Test Conversational initialization with custom parameters."""
         conv = Conversational(
             retriever=MockRetriever,
-            judge_bos_think_token="<reasoning>",
-            judege_eos_think_token="</reasoning>",
-            judge_base_url="https://custom-api.com",
-            judge_api_key=SecretStr("test-key"),
-            judge_model="custom-model",
-            judge_temperature=0.5,
-            judge_bos_json_clause="<json>",
-            judge_eos_json_clause="</json>",
+            model=mock_model,
+            use_structured_output=True,
+            bos_json_clause="<json>",
+            eos_json_clause="</json>",
         )
 
-        assert conv.judge_url == "https://custom-api.com"
-        assert conv.judge_model == "custom-model"
-        assert conv.judge_temperature == 0.5
-        assert conv.judge_bos_think_token == "<reasoning>"
-        assert conv.judge_eos_think_token == "</reasoning>"
+        assert conv.model == mock_model
+        assert conv.use_structured_output is True
+        assert conv.bos_json_clause == "<json>"
+        assert conv.eos_json_clause == "</json>"
 
-    @patch('fair_forge.metrics.conversational.Judge')
-    def test_batch_processing(self, mock_judge_class):
+    @patch("fair_forge.metrics.conversational.Judge")
+    def test_batch_processing(self, mock_judge_class, mock_model):
         """Test batch method processes interactions correctly."""
         mock_judge = MagicMock()
         mock_judge_class.return_value = mock_judge
@@ -58,11 +56,11 @@ class TestConversationalMetric:
                 "quantity_maxim": 0.75,
                 "relation_maxim": 0.9,
                 "manner_maxim": 0.85,
-                "sensibleness": 0.88
-            }
+                "sensibleness": 0.88,
+            },
         )
 
-        conv = Conversational(retriever=MockRetriever)
+        conv = Conversational(retriever=MockRetriever, model=mock_model)
 
         batches = [
             create_sample_batch(qa_id="qa_001"),
@@ -74,7 +72,7 @@ class TestConversationalMetric:
             context="Test context",
             assistant_id="test_assistant",
             batch=batches,
-            language="english"
+            language="english",
         )
 
         assert len(conv.metrics) == 2
@@ -92,8 +90,8 @@ class TestConversationalMetric:
         assert metric.conversational_sensibleness == 0.88
         assert metric.conversational_thinkings == "I analyzed the conversation..."
 
-    @patch('fair_forge.metrics.conversational.Judge')
-    def test_batch_with_observation(self, mock_judge_class):
+    @patch("fair_forge.metrics.conversational.Judge")
+    def test_batch_with_observation(self, mock_judge_class, mock_model):
         """Test batch method handles observation correctly."""
         mock_judge = MagicMock()
         mock_judge_class.return_value = mock_judge
@@ -107,22 +105,19 @@ class TestConversationalMetric:
                 "quantity_maxim": 0.75,
                 "relation_maxim": 0.9,
                 "manner_maxim": 0.85,
-                "sensibleness": 0.88
-            }
+                "sensibleness": 0.88,
+            },
         )
 
-        conv = Conversational(retriever=MockRetriever)
+        conv = Conversational(retriever=MockRetriever, model=mock_model)
 
-        batch = create_sample_batch(
-            qa_id="qa_001",
-            observation="The user seems satisfied"
-        )
+        batch = create_sample_batch(qa_id="qa_001", observation="The user seems satisfied")
 
         conv.batch(
             session_id="test_session",
             context="Test context",
             assistant_id="test_assistant",
-            batch=[batch]
+            batch=[batch],
         )
 
         # Verify judge was called with observation data
@@ -130,8 +125,8 @@ class TestConversationalMetric:
         call_args = mock_judge.check.call_args
         assert "observation" in call_args[0][2]
 
-    @patch('fair_forge.metrics.conversational.Judge')
-    def test_batch_without_observation(self, mock_judge_class):
+    @patch("fair_forge.metrics.conversational.Judge")
+    def test_batch_without_observation(self, mock_judge_class, mock_model):
         """Test batch method handles case without observation."""
         mock_judge = MagicMock()
         mock_judge_class.return_value = mock_judge
@@ -145,11 +140,11 @@ class TestConversationalMetric:
                 "quantity_maxim": 0.75,
                 "relation_maxim": 0.9,
                 "manner_maxim": 0.85,
-                "sensibleness": 0.88
-            }
+                "sensibleness": 0.88,
+            },
         )
 
-        conv = Conversational(retriever=MockRetriever)
+        conv = Conversational(retriever=MockRetriever, model=mock_model)
 
         batch = create_sample_batch(qa_id="qa_001", observation=None)
 
@@ -157,34 +152,34 @@ class TestConversationalMetric:
             session_id="test_session",
             context="Test context",
             assistant_id="test_assistant",
-            batch=[batch]
+            batch=[batch],
         )
 
         # Verify judge was called with ground_truth_assistant
         call_args = mock_judge.check.call_args
         assert "ground_truth_assistant" in call_args[0][2]
 
-    @patch('fair_forge.metrics.conversational.Judge')
-    def test_batch_raises_on_no_json(self, mock_judge_class):
-        """Test batch raises ValueError when no JSON is returned."""
+    @patch("fair_forge.metrics.conversational.Judge")
+    def test_batch_raises_on_no_result(self, mock_judge_class, mock_model):
+        """Test batch raises ValueError when no result is returned."""
         mock_judge = MagicMock()
         mock_judge_class.return_value = mock_judge
         mock_judge.check.return_value = ("Some thinking", None)
 
-        conv = Conversational(retriever=MockRetriever)
+        conv = Conversational(retriever=MockRetriever, model=mock_model)
 
         batch = create_sample_batch(qa_id="qa_001")
 
-        with pytest.raises(ValueError, match="No JSON found"):
+        with pytest.raises(ValueError, match="No valid response"):
             conv.batch(
                 session_id="test_session",
                 context="Test context",
                 assistant_id="test_assistant",
-                batch=[batch]
+                batch=[batch],
             )
 
-    @patch('fair_forge.metrics.conversational.Judge')
-    def test_run_method(self, mock_judge_class):
+    @patch("fair_forge.metrics.conversational.Judge")
+    def test_run_method(self, mock_judge_class, mock_model):
         """Test the run class method."""
         mock_judge = MagicMock()
         mock_judge_class.return_value = mock_judge
@@ -198,21 +193,21 @@ class TestConversationalMetric:
                 "quantity_maxim": 0.75,
                 "relation_maxim": 0.9,
                 "manner_maxim": 0.85,
-                "sensibleness": 0.88
-            }
+                "sensibleness": 0.88,
+            },
         )
 
         metrics = Conversational.run(
             ConversationalDatasetRetriever,
-            judge_api_key=SecretStr("test-key"),
-            verbose=False
+            model=mock_model,
+            verbose=False,
         )
 
         assert len(metrics) > 0
         assert all(isinstance(m, ConversationalMetric) for m in metrics)
 
-    @patch('fair_forge.metrics.conversational.Judge')
-    def test_judge_initialization_params(self, mock_judge_class):
+    @patch("fair_forge.metrics.conversational.Judge")
+    def test_judge_initialization_params(self, mock_judge_class, mock_model):
         """Test that Judge is initialized with correct parameters."""
         mock_judge = MagicMock()
         mock_judge_class.return_value = mock_judge
@@ -226,20 +221,16 @@ class TestConversationalMetric:
                 "quantity_maxim": 0.5,
                 "relation_maxim": 0.5,
                 "manner_maxim": 0.5,
-                "sensibleness": 0.5
-            }
+                "sensibleness": 0.5,
+            },
         )
 
         conv = Conversational(
             retriever=MockRetriever,
-            judge_bos_think_token="<t>",
-            judege_eos_think_token="</t>",
-            judge_base_url="https://test.com",
-            judge_api_key=SecretStr("key"),
-            judge_model="model",
-            judge_temperature=0.1,
-            judge_bos_json_clause="[",
-            judge_eos_json_clause="]",
+            model=mock_model,
+            use_structured_output=False,
+            bos_json_clause="[",
+            eos_json_clause="]",
         )
 
         batch = create_sample_batch(qa_id="qa_001")
@@ -247,22 +238,18 @@ class TestConversationalMetric:
             session_id="s",
             context="c",
             assistant_id="a",
-            batch=[batch]
+            batch=[batch],
         )
 
         mock_judge_class.assert_called_once_with(
-            bos_think_token="<t>",
-            eos_think_token="</t>",
-            base_url="https://test.com",
-            api_key=SecretStr("key"),
-            model="model",
-            temperature=0.1,
+            model=mock_model,
+            use_structured_output=False,
             bos_json_clause="[",
             eos_json_clause="]",
         )
 
-    @patch('fair_forge.metrics.conversational.Judge')
-    def test_language_parameter(self, mock_judge_class):
+    @patch("fair_forge.metrics.conversational.Judge")
+    def test_language_parameter(self, mock_judge_class, mock_model):
         """Test that language parameter is passed correctly."""
         mock_judge = MagicMock()
         mock_judge_class.return_value = mock_judge
@@ -276,11 +263,11 @@ class TestConversationalMetric:
                 "quantity_maxim": 0.5,
                 "relation_maxim": 0.5,
                 "manner_maxim": 0.5,
-                "sensibleness": 0.5
-            }
+                "sensibleness": 0.5,
+            },
         )
 
-        conv = Conversational(retriever=MockRetriever)
+        conv = Conversational(retriever=MockRetriever, model=mock_model)
 
         batch = create_sample_batch(qa_id="qa_001")
         conv.batch(
@@ -288,15 +275,15 @@ class TestConversationalMetric:
             context="c",
             assistant_id="a",
             batch=[batch],
-            language="spanish"
+            language="spanish",
         )
 
         # Verify preferred_language was passed
         call_args = mock_judge.check.call_args
         assert call_args[0][2]["preferred_language"] == "spanish"
 
-    @patch('fair_forge.metrics.conversational.Judge')
-    def test_verbose_mode(self, mock_judge_class):
+    @patch("fair_forge.metrics.conversational.Judge")
+    def test_verbose_mode(self, mock_judge_class, mock_model):
         """Test that verbose mode doesn't break processing."""
         mock_judge = MagicMock()
         mock_judge_class.return_value = mock_judge
@@ -310,18 +297,57 @@ class TestConversationalMetric:
                 "quantity_maxim": 0.75,
                 "relation_maxim": 0.9,
                 "manner_maxim": 0.85,
-                "sensibleness": 0.88
-            }
+                "sensibleness": 0.88,
+            },
         )
 
-        conv = Conversational(retriever=MockRetriever, verbose=True)
+        conv = Conversational(retriever=MockRetriever, model=mock_model, verbose=True)
 
         batch = create_sample_batch(qa_id="qa_001")
         conv.batch(
             session_id="s",
             context="c",
             assistant_id="a",
-            batch=[batch]
+            batch=[batch],
         )
 
         assert len(conv.metrics) == 1
+
+    @patch("fair_forge.metrics.conversational.Judge")
+    def test_structured_output_mode(self, mock_judge_class, mock_model):
+        """Test Conversational with structured output enabled."""
+        from fair_forge.llm.schemas import ConversationalJudgeOutput
+
+        mock_judge = MagicMock()
+        mock_judge_class.return_value = mock_judge
+
+        expected_result = ConversationalJudgeOutput(
+            memory=8.5,
+            language=9.0,
+            insight="Good conversation",
+            quality_maxim=8.0,
+            quantity_maxim=7.5,
+            relation_maxim=9.0,
+            manner_maxim=8.5,
+            sensibleness=9.0,
+        )
+        mock_judge.check.return_value = ("", expected_result)
+
+        conv = Conversational(
+            retriever=MockRetriever,
+            model=mock_model,
+            use_structured_output=True,
+        )
+
+        batch = create_sample_batch(qa_id="qa_001")
+        conv.batch(
+            session_id="test_session",
+            context="Test context",
+            assistant_id="test_assistant",
+            batch=[batch],
+        )
+
+        assert len(conv.metrics) == 1
+        assert conv.metrics[0].conversational_memory == 8.5
+        assert conv.metrics[0].conversational_language == 9.0
+        assert conv.metrics[0].conversational_insight == "Good conversation"
