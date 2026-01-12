@@ -63,14 +63,17 @@ Results in self.metrics
 
 ### Key Modules
 
-- **`fair_forge/metrics/`**: Metric implementations (Toxicity, Bias, Context, Conversational, Humanity, BestOf, Agentic)
-- **`fair_forge/core/`**: Base classes - `FairForge`, `Retriever`, `Guardian`, `ToxicityLoader`
+- **`fair_forge/metrics/`**: Metric implementations (Toxicity, Bias, Context, Conversational, Humanity, BestOf, Agentic). Uses lazy imports.
+- **`fair_forge/core/`**: Base classes - `FairForge`, `Retriever`, `Guardian`, `ToxicityLoader`, `SentimentAnalyzer`
 - **`fair_forge/schemas/`**: Pydantic models for data validation (`Dataset`, `Batch`, metric-specific schemas)
 - **`fair_forge/runners/`**: Test execution against AI systems (`BaseRunner`, `AlquimiaRunner`)
 - **`fair_forge/storage/`**: Storage backends for test datasets (`LocalStorage`, `LakeFSStorage`)
 - **`fair_forge/statistical/`**: Statistical modes (`FrequentistMode`, `BayesianMode`) for metrics like Toxicity
 - **`fair_forge/guardians/`**: Bias detection implementations (IBMGranite, LlamaGuard)
 - **`fair_forge/loaders/`**: Dataset loaders (e.g., `HurtlexLoader` for toxicity lexicons)
+- **`fair_forge/llm/`**: LLM integration (`Judge`, prompts, schemas for structured outputs)
+- **`fair_forge/extractors/`**: Group extraction implementations (`EmbeddingGroupExtractor`)
+- **`fair_forge/utils/`**: Utilities (logging configuration)
 
 ### Custom Retriever Pattern
 Users must implement a `Retriever` subclass to load their data:

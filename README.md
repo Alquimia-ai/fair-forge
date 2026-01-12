@@ -167,8 +167,7 @@ To use your dataset with Fair Forge metrics, you need to create a custom retriev
 
 ```python
 import json
-from fair_forge.schemas.common import Dataset
-from fair_forge.core.retriever import Retriever
+from fair_forge import Retriever, Dataset
 
 class CustomRetriever(Retriever):
     def load_dataset(self) -> list[Dataset]:
@@ -183,45 +182,75 @@ class CustomRetriever(Retriever):
 
 #### Context Metric
 
-```python
-from getpass import getpass
-from pydantic import SecretStr
-from fair_forge.metrics import Context
+The Context metric evaluates how well AI responses align with the provided context. It uses an LLM as a judge to score responses.
 
-judge_api_key = SecretStr(getpass("Please enter your Judge API key: "))
+```python
+from fair_forge.metrics.context import Context
+from langchain_openai import ChatOpenAI
+
+# Initialize your LLM judge (any LangChain-compatible chat model)
+judge_model = ChatOpenAI(
+    model="gpt-4o",
+    temperature=0.0,
+)
 
 metrics = Context.run(
     CustomRetriever,
-    judge_api_key=judge_api_key,
-    verbose=True  # Enable detailed logging
+    model=judge_model,
+    use_structured_output=True,  # Use LangChain's structured output
+    verbose=True,
 )
+
+# Access results
+for metric in metrics:
+    print(f"QA ID: {metric.qa_id}")
+    print(f"Context Awareness Score: {metric.context_awareness}")
+    print(f"Insight: {metric.context_insight}")
 ```
 
 #### Humanity Metric
 
+The Humanity metric evaluates how human-like and natural the responses are through emotional analysis using the NRC Emotion Lexicon.
+
 ```python
-from fair_forge.metrics import Humanity
+from fair_forge.metrics.humanity import Humanity
 
 metrics = Humanity.run(
     CustomRetriever,
-    verbose=True  # Enable detailed logging
+    verbose=True,
 )
+
+# Access results
+for metric in metrics:
+    print(f"Session: {metric.session_id}")
+    print(f"Emotion Correlation: {metric.emotion_correlation}")
 ```
 
 #### Conversational Metric
 
-```python
-from getpass import getpass
-from pydantic import SecretStr
-from fair_forge.metrics import Conversational
+The Conversational metric evaluates dialogue quality using Grice's maxims (quality, quantity, relation, manner) and sensibleness.
 
-judge_api_key = SecretStr(getpass("Please enter your Judge API key: "))
+```python
+from fair_forge.metrics.conversational import Conversational
+from langchain_openai import ChatOpenAI
+
+judge_model = ChatOpenAI(
+    model="gpt-4o",
+    temperature=0.0,
+)
 
 metrics = Conversational.run(
     CustomRetriever,
-    judge_api_key=judge_api_key,
-    verbose=True  # Enable detailed logging
+    model=judge_model,
+    use_structured_output=True,
+    verbose=True,
 )
+
+# Access results
+for metric in metrics:
+    print(f"QA ID: {metric.qa_id}")
+    print(f"Quality Maxim: {metric.conversational_quality_maxim}")
+    print(f"Sensibleness: {metric.conversational_sensibleness}")
 ```
 
 #### Bias Metric
@@ -256,8 +285,10 @@ Here's an example using the built-in IBMGranite guardian:
 import os
 from getpass import getpass
 from pydantic import SecretStr
-from fair_forge.metrics import Bias
-from fair_forge.guardians import IBMGranite, GuardianLLMConfig, OpenAIGuardianProvider
+from fair_forge.metrics.bias import Bias
+from fair_forge.guardians import IBMGranite
+from fair_forge.guardians.llms.providers import OpenAIGuardianProvider
+from fair_forge.schemas.bias import GuardianLLMConfig
 
 # Set up your environment variables
 GUARDIAN_URL = os.environ.get("GUARDIAN_URL")
@@ -284,14 +315,14 @@ metrics = Bias.run(
 And here's an example using your custom guardian:
 
 ```python
-from fair_forge.metrics import Bias
+from fair_forge.metrics.bias import Bias
 
 # Run the Bias metric with your custom guardian
 metrics = Bias.run(
-    CustomRetriever,  # Use your custom retriever
+    CustomRetriever,
     guardian=MyCustomGuardian,
     confidence_level=0.80,
-    verbose=True
+    verbose=True,
 )
 ```
 
@@ -313,9 +344,9 @@ The Toxicity metric detects and quantifies toxic language patterns in AI respons
 **Example with Frequentist Mode (Default):**
 
 ```python
-from fair_forge.metrics import Toxicity
+from fair_forge.metrics.toxicity import Toxicity
 from fair_forge.loaders import HurtlexLoader
-from fair_forge.statistical import FrequentistMode
+from fair_forge import FrequentistMode
 
 # Run Toxicity with frequentist statistics (returns point estimates)
 metrics = Toxicity.run(
@@ -349,9 +380,9 @@ metrics = Toxicity.run(
 **Example with Bayesian Mode:**
 
 ```python
-from fair_forge.metrics import Toxicity
+from fair_forge.metrics.toxicity import Toxicity
 from fair_forge.loaders import HurtlexLoader
-from fair_forge.statistical import BayesianMode
+from fair_forge import BayesianMode
 
 # Run Toxicity with Bayesian statistics (returns posterior distributions with credible intervals)
 metrics = Toxicity.run(
@@ -435,7 +466,7 @@ For **Bayesian Mode**:
 You can create your own toxicity dataset loader by implementing the ToxicityLoader interface:
 
 ```python
-from fair_forge.core.loader import ToxicityLoader
+from fair_forge import ToxicityLoader
 from fair_forge.schemas.toxicity import ToxicityDataset
 
 class MyCustomToxicityLoader(ToxicityLoader):
@@ -453,11 +484,13 @@ class MyCustomToxicityLoader(ToxicityLoader):
 Then use your custom loader with the Toxicity metric:
 
 ```python
+from fair_forge.metrics.toxicity import Toxicity
+
 metrics = Toxicity.run(
     CustomRetriever,
     toxicity_loader=MyCustomToxicityLoader,
     group_prototypes={'gender': ['man', 'woman']},
-    verbose=True
+    verbose=True,
 )
 ```
 
@@ -466,17 +499,20 @@ metrics = Toxicity.run(
 The BestOf metric implements a tournament-style evaluation to determine the best response among multiple candidates. It uses a judge LLM to compare responses in pairs and determines the winner through elimination rounds.
 
 ```python
-from getpass import getpass
-from pydantic import SecretStr
-from fair_forge.metrics import BestOf
+from fair_forge.metrics.best_of import BestOf
+from langchain_openai import ChatOpenAI
 
-judge_api_key = SecretStr(getpass("Please enter your Judge API key: "))
+judge_model = ChatOpenAI(
+    model="gpt-4o",
+    temperature=0.0,
+)
 
-# Run the BestOf metric
 metrics = BestOf.run(
-    CustomRetriever,  # Use your custom retriever
-    judge_api_key=judge_api_key,
-    verbose=True
+    CustomRetriever,
+    model=judge_model,
+    use_structured_output=True,
+    criteria="BestOf",  # Label for the evaluation criteria
+    verbose=True,
 )
 ```
 
@@ -510,8 +546,10 @@ The IBM Granite Guardian model is specifically trained to detect various risks i
 
 For practical examples of how to use Alquimia AI Fair Forge, please refer to our example implementations in the repository:
 
-- [Openshift AI Pipeline](examples/fair-forge.pipeline) - A simple implementation showing how to set up and use the basic metrics using Elyra pipeline to be executed.
+- [Context Metric Notebook](examples/context/context.ipynb) - Interactive notebook demonstrating the Context metric
+- [Bias Metric Notebook](examples/bias/bias.ipynb) - Interactive notebook demonstrating the Bias metric
 - [Custom Retriever Example](examples/helpers/retriever.py) - Implementation of a custom dataset retriever
+- [Sample Dataset](examples/data/dataset.json) - Example dataset format
 
 Each example includes detailed comments and explanations to help you understand the implementation details. Feel free to use these examples as a starting point for your own implementations.
 
@@ -745,10 +783,11 @@ class CustomRunner(BaseRunner):
 Test results are fully compatible with Fair Forge metrics for comprehensive analysis:
 
 ```python
-from fair_forge.metrics import Toxicity, Bias, Context
-from fair_forge.core.retriever import Retriever
-from fair_forge.schemas.common import Dataset
 import json
+from fair_forge import Retriever, Dataset
+from fair_forge.metrics.toxicity import Toxicity
+from fair_forge.metrics.bias import Bias
+from fair_forge.metrics.context import Context
 
 # Create a custom retriever for your test results
 class TestResultsRetriever(Retriever):
@@ -758,7 +797,7 @@ class TestResultsRetriever(Retriever):
             return [Dataset.model_validate(d) for d in data]
 
 # Analyze test results with metrics
-toxicity_metrics = Toxicity.run(TestResultsRetriever)
+toxicity_metrics = Toxicity.run(TestResultsRetriever, ...)
 bias_metrics = Bias.run(TestResultsRetriever, ...)
 context_metrics = Context.run(TestResultsRetriever, ...)
 ```
@@ -775,9 +814,7 @@ To contribute a new metric to Fair Forge, follow these steps:
 
 ```python
 from typing import Type, Optional
-from fair_forge.core.base import FairForge
-from fair_forge.core.retriever import Retriever
-from fair_forge.schemas.common import Batch
+from fair_forge import FairForge, Retriever, Batch
 
 class MyMetric(FairForge):
     def __init__(self, retriever: Type[Retriever], **kwargs):
@@ -807,15 +844,19 @@ class MyMetric(FairForge):
    - `language`: Optional language parameter (defaults to "english")
 
 
-4. In file `metrics/__init__.py` add your metric file export:
+4. In file `fair_forge/metrics/__init__.py` add your metric to the `__all__` list:
 
 ```python
-from .my_metric import MyMetric
-
 __all__ = [
-    'MyMetric'
+    # ... existing metrics
+    "MyMetric",
 ]
 ```
+
+   Users will import your metric directly from its module:
+   ```python
+   from fair_forge.metrics.my_metric import MyMetric
+   ```
 
 5. Document your metric in the `docs/journal.tex` file, including:
    - Mathematical formulation
@@ -824,10 +865,6 @@ __all__ = [
    - References to relevant research
 
 6. Submit a pull request with your implementation
-
-## Contributing
-
-We welcome contributions! Please feel free to submit a Pull Request.
 
 ## License
 
