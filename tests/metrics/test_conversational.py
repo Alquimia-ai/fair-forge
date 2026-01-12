@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from fair_forge.metrics.conversational import Conversational
-from fair_forge.schemas import ConversationalMetric
+from fair_forge.schemas.conversational import ConversationalMetric
 from tests.fixtures.mock_data import create_sample_batch
 from tests.fixtures.mock_retriever import ConversationalDatasetRetriever, MockRetriever
 
@@ -23,8 +23,6 @@ class TestConversationalMetric:
 
         assert conv.model == mock_model
         assert conv.use_structured_output is False
-        assert conv.bos_think_token is None
-        assert conv.eos_think_token is None
         assert conv.bos_json_clause == "```json"
         assert conv.eos_json_clause == "```"
 
@@ -34,16 +32,12 @@ class TestConversationalMetric:
             retriever=MockRetriever,
             model=mock_model,
             use_structured_output=True,
-            bos_think_token="<reasoning>",
-            eos_think_token="</reasoning>",
             bos_json_clause="<json>",
             eos_json_clause="</json>",
         )
 
         assert conv.model == mock_model
         assert conv.use_structured_output is True
-        assert conv.bos_think_token == "<reasoning>"
-        assert conv.eos_think_token == "</reasoning>"
         assert conv.bos_json_clause == "<json>"
         assert conv.eos_json_clause == "</json>"
 
@@ -235,8 +229,6 @@ class TestConversationalMetric:
             retriever=MockRetriever,
             model=mock_model,
             use_structured_output=False,
-            bos_think_token="<t>",
-            eos_think_token="</t>",
             bos_json_clause="[",
             eos_json_clause="]",
         )
@@ -252,8 +244,6 @@ class TestConversationalMetric:
         mock_judge_class.assert_called_once_with(
             model=mock_model,
             use_structured_output=False,
-            bos_think_token="<t>",
-            eos_think_token="</t>",
             bos_json_clause="[",
             eos_json_clause="]",
         )

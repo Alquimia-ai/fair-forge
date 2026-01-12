@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from fair_forge.metrics.context import Context
-from fair_forge.schemas import ContextMetric
+from fair_forge.schemas.context import ContextMetric
 from tests.fixtures.mock_data import create_sample_batch
 from tests.fixtures.mock_retriever import ContextDatasetRetriever, MockRetriever
 
@@ -23,8 +23,6 @@ class TestContextMetric:
 
         assert context.model == mock_model
         assert context.use_structured_output is False
-        assert context.bos_think_token is None
-        assert context.eos_think_token is None
         assert context.bos_json_clause == "```json"
         assert context.eos_json_clause == "```"
 
@@ -34,16 +32,12 @@ class TestContextMetric:
             retriever=MockRetriever,
             model=mock_model,
             use_structured_output=True,
-            bos_think_token="<reasoning>",
-            eos_think_token="</reasoning>",
             bos_json_clause="<json>",
             eos_json_clause="</json>",
         )
 
         assert context.model == mock_model
         assert context.use_structured_output is True
-        assert context.bos_think_token == "<reasoning>"
-        assert context.eos_think_token == "</reasoning>"
         assert context.bos_json_clause == "<json>"
         assert context.eos_json_clause == "</json>"
 
@@ -180,8 +174,6 @@ class TestContextMetric:
             retriever=MockRetriever,
             model=mock_model,
             use_structured_output=False,
-            bos_think_token="<t>",
-            eos_think_token="</t>",
             bos_json_clause="[",
             eos_json_clause="]",
         )
@@ -197,8 +189,6 @@ class TestContextMetric:
         mock_judge_class.assert_called_once_with(
             model=mock_model,
             use_structured_output=False,
-            bos_think_token="<t>",
-            eos_think_token="</t>",
             bos_json_clause="[",
             eos_json_clause="]",
         )

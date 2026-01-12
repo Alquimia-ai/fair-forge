@@ -22,8 +22,6 @@ class TestBestOfMetric:
 
         assert best_of.model == mock_model
         assert best_of.use_structured_output is False
-        assert best_of.bos_think_token is None
-        assert best_of.eos_think_token is None
         assert best_of.bos_json_clause == "```json"
         assert best_of.eos_json_clause == "```"
         assert best_of.criteria == "BestOf"
@@ -34,8 +32,6 @@ class TestBestOfMetric:
             retriever=MockRetriever,
             model=mock_model,
             use_structured_output=True,
-            bos_think_token="<reasoning>",
-            eos_think_token="</reasoning>",
             bos_json_clause="<json>",
             eos_json_clause="</json>",
             criteria="Quality comparison",
@@ -43,8 +39,6 @@ class TestBestOfMetric:
 
         assert best_of.model == mock_model
         assert best_of.use_structured_output is True
-        assert best_of.bos_think_token == "<reasoning>"
-        assert best_of.eos_think_token == "</reasoning>"
         assert best_of.bos_json_clause == "<json>"
         assert best_of.eos_json_clause == "</json>"
         assert best_of.criteria == "Quality comparison"
@@ -116,8 +110,6 @@ class TestBestOfMetric:
             retriever=BestOfDatasetRetriever,
             model=mock_model,
             use_structured_output=True,
-            bos_think_token="<t>",
-            eos_think_token="</t>",
             bos_json_clause="[",
             eos_json_clause="]",
         )
@@ -127,8 +119,6 @@ class TestBestOfMetric:
         mock_judge_class.assert_called_once_with(
             model=mock_model,
             use_structured_output=True,
-            bos_think_token="<t>",
-            eos_think_token="</t>",
             bos_json_clause="[",
             eos_json_clause="]",
         )

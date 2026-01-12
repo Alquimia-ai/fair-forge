@@ -23,8 +23,6 @@ class Conversational(FairForge):
         retriever: Retriever class for loading datasets
         model: LangChain BaseChatModel instance for evaluation
         use_structured_output: If True, use LangChain's with_structured_output()
-        bos_think_token: Begin token for chain-of-thought extraction
-        eos_think_token: End token for chain-of-thought extraction
         bos_json_clause: Opening marker for JSON blocks
         eos_json_clause: Closing marker for JSON blocks
         **kwargs: Additional arguments passed to FairForge base class
@@ -35,8 +33,6 @@ class Conversational(FairForge):
         retriever: Type[Retriever],
         model: BaseChatModel,
         use_structured_output: bool = False,
-        bos_think_token: Optional[str] = None,
-        eos_think_token: Optional[str] = None,
         bos_json_clause: str = "```json",
         eos_json_clause: str = "```",
         **kwargs,
@@ -44,8 +40,6 @@ class Conversational(FairForge):
         super().__init__(retriever, **kwargs)
         self.model = model
         self.use_structured_output = use_structured_output
-        self.bos_think_token = bos_think_token
-        self.eos_think_token = eos_think_token
         self.bos_json_clause = bos_json_clause
         self.eos_json_clause = eos_json_clause
 
@@ -60,8 +54,6 @@ class Conversational(FairForge):
         judge = Judge(
             model=self.model,
             use_structured_output=self.use_structured_output,
-            bos_think_token=self.bos_think_token,
-            eos_think_token=self.eos_think_token,
             bos_json_clause=self.bos_json_clause,
             eos_json_clause=self.eos_json_clause,
         )
@@ -73,14 +65,14 @@ class Conversational(FairForge):
                 "assistant_answer": interaction.assistant,
             }
             if interaction.observation:
-                thinking, result = judge.check(
+                reasoning, result = judge.check(
                     conversational_reasoning_system_prompt_observation,
                     interaction.query,
                     {"observation": interaction.observation, **data},
                     output_schema=ConversationalJudgeOutput,
                 )
             else:
-                thinking, result = judge.check(
+                reasoning, result = judge.check(
                     conversational_reasoning_system_prompt,
                     interaction.query,
                     {"ground_truth_assistant": interaction.assistant, **data},
@@ -105,7 +97,7 @@ class Conversational(FairForge):
                     conversational_relation_maxim=result.relation_maxim,
                     conversational_manner_maxim=result.manner_maxim,
                     conversational_sensibleness=result.sensibleness,
-                    conversational_thinkings=thinking,
+                    conversational_thinkings=reasoning,
                 )
             else:
                 metric = ConversationalMetric(
@@ -120,7 +112,7 @@ class Conversational(FairForge):
                     conversational_relation_maxim=result["relation_maxim"],
                     conversational_manner_maxim=result["manner_maxim"],
                     conversational_sensibleness=result["sensibleness"],
-                    conversational_thinkings=thinking,
+                    conversational_thinkings=reasoning,
                 )
 
             self.logger.debug(f"Conversational memory: {metric.conversational_memory}")

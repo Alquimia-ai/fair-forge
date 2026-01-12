@@ -28,8 +28,6 @@ class TestJudge:
         judge = Judge(model=mock_model)
         assert judge.model == mock_model
         assert judge.use_structured_output is False
-        assert judge.bos_think_token is None
-        assert judge.eos_think_token is None
         assert judge.bos_json_clause == "```json"
         assert judge.eos_json_clause == "```"
         assert judge.chat_history == []
@@ -38,14 +36,6 @@ class TestJudge:
         """Test Judge initialization with structured output enabled."""
         judge = Judge(model=mock_model, use_structured_output=True)
         assert judge.use_structured_output is True
-
-    def test_initialization_with_think_tokens(self, mock_model):
-        """Test Judge initialization with think tokens."""
-        judge = Judge(
-            model=mock_model, bos_think_token="<think>", eos_think_token="</think>"
-        )
-        assert judge.bos_think_token == "<think>"
-        assert judge.eos_think_token == "</think>"
 
     def test_initialization_custom_json_clauses(self, mock_model):
         """Test Judge initialization with custom JSON clauses."""
@@ -62,6 +52,7 @@ class TestJudge:
         mock_response.content = (
             'Here is the result:\n```json\n{"score": 0.85, "valid": true}\n```'
         )
+        mock_response.additional_kwargs = {}
 
         mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response
@@ -81,6 +72,7 @@ class TestJudge:
         """Test check method in regex mode when no JSON found."""
         mock_response = MagicMock()
         mock_response.content = "Response without JSON"
+        mock_response.additional_kwargs = {}
 
         mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response
@@ -100,6 +92,7 @@ class TestJudge:
         """Test check method in regex mode with invalid JSON."""
         mock_response = MagicMock()
         mock_response.content = "```json\n{invalid json}\n```"
+        mock_response.additional_kwargs = {}
 
         mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response
@@ -119,6 +112,7 @@ class TestJudge:
         """Test check method with custom JSON clauses."""
         mock_response = MagicMock()
         mock_response.content = 'Result: <json>{"value": 42}</json>'
+        mock_response.additional_kwargs = {}
 
         mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response
@@ -135,10 +129,11 @@ class TestJudge:
         assert json_data == {"value": 42}
 
     @patch("fair_forge.llm.judge.ChatPromptTemplate")
-    def test_check_regex_mode_with_think_tokens(self, mock_template, mock_model):
-        """Test check method extracts thinking content."""
+    def test_check_regex_mode_with_langchain_reasoning(self, mock_template, mock_model):
+        """Test check method extracts reasoning from LangChain's additional_kwargs."""
         mock_response = MagicMock()
-        mock_response.content = '<think>Let me analyze this</think>\n```json\n{"result": "done"}\n```'
+        mock_response.content = '```json\n{"result": "done"}\n```'
+        mock_response.additional_kwargs = {"reasoning_content": "Let me analyze this"}
 
         mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response
@@ -147,9 +142,7 @@ class TestJudge:
         mock_prompt.__or__ = MagicMock(return_value=mock_chain)
         mock_template.from_messages.return_value = mock_prompt
 
-        judge = Judge(
-            model=mock_model, bos_think_token="<think>", eos_think_token="</think>"
-        )
+        judge = Judge(model=mock_model)
         thought, json_data = judge.check("System", "Query", {})
 
         assert thought == "Let me analyze this"
@@ -184,6 +177,7 @@ class TestJudge:
         """Test check falls back to regex when no schema provided in structured mode."""
         mock_response = MagicMock()
         mock_response.content = '```json\n{"score": 0.5}\n```'
+        mock_response.additional_kwargs = {}
 
         mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response
@@ -202,6 +196,7 @@ class TestJudge:
         """Test that chat history accumulates across calls."""
         mock_response = MagicMock()
         mock_response.content = '```json\n{"result": 1}\n```'
+        mock_response.additional_kwargs = {}
 
         mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response
@@ -226,6 +221,7 @@ class TestJudge:
         """Test check handles JSON with extra whitespace."""
         mock_response = MagicMock()
         mock_response.content = '```json   \n  {"key": "value"}  \n  ```'
+        mock_response.additional_kwargs = {}
 
         mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response
@@ -244,6 +240,7 @@ class TestJudge:
         """Test check handles nested JSON."""
         mock_response = MagicMock()
         mock_response.content = '```json\n{"outer": {"inner": [1, 2, 3]}}\n```'
+        mock_response.additional_kwargs = {}
 
         mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response
@@ -271,6 +268,7 @@ class TestJudge:
         """Test check appends schema to prompt in regex mode."""
         mock_response = MagicMock()
         mock_response.content = '```json\n{"score": 0.7, "insight": "test"}\n```'
+        mock_response.additional_kwargs = {}
 
         mock_chain = MagicMock()
         mock_chain.invoke.return_value = mock_response

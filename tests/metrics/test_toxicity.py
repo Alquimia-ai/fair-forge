@@ -1,11 +1,12 @@
 """Unit tests for Toxicity metric."""
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-import numpy as np
 from collections import Counter
+from unittest.mock import MagicMock, Mock, patch
 
-from fair_forge.metrics import Toxicity
-from fair_forge.schemas import ToxicityMetric
+import numpy as np
+import pytest
+
+from fair_forge.metrics.toxicity import Toxicity
+from fair_forge.schemas.toxicity import ToxicityMetric
 from fair_forge.statistical import FrequentistMode, BayesianMode
 from tests.fixtures.mock_retriever import ToxicityDatasetRetriever
 from tests.fixtures.mock_data import create_sample_batch, create_sample_dataset

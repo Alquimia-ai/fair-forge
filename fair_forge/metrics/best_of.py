@@ -18,8 +18,6 @@ class BestOf(FairForge):
         retriever: Retriever class for loading datasets
         model: LangChain BaseChatModel instance for evaluation
         use_structured_output: If True, use LangChain's with_structured_output()
-        bos_think_token: Begin token for chain-of-thought extraction
-        eos_think_token: End token for chain-of-thought extraction
         bos_json_clause: Opening marker for JSON blocks
         eos_json_clause: Closing marker for JSON blocks
         criteria: Label describing the evaluation criteria
@@ -31,8 +29,6 @@ class BestOf(FairForge):
         retriever: Type[Retriever],
         model: BaseChatModel,
         use_structured_output: bool = False,
-        bos_think_token: Optional[str] = None,
-        eos_think_token: Optional[str] = None,
         bos_json_clause: str = "```json",
         eos_json_clause: str = "```",
         criteria: str = "BestOf",
@@ -41,8 +37,6 @@ class BestOf(FairForge):
         super().__init__(retriever, **kwargs)
         self.model = model
         self.use_structured_output = use_structured_output
-        self.bos_think_token = bos_think_token
-        self.eos_think_token = eos_think_token
         self.bos_json_clause = bos_json_clause
         self.eos_json_clause = eos_json_clause
         self.criteria = criteria
@@ -76,8 +70,6 @@ class BestOf(FairForge):
         judge = Judge(
             model=self.model,
             use_structured_output=self.use_structured_output,
-            bos_think_token=self.bos_think_token,
-            eos_think_token=self.eos_think_token,
             bos_json_clause=self.bos_json_clause,
             eos_json_clause=self.eos_json_clause,
         )
@@ -113,7 +105,7 @@ class BestOf(FairForge):
                 right_contestant = self._build_conversation_batch(right_id)
 
                 self.logger.debug(f"Round {round_number}: Comparing {left_id} and {right_id} contestants")
-                thinking, result = judge.check(
+                reasoning, result = judge.check(
                     bestOf_judge_prompt,
                     self.criteria,
                     {
@@ -134,12 +126,12 @@ class BestOf(FairForge):
                     winner = result.winner
                     confidence = result.confidence
                     verdict = result.verdict
-                    reasoning = result.reasoning
+                    result_reasoning = result.reasoning
                 else:
                     winner = result.get("winner", "")
                     confidence = result.get("confidence")
                     verdict = result.get("verdict")
-                    reasoning = result.get("reasoning")
+                    result_reasoning = result.get("reasoning")
 
                 if winner == left_id:
                     round_winners.append(left_id)
@@ -160,8 +152,8 @@ class BestOf(FairForge):
                         winner_id=winner if winner in (left_id, right_id) else "tie",
                         confidence=confidence,
                         verdict=verdict,
-                        reasoning=reasoning,
-                        thinkings=thinking,
+                        reasoning=result_reasoning,
+                        thinkings=reasoning,
                     )
                 )
 

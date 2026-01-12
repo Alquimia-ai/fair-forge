@@ -1,8 +1,10 @@
 """Unit tests for Humanity metric."""
-import pytest
 import math
-from fair_forge.metrics import Humanity
-from fair_forge.schemas import HumanityMetric
+
+import pytest
+
+from fair_forge.metrics.humanity import Humanity
+from fair_forge.schemas.humanity import HumanityMetric
 from tests.fixtures.mock_retriever import EmotionalDatasetRetriever, MockRetriever
 from tests.fixtures.mock_data import create_sample_batch, create_emotional_dataset
 

@@ -20,8 +20,6 @@ class Context(FairForge):
         retriever: Retriever class for loading datasets
         model: LangChain BaseChatModel instance for evaluation
         use_structured_output: If True, use LangChain's with_structured_output()
-        bos_think_token: Begin token for chain-of-thought extraction
-        eos_think_token: End token for chain-of-thought extraction
         bos_json_clause: Opening marker for JSON blocks
         eos_json_clause: Closing marker for JSON blocks
         **kwargs: Additional arguments passed to FairForge base class
@@ -32,8 +30,6 @@ class Context(FairForge):
         retriever: Type[Retriever],
         model: BaseChatModel,
         use_structured_output: bool = False,
-        bos_think_token: Optional[str] = None,
-        eos_think_token: Optional[str] = None,
         bos_json_clause: str = "```json",
         eos_json_clause: str = "```",
         **kwargs,
@@ -41,8 +37,6 @@ class Context(FairForge):
         super().__init__(retriever, **kwargs)
         self.model = model
         self.use_structured_output = use_structured_output
-        self.bos_think_token = bos_think_token
-        self.eos_think_token = eos_think_token
         self.bos_json_clause = bos_json_clause
         self.eos_json_clause = eos_json_clause
 
@@ -57,8 +51,6 @@ class Context(FairForge):
         judge = Judge(
             model=self.model,
             use_structured_output=self.use_structured_output,
-            bos_think_token=self.bos_think_token,
-            eos_think_token=self.eos_think_token,
             bos_json_clause=self.bos_json_clause,
             eos_json_clause=self.eos_json_clause,
         )
@@ -71,14 +63,14 @@ class Context(FairForge):
                 "assistant_answer": interaction.assistant,
             }
             if interaction.observation:
-                thinking, result = judge.check(
+                reasoning, result = judge.check(
                     context_reasoning_system_prompt_observation,
                     query,
                     {"observation": interaction.observation, **data},
                     output_schema=ContextJudgeOutput,
                 )
             else:
-                thinking, result = judge.check(
+                reasoning, result = judge.check(
                     context_reasoning_system_prompt,
                     query,
                     {"ground_truth_assistant": interaction.assistant, **data},
@@ -99,7 +91,7 @@ class Context(FairForge):
 
             metric = ContextMetric(
                 context_insight=insight,
-                context_thinkings=thinking,
+                context_thinkings=reasoning,
                 context_awareness=score,
                 session_id=session_id,
                 assistant_id=assistant_id,

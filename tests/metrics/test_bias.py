@@ -1,10 +1,12 @@
 """Tests for Bias metric."""
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from fair_forge.metrics.bias import Bias
+
 from fair_forge.core import Guardian
-from fair_forge.schemas import Batch, ProtectedAttribute
-from fair_forge.schemas.bias import GuardianBias, BiasMetric
+from fair_forge.metrics.bias import Bias
+from fair_forge.schemas import Batch
+from fair_forge.schemas.bias import BiasMetric, GuardianBias, ProtectedAttribute
 from tests.fixtures.mock_retriever import MockRetriever, BiasDatasetRetriever
 from tests.fixtures.mock_data import create_sample_batch, create_bias_dataset
 
