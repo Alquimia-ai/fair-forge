@@ -102,10 +102,10 @@ class BayesianMode(StatisticalMode):
         aggregated_samples = np.zeros(self.mc_samples)
         for name, metric_result in metrics.items():
             weight = normalized_weights.get(name, 0.0)
-            if 'samples' in metric_result:
+            if 'samples' in metric_result and len(metric_result['samples']) == self.mc_samples:
                 aggregated_samples += weight * metric_result['samples']
             else:
-                # Fallback if no samples (shouldn't happen in pure Bayesian)
+                # Fallback if no samples or wrong size
                 aggregated_samples += weight * metric_result.get('mean', 0.0)
 
         return self._summarize(aggregated_samples)
@@ -122,10 +122,10 @@ class BayesianMode(StatisticalMode):
         # Stack all samples
         all_samples = []
         for v in values.values():
-            if 'samples' in v:
+            if 'samples' in v and len(v['samples']) == self.mc_samples:
                 all_samples.append(v['samples'])
             else:
-                # Fallback to point estimate if no samples
+                # Fallback to point estimate if no samples or wrong size
                 all_samples.append(np.full(self.mc_samples, v.get('mean', 0.0)))
 
         all_samples = np.array(all_samples)
@@ -162,7 +162,7 @@ class BayesianMode(StatisticalMode):
             'mean': 0.0,
             'ci_low': 0.0,
             'ci_high': 0.0,
-            'samples': np.array([])
+            'samples': np.zeros(self.mc_samples)
         }
 
     def get_result_type(self) -> str:

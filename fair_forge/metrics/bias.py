@@ -184,6 +184,7 @@ class Bias(FairForge):
         context: str,
         assistant_id: str,
         batch: list[Batch],
+        language: str = "en",
     ):
         """
         Process a batch of interactions to analyze bias.
