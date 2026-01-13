@@ -80,6 +80,10 @@ Fair Forge is modular - install only what you need:
 | `bias` | Bias detection across protected attributes | numpy, pandas, scikit-learn, umap-learn, hdbscan, sentence-transformers, torch |
 | `metrics` | All metrics above | All metric dependencies |
 | `runners` | Test execution against AI systems | alquimia-client, python-dotenv, httpx, aiosseclient |
+| `generators` | Synthetic test dataset generation (base) | httpx |
+| `generators-openai` | Generators with OpenAI support | httpx, langchain-openai |
+| `generators-groq` | Generators with Groq support | httpx, langchain-groq |
+| `generators-all` | Generators with all LLM providers | httpx, langchain-openai, langchain-groq |
 | `cloud` | Cloud storage backends (S3, LakeFS) | boto3, lakefs |
 | `all` | Everything | All dependencies |
 | `dev` | Development tools | pytest, ruff, mypy, sphinx, jupyter |
@@ -835,6 +839,235 @@ context_metrics = Context.run(TestResultsRetriever, ...)
 ```
 
 This enables comprehensive evaluation of agent behavior using toxicity, bias, conversational quality, and other metrics on your test execution results.
+
+## Generators Module
+
+Fair Forge includes a **generators** module for creating synthetic test datasets from context documents. This enables automated test generation for evaluating AI assistants against your documentation or knowledge base.
+
+### Architecture
+
+The generators module consists of 2 main components:
+
+1. **Generators** (`fair_forge.generators`): Generate test queries from context
+   - `BaseGenerator`: Abstract interface for custom generator implementations
+   - `OpenAIGenerator`: Uses OpenAI models via LangChain (GPT-4, GPT-3.5)
+   - `GroqGenerator`: Uses Groq's ultra-fast inference API (Llama, Mixtral)
+   - `AlquimiaGenerator`: Uses Alquimia's internal LLM endpoint
+   - `LangChainGenerator`: Base class for any LangChain-compatible model
+
+2. **Context Loaders** (`fair_forge.generators.context_loaders`): Load and chunk context documents
+   - `BaseContextLoader`: Abstract interface for custom loaders
+   - `LocalMarkdownLoader`: Load and chunk local markdown files
+
+### Quick Start with OpenAI
+
+```python
+import asyncio
+import os
+from fair_forge.generators import create_openai_generator, create_markdown_loader
+
+# Set API key via environment variable
+os.environ["OPENAI_API_KEY"] = "your-api-key"
+
+# 1. Create context loader
+loader = create_markdown_loader(max_chunk_size=2000)
+
+# 2. Create OpenAI generator
+generator = create_openai_generator(
+    model_name="gpt-4o-mini",  # or "gpt-4o", "gpt-3.5-turbo"
+    temperature=0.7,
+)
+
+# 3. Generate dataset
+async def generate():
+    dataset = await generator.generate_dataset(
+        context_loader=loader,
+        source="./docs/knowledge_base.md",
+        assistant_id="my-assistant",
+        num_queries_per_chunk=3,
+    )
+    return dataset
+
+dataset = asyncio.run(generate())
+print(f"Generated {len(dataset.conversation)} test queries")
+```
+
+### Quick Start with Groq
+
+Groq provides ultra-fast inference for open-source models:
+
+```python
+import asyncio
+import os
+from fair_forge.generators import create_groq_generator, create_markdown_loader
+
+# Set API key via environment variable
+os.environ["GROQ_API_KEY"] = "your-api-key"
+
+# Create Groq generator with Llama 3.1
+generator = create_groq_generator(
+    model_name="llama-3.1-70b-versatile",  # or "llama-3.1-8b-instant", "mixtral-8x7b-32768"
+    temperature=0.7,
+)
+
+# Generate dataset
+loader = create_markdown_loader()
+dataset = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs/knowledge_base.md",
+    assistant_id="my-assistant",
+)
+```
+
+### Quick Start with Alquimia
+
+The Alquimia generator uses an agent configured in your Alquimia workspace. The `context`, `seed_examples`, and `num_queries` are passed as extra data that gets injected into the agent's system prompt.
+
+```python
+from fair_forge.generators import create_alquimia_generator, create_markdown_loader
+
+generator = create_alquimia_generator(
+    base_url="https://api.alquimia.ai",
+    api_key="your-api-key",
+    agent_id="your-agent-id",      # Agent configured in Alquimia workspace
+    channel_id="your-channel-id",  # Channel identifier
+)
+
+loader = create_markdown_loader()
+dataset = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs/knowledge_base.md",
+    assistant_id="my-assistant",
+)
+```
+
+**Note:** AlquimiaGenerator does not support custom system prompts. Configure the agent's prompt in your Alquimia workspace to accept `context`, `num_queries`, and `seed_examples` as template variables.
+
+### Available Generator Models
+
+| Provider | Models | Configuration |
+|----------|--------|---------------------|
+| OpenAI | `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`, `gpt-3.5-turbo` | `OPENAI_API_KEY` env var |
+| Groq | `llama-3.1-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768` | `GROQ_API_KEY` env var |
+| Alquimia | Agent-based (workspace configured) | `agent_id`, `channel_id` params |
+
+### Context Loaders
+
+#### LocalMarkdownLoader
+
+Load and chunk local markdown files using a hybrid strategy:
+
+```python
+from fair_forge.generators import create_markdown_loader
+
+loader = create_markdown_loader(
+    max_chunk_size=2000,   # Maximum characters per chunk
+    min_chunk_size=200,    # Minimum characters per chunk
+    overlap=100,           # Overlap between size-based chunks
+    header_levels=[1, 2, 3],  # Split on H1, H2, H3 headers
+)
+
+# Load and chunk a markdown file
+chunks = loader.load("./docs/knowledge_base.md")
+for chunk in chunks:
+    print(f"Chunk: {chunk.chunk_id}")
+    print(f"Content: {chunk.content[:100]}...")
+```
+
+**Chunking Strategy:**
+1. **Primary**: Split by markdown headers (H1, H2, H3, etc.)
+2. **Fallback**: Split by character count for long sections without headers
+
+### Generator Configuration
+
+#### Seed Examples
+
+Guide the query generation style using seed examples:
+
+```python
+dataset = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs/knowledge_base.md",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=3,
+    seed_examples=[
+        "What are the main features of the platform?",
+        "How do I configure the authentication system?",
+    ],
+)
+```
+
+#### Custom System Prompt (OpenAI/Groq only)
+
+Use a custom system prompt for domain-specific generation with OpenAI or Groq generators:
+
+```python
+custom_prompt = """You are a QA specialist creating test questions.
+
+Context:
+{context}
+
+{seed_examples_section}
+
+Generate exactly {num_queries} questions based on this context.
+
+You MUST respond with valid JSON:
+{{"queries": [{{"query": "...", "difficulty": "easy|medium|hard", "query_type": "factual|inferential"}}], "chunk_summary": "..."}}"""
+
+dataset = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs/knowledge_base.md",
+    assistant_id="my-assistant",
+    custom_system_prompt=custom_prompt,
+)
+```
+
+### Creating Custom Context Loaders
+
+Implement custom loaders by extending the `BaseContextLoader` interface:
+
+```python
+from fair_forge.schemas.generators import BaseContextLoader, Chunk
+
+class JsonContextLoader(BaseContextLoader):
+    """Custom loader for JSON documents."""
+
+    def load(self, source: str) -> list[Chunk]:
+        import json
+        from pathlib import Path
+
+        with open(source) as f:
+            data = json.load(f)
+
+        chunks = []
+        for key, value in data.items():
+            chunks.append(Chunk(
+                content=f"{key}: {json.dumps(value)}",
+                chunk_id=f"json_{key}",
+                metadata={"key": key},
+            ))
+        return chunks
+```
+
+### Integration with Runners
+
+Generated datasets are fully compatible with Fair Forge runners:
+
+```python
+from fair_forge.runners import AlquimiaRunner
+from fair_forge.storage import create_local_storage
+
+# Generate test dataset
+dataset = await generator.generate_dataset(...)
+
+# Run tests against AI system
+runner = AlquimiaRunner(...)
+updated_dataset, summary = await runner.run_dataset(dataset)
+
+# Analyze results with metrics
+from fair_forge.metrics.context import Context
+metrics = Context.run(TestResultsRetriever, ...)
+```
 
 ## Contributing
 
