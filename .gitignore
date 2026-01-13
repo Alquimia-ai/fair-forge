@@ -48,5 +48,10 @@ examples/pipeline/.virtual_documents/
 .DS_Store
 Thumbs.db
 
-# Claude
-.claude
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.pytest_cache/

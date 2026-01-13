@@ -20,9 +20,12 @@
 
 ## Installation
 
-### For Development (Recommended with uv)
+### Requirements
 
-We recommend using [uv](https://docs.astral.sh/uv/) for fast and reliable Python package management.
+- **Python**: >= 3.11 (recommended: 3.11, 3.12, or 3.13)
+- **uv**: We recommend using [uv](https://docs.astral.sh/uv/) for fast and reliable Python package management
+
+### Quick Start
 
 1. Install uv if you haven't already:
 
@@ -30,85 +33,114 @@ We recommend using [uv](https://docs.astral.sh/uv/) for fast and reliable Python
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-2. Clone the repository and sync dependencies:
+2. Clone the repository:
 
 ```shell
 git clone https://github.com/Alquimia-ai/fair-forge.git
 cd fair-forge
-uv sync
 ```
 
-3. You can now use the package in development mode directly with `uv run`:
+3. Create and activate a virtual environment:
 
 ```shell
-uv run python your_script.py
+uv venv
+source .venv/bin/activate
 ```
 
-### For Using in Your Own Project
-
-If you want to use `alquimia-fair-forge` in your own project:
-
-#### With uv (Recommended)
-
-Simply add it to your project dependencies:
-
-```shell
-uv add alquimia-fair-forge
-```
-
-This will add the package to your `pyproject.toml` and install it.
-
-#### With pip
-
-Add to your `requirements.txt` or install directly:
-
-```shell
-pip install alquimia-fair-forge
-```
-
-### For Distribution (Building the Package)
-
-If you're a maintainer building the package for distribution:
-
-#### Using uv (Modern approach)
-
-1. Build the package:
+4. Build the package:
 
 ```shell
 make build
-# or directly: uv build
 ```
 
-2. Install from the local build:
+5. Install the package with the modules you need:
 
 ```shell
-uv pip install dist/alquimia_fair_forge-0.0.1-py3-none-any.whl
+# Install with a specific module
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[toxicity]"
+
+# Install with multiple modules
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[toxicity,bias]"
+
+# Install everything
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[all]"
 ```
 
-#### Using pip (Traditional approach)
+### Available Modules
 
-1. Build the package:
+Fair Forge is modular - install only what you need:
+
+| Module | Description | Dependencies |
+|--------|-------------|--------------|
+| `context` | Context awareness metric (LLM-based) | Core only |
+| `conversational` | Grice's maxims evaluation (LLM-based) | Core only |
+| `bestof` | Tournament-style response comparison (LLM-based) | Core only |
+| `humanity` | Emotional analysis metric | numpy, pandas |
+| `toxicity` | Toxic language detection with DIDT framework | nltk, numpy, pandas, scikit-learn, umap-learn, hdbscan, sentence-transformers, torch |
+| `bias` | Bias detection across protected attributes | numpy, pandas, scikit-learn, umap-learn, hdbscan, sentence-transformers, torch |
+| `metrics` | All metrics above | All metric dependencies |
+| `runners` | Test execution against AI systems | alquimia-client, python-dotenv, httpx, aiosseclient |
+| `cloud` | Cloud storage backends (S3, LakeFS) | boto3, lakefs |
+| `all` | Everything | All dependencies |
+| `dev` | Development tools | pytest, ruff, mypy, sphinx, jupyter |
+
+### Installation Examples
 
 ```shell
-make package
+# For toxicity analysis only
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[toxicity]"
+
+# For bias detection only
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[bias]"
+
+# For LLM-based metrics (context, conversational, bestof)
+# Note: You also need to install your LLM provider (e.g., langchain-openai, langchain-groq)
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[context]"
+uv pip install langchain-openai  # or your preferred provider
+
+# For running tests against AI systems
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[runners]"
+
+# For cloud storage support
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[cloud]"
+
+# For all metrics
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[metrics]"
+
+# For everything (all modules)
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[all]"
 ```
 
-2. Install from the local build:
+### Installing in Jupyter Notebooks
 
-```shell
-pip install dist/alquimia_fair_forge-0.0.1.tar.gz
+When working in Jupyter notebooks, use this pattern to install from a local build:
+
+```python
+import sys
+!uv pip install --python {sys.executable} --force-reinstall "../../dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[toxicity]"
 ```
 
-### For Local Development (Editable Mode)
+Replace `toxicity` with the module(s) you need, or use `all` for everything.
 
-If you're contributing to this project, install in editable mode:
+### For Development
+
+If you're contributing to this project:
 
 ```shell
-# With uv (after running uv sync)
-uv pip install -e .
+# Clone and setup
+git clone https://github.com/Alquimia-ai/fair-forge.git
+cd fair-forge
+uv venv
+source .venv/bin/activate
 
-# Or with pip
-pip install -e .
+# Install all dependencies including dev tools
+uv sync
+
+# Run scripts in development
+uv run python your_script.py
+
+# Install in editable mode
+uv pip install -e ".[dev]"
 ```
 
 ## How It Works
