@@ -8,8 +8,16 @@ from pathlib import Path
 from fair_forge.generators import (
     LangChainGenerator,
     LocalMarkdownLoader,
+    SequentialStrategy,
+    RandomSamplingStrategy,
 )
-from fair_forge.schemas.generators import Chunk, GeneratedQuery, GeneratedQueriesOutput
+from fair_forge.schemas.generators import (
+    Chunk,
+    GeneratedQuery,
+    GeneratedQueriesOutput,
+    ConversationTurn,
+    GeneratedConversationOutput,
+)
 from fair_forge.schemas.common import Dataset, Batch
 
 
@@ -284,7 +292,6 @@ class TestLangChainGeneratorIntegration:
     async def test_generate_queries_structured_output(self, sample_chunk: Chunk):
         """Test generate_queries with structured output mode."""
         mock_model = MagicMock()
-        mock_structured_model = MagicMock()
 
         # Mock the structured output result
         mock_result = GeneratedQueriesOutput(
@@ -293,15 +300,19 @@ class TestLangChainGeneratorIntegration:
             ],
             chunk_summary="Test summary",
         )
-        mock_structured_model.invoke.return_value = mock_result
-        mock_model.with_structured_output.return_value = mock_structured_model
 
-        generator = LangChainGenerator(model=mock_model, use_structured_output=True)
-        queries = await generator.generate_queries(sample_chunk, num_queries=1)
+        with patch("fair_forge.generators.langchain_generator.ChatPromptTemplate") as mock_prompt:
+            # Mock the chain that is created when prompt | model
+            mock_chain = MagicMock()
+            mock_chain.invoke.return_value = mock_result
+            mock_prompt.from_messages.return_value.__or__ = MagicMock(return_value=mock_chain)
 
-        assert len(queries) == 1
-        assert queries[0].query == "Test question?"
-        mock_model.with_structured_output.assert_called_once()
+            generator = LangChainGenerator(model=mock_model, use_structured_output=True)
+            queries = await generator.generate_queries(sample_chunk, num_queries=1)
+
+            assert len(queries) == 1
+            assert queries[0].query == "Test question?"
+            mock_model.with_structured_output.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_generate_queries_regex_mode(self, sample_chunk: Chunk):
@@ -331,9 +342,8 @@ class TestLangChainGeneratorIntegration:
     async def test_generate_dataset_creates_valid_dataset(
         self, temp_markdown_file: Path
     ):
-        """Test generate_dataset creates a valid Dataset object."""
+        """Test generate_dataset creates a valid list of Dataset objects."""
         mock_model = MagicMock()
-        mock_structured_model = MagicMock()
 
         mock_result = GeneratedQueriesOutput(
             queries=[
@@ -341,27 +351,34 @@ class TestLangChainGeneratorIntegration:
             ],
             chunk_summary="Summary",
         )
-        mock_structured_model.invoke.return_value = mock_result
-        mock_model.with_structured_output.return_value = mock_structured_model
 
-        generator = LangChainGenerator(model=mock_model, use_structured_output=True)
-        loader = LocalMarkdownLoader()
+        with patch("fair_forge.generators.langchain_generator.ChatPromptTemplate") as mock_prompt:
+            mock_chain = MagicMock()
+            mock_chain.invoke.return_value = mock_result
+            mock_prompt.from_messages.return_value.__or__ = MagicMock(return_value=mock_chain)
 
-        dataset = await generator.generate_dataset(
-            context_loader=loader,
-            source=str(temp_markdown_file),
-            assistant_id="test-assistant",
-            num_queries_per_chunk=1,
-        )
+            generator = LangChainGenerator(model=mock_model, use_structured_output=True)
+            loader = LocalMarkdownLoader()
 
-        assert isinstance(dataset, Dataset)
-        assert dataset.assistant_id == "test-assistant"
-        assert len(dataset.conversation) > 0
+            datasets = await generator.generate_dataset(
+                context_loader=loader,
+                source=str(temp_markdown_file),
+                assistant_id="test-assistant",
+                num_queries_per_chunk=1,
+            )
 
-        for batch in dataset.conversation:
-            assert isinstance(batch, Batch)
-            assert batch.query
-            assert batch.assistant == ""
+            assert isinstance(datasets, list)
+            assert len(datasets) >= 1
+
+            dataset = datasets[0]
+            assert isinstance(dataset, Dataset)
+            assert dataset.assistant_id == "test-assistant"
+            assert len(dataset.conversation) > 0
+
+            for batch in dataset.conversation:
+                assert isinstance(batch, Batch)
+                assert batch.query
+                assert batch.assistant == ""
 
 
 class TestLangChainGeneratorWithSeedExamples:
@@ -377,7 +394,10 @@ class TestLangChainGeneratorWithSeedExamples:
             queries=[GeneratedQuery(query="Q?", difficulty="easy", query_type="factual")],
             chunk_summary="Summary",
         )
-        mock_structured_model.invoke.return_value = mock_result
+        # Mock the chain: prompt | structured_model creates a chain that returns result
+        mock_chain = MagicMock()
+        mock_chain.invoke.return_value = mock_result
+        mock_structured_model.__or__ = MagicMock(return_value=mock_chain)
         mock_model.with_structured_output.return_value = mock_structured_model
 
         generator = LangChainGenerator(model=mock_model, use_structured_output=True)
@@ -392,3 +412,272 @@ class TestLangChainGeneratorWithSeedExamples:
         # The seed examples should be included in the formatted prompt
         # This is validated through the successful call - the format works
         mock_model.with_structured_output.assert_called_once()
+
+
+class TestLangChainGeneratorConversationMode:
+    """Test conversation mode functionality."""
+
+    @pytest.mark.asyncio
+    async def test_generate_conversation_structured_output(self, sample_chunk: Chunk):
+        """Test generate_conversation with structured output mode."""
+        mock_model = MagicMock()
+
+        mock_result = GeneratedConversationOutput(
+            turns=[
+                ConversationTurn(
+                    query="What is this about?",
+                    turn_number=1,
+                    difficulty="easy",
+                    query_type="factual",
+                ),
+                ConversationTurn(
+                    query="Can you explain more?",
+                    turn_number=2,
+                    difficulty="medium",
+                    query_type="inferential",
+                    expected_context="Builds on turn 1",
+                ),
+            ],
+            conversation_summary="A two-turn conversation",
+            chunk_summary="Test summary",
+        )
+
+        with patch("fair_forge.generators.langchain_generator.ChatPromptTemplate") as mock_prompt:
+            mock_chain = MagicMock()
+            mock_chain.invoke.return_value = mock_result
+            mock_prompt.from_messages.return_value.__or__ = MagicMock(return_value=mock_chain)
+
+            generator = LangChainGenerator(model=mock_model, use_structured_output=True)
+            turns = await generator.generate_conversation(sample_chunk, num_turns=2)
+
+            assert len(turns) == 2
+            assert turns[0].query == "What is this about?"
+            assert turns[0].turn_number == 1
+            assert turns[1].turn_number == 2
+            assert turns[1].expected_context == "Builds on turn 1"
+
+    @pytest.mark.asyncio
+    async def test_generate_dataset_conversation_mode(
+        self, temp_markdown_file: Path
+    ):
+        """Test generate_dataset with conversation_mode=True."""
+        mock_model = MagicMock()
+        mock_structured_model = MagicMock()
+
+        mock_result = GeneratedConversationOutput(
+            turns=[
+                ConversationTurn(
+                    query="Turn 1?",
+                    turn_number=1,
+                    difficulty="easy",
+                    query_type="factual",
+                ),
+                ConversationTurn(
+                    query="Turn 2?",
+                    turn_number=2,
+                    difficulty="medium",
+                    query_type="inferential",
+                    expected_context="Builds on turn 1",
+                ),
+            ],
+            conversation_summary="Test conversation",
+            chunk_summary="Summary",
+        )
+        # Mock the chain: prompt | structured_model creates a chain that returns result
+        mock_chain = MagicMock()
+        mock_chain.invoke.return_value = mock_result
+        mock_structured_model.__or__ = MagicMock(return_value=mock_chain)
+        mock_model.with_structured_output.return_value = mock_structured_model
+
+        generator = LangChainGenerator(model=mock_model, use_structured_output=True)
+        loader = LocalMarkdownLoader()
+
+        datasets = await generator.generate_dataset(
+            context_loader=loader,
+            source=str(temp_markdown_file),
+            assistant_id="test-assistant",
+            num_queries_per_chunk=2,
+            conversation_mode=True,
+        )
+
+        assert isinstance(datasets, list)
+        assert len(datasets) >= 1
+
+        dataset = datasets[0]
+        assert dataset.assistant_id == "test-assistant"
+
+        # Check that batches have conversation metadata
+        for batch in dataset.conversation:
+            assert "turn_number" in batch.agentic
+            assert batch.agentic.get("conversation_mode") is True
+
+    def test_parse_conversation_response_from_code_block(self):
+        """Test parsing conversation JSON from markdown code block."""
+        mock_model = MagicMock()
+        generator = LangChainGenerator(model=mock_model)
+
+        content = '''Here is the conversation:
+```json
+{
+    "turns": [
+        {"query": "First question?", "turn_number": 1, "difficulty": "easy", "query_type": "factual"}
+    ],
+    "conversation_summary": "A brief conversation",
+    "chunk_summary": "Test chunk"
+}
+```'''
+
+        result = generator._parse_conversation_response(content)
+
+        assert isinstance(result, GeneratedConversationOutput)
+        assert len(result.turns) == 1
+        assert result.turns[0].query == "First question?"
+        assert result.turns[0].turn_number == 1
+
+
+class TestLangChainGeneratorWithStrategies:
+    """Test chunk selection strategies with LangChain generator."""
+
+    @pytest.mark.asyncio
+    async def test_sequential_strategy_default(self, temp_markdown_file: Path):
+        """Test that default strategy is sequential."""
+        mock_model = MagicMock()
+        mock_structured_model = MagicMock()
+
+        mock_result = GeneratedQueriesOutput(
+            queries=[GeneratedQuery(query="Q?", difficulty="easy", query_type="factual")],
+            chunk_summary="Summary",
+        )
+        # Mock the chain: prompt | structured_model creates a chain that returns result
+        mock_chain = MagicMock()
+        mock_chain.invoke.return_value = mock_result
+        mock_structured_model.__or__ = MagicMock(return_value=mock_chain)
+        mock_model.with_structured_output.return_value = mock_structured_model
+
+        generator = LangChainGenerator(model=mock_model)
+        loader = LocalMarkdownLoader()
+
+        # No strategy provided - should use sequential (single dataset)
+        datasets = await generator.generate_dataset(
+            context_loader=loader,
+            source=str(temp_markdown_file),
+            assistant_id="test",
+        )
+
+        assert isinstance(datasets, list)
+        assert len(datasets) == 1
+
+    @pytest.mark.asyncio
+    async def test_explicit_sequential_strategy(self, temp_markdown_file: Path):
+        """Test explicit SequentialStrategy."""
+        mock_model = MagicMock()
+        mock_structured_model = MagicMock()
+
+        mock_result = GeneratedQueriesOutput(
+            queries=[GeneratedQuery(query="Q?", difficulty="easy", query_type="factual")],
+            chunk_summary="Summary",
+        )
+        # Mock the chain: prompt | structured_model creates a chain that returns result
+        mock_chain = MagicMock()
+        mock_chain.invoke.return_value = mock_result
+        mock_structured_model.__or__ = MagicMock(return_value=mock_chain)
+        mock_model.with_structured_output.return_value = mock_structured_model
+
+        generator = LangChainGenerator(model=mock_model)
+        loader = LocalMarkdownLoader()
+
+        strategy = SequentialStrategy()
+        datasets = await generator.generate_dataset(
+            context_loader=loader,
+            source=str(temp_markdown_file),
+            assistant_id="test",
+            selection_strategy=strategy,
+        )
+
+        assert isinstance(datasets, list)
+        assert len(datasets) == 1
+
+    @pytest.mark.asyncio
+    async def test_random_sampling_strategy(self, temp_markdown_file: Path):
+        """Test RandomSamplingStrategy produces multiple datasets."""
+        mock_model = MagicMock()
+        mock_structured_model = MagicMock()
+
+        mock_result = GeneratedQueriesOutput(
+            queries=[GeneratedQuery(query="Q?", difficulty="easy", query_type="factual")],
+            chunk_summary="Summary",
+        )
+        # Mock the chain: prompt | structured_model creates a chain that returns result
+        mock_chain = MagicMock()
+        mock_chain.invoke.return_value = mock_result
+        mock_structured_model.__or__ = MagicMock(return_value=mock_chain)
+        mock_model.with_structured_output.return_value = mock_structured_model
+
+        generator = LangChainGenerator(model=mock_model)
+        loader = LocalMarkdownLoader()
+
+        # Request 3 random samples
+        strategy = RandomSamplingStrategy(
+            num_samples=3,
+            chunks_per_sample=1,
+            seed=42,
+        )
+        datasets = await generator.generate_dataset(
+            context_loader=loader,
+            source=str(temp_markdown_file),
+            assistant_id="test",
+            selection_strategy=strategy,
+        )
+
+        assert isinstance(datasets, list)
+        assert len(datasets) == 3
+
+        # Each dataset should have unique session_id
+        session_ids = [d.session_id for d in datasets]
+        assert len(session_ids) == len(set(session_ids))
+
+    @pytest.mark.asyncio
+    async def test_random_sampling_with_conversation_mode(
+        self, temp_markdown_file: Path
+    ):
+        """Test combining random sampling with conversation mode."""
+        mock_model = MagicMock()
+
+        mock_result = GeneratedConversationOutput(
+            turns=[
+                ConversationTurn(query="T1?", turn_number=1, difficulty="easy", query_type="factual"),
+                ConversationTurn(query="T2?", turn_number=2, difficulty="medium", query_type="inferential"),
+            ],
+            conversation_summary="Conversation",
+            chunk_summary="Summary",
+        )
+
+        with patch("fair_forge.generators.langchain_generator.ChatPromptTemplate") as mock_prompt:
+            mock_chain = MagicMock()
+            mock_chain.invoke.return_value = mock_result
+            mock_prompt.from_messages.return_value.__or__ = MagicMock(return_value=mock_chain)
+
+            generator = LangChainGenerator(model=mock_model)
+            loader = LocalMarkdownLoader()
+
+            strategy = RandomSamplingStrategy(
+                num_samples=2,
+                chunks_per_sample=1,
+                seed=42,
+            )
+            datasets = await generator.generate_dataset(
+                context_loader=loader,
+                source=str(temp_markdown_file),
+                assistant_id="test",
+                selection_strategy=strategy,
+                conversation_mode=True,
+                num_queries_per_chunk=2,
+            )
+
+            assert len(datasets) == 2
+
+            for dataset in datasets:
+                # Each dataset should have conversation batches
+                assert len(dataset.conversation) > 0
+                for batch in dataset.conversation:
+                    assert batch.agentic.get("conversation_mode") is True

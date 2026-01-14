@@ -10,12 +10,17 @@ from loguru import logger
 
 from fair_forge.schemas.common import Batch, Dataset
 from fair_forge.schemas.generators import (
+    BaseChunkSelectionStrategy,
     BaseContextLoader,
     BaseGenerator,
     Chunk,
+    ConversationTurn,
+    GeneratedConversationOutput,
     GeneratedQueriesOutput,
     GeneratedQuery,
 )
+
+from .strategies import SequentialStrategy
 
 
 class AlquimiaGenerator(BaseGenerator):
@@ -134,6 +139,35 @@ class AlquimiaGenerator(BaseGenerator):
             logger.warning(f"Failed to parse JSON response: {e}, trying plain text")
             return self._parse_plain_text_response(response)
 
+    def _parse_conversation_response(self, response: str) -> GeneratedConversationOutput:
+        """Parse the agent response to extract conversation turns.
+
+        Args:
+            response: Raw response from the agent
+
+        Returns:
+            GeneratedConversationOutput: Parsed structured output
+        """
+        # Try to extract JSON from markdown code blocks
+        pattern = r"```json\s*(\{.*?\})\s*```"
+        match = re.search(pattern, response, re.DOTALL)
+        if match:
+            json_str = match.group(1)
+        else:
+            # Try to find raw JSON
+            json_match = re.search(r"\{.*\}", response, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+            else:
+                # If no JSON found, try to parse as plain text
+                return self._parse_plain_text_conversation(response)
+
+        try:
+            return GeneratedConversationOutput.model_validate_json(json_str)
+        except Exception as e:
+            logger.warning(f"Failed to parse JSON conversation: {e}, trying plain text")
+            return self._parse_plain_text_conversation(response)
+
     def _parse_plain_text_response(self, response: str) -> GeneratedQueriesOutput:
         """Parse plain text response when JSON parsing fails.
 
@@ -165,6 +199,51 @@ class AlquimiaGenerator(BaseGenerator):
 
         return GeneratedQueriesOutput(
             queries=queries,
+            chunk_summary="Parsed from plain text response",
+        )
+
+    def _parse_plain_text_conversation(
+        self, response: str
+    ) -> GeneratedConversationOutput:
+        """Parse plain text response as conversation turns.
+
+        Args:
+            response: Raw response from the agent
+
+        Returns:
+            GeneratedConversationOutput: Parsed conversation turns
+        """
+        turns = []
+        lines = response.strip().split("\n")
+        turn_number = 1
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            if line.endswith("?"):
+                cleaned = re.sub(r"^[\d]+[\.\)]\s*", "", line)
+                cleaned = re.sub(r"^[-*•]\s*", "", cleaned)
+                if cleaned:
+                    turns.append(
+                        ConversationTurn(
+                            query=cleaned,
+                            turn_number=turn_number,
+                        )
+                    )
+                    turn_number += 1
+
+        if not turns:
+            turns.append(
+                ConversationTurn(
+                    query=response.strip(),
+                    turn_number=1,
+                )
+            )
+
+        return GeneratedConversationOutput(
+            turns=turns,
+            conversation_summary="Parsed from plain text response",
             chunk_summary="Parsed from plain text response",
         )
 
@@ -222,6 +301,66 @@ class AlquimiaGenerator(BaseGenerator):
             logger.error(f"Failed to generate queries for chunk {chunk.chunk_id}: {e}")
             raise
 
+    async def generate_conversation(
+        self,
+        chunk: Chunk,
+        num_turns: int = 3,
+        seed_examples: Optional[list[str]] = None,
+        custom_system_prompt: Optional[str] = None,  # Not used with Alquimia
+    ) -> list[ConversationTurn]:
+        """Generate a coherent multi-turn conversation from a chunk.
+
+        Creates follow-up questions where each turn builds on the previous,
+        maintaining a natural conversation flow exploring the chunk's content.
+
+        Args:
+            chunk: The context chunk to generate conversation from.
+            num_turns: Number of conversation turns to generate.
+            seed_examples: Optional example conversations to guide style.
+            custom_system_prompt: Not used with Alquimia (ignored).
+
+        Returns:
+            list[ConversationTurn]: Ordered conversation turns.
+        """
+        logger.debug(
+            f"Generating {num_turns}-turn conversation for chunk {chunk.chunk_id}"
+        )
+
+        # Build extra data that will be injected into the system prompt
+        extra_data: dict[str, Any] = {
+            "context": chunk.content,
+            "num_turns": num_turns,
+            "conversation_mode": True,
+        }
+
+        if seed_examples:
+            extra_data["seed_examples"] = seed_examples
+
+        # Create a session ID for this generation
+        session_id = f"conv_{chunk.chunk_id}_{uuid.uuid4().hex[:8]}"
+
+        # Query to send to the agent
+        query = (
+            f"Generate a coherent {num_turns}-turn conversation based on the provided context. "
+            f"Each question should naturally follow from and build upon the previous one. "
+            f"Start with a broad question, then drill down into specifics. "
+            f"Return in JSON format with 'turns' array containing objects with 'query', "
+            f"'turn_number', 'difficulty', 'query_type', and 'expected_context' fields."
+        )
+
+        try:
+            response = await self._invoke_agent(query, session_id, extra_data)
+            output = self._parse_conversation_response(response)
+            logger.debug(
+                f"Generated {len(output.turns)} turns for chunk {chunk.chunk_id}"
+            )
+            return output.turns
+        except Exception as e:
+            logger.error(
+                f"Failed to generate conversation for chunk {chunk.chunk_id}: {e}"
+            )
+            raise
+
     async def generate_dataset(
         self,
         context_loader: BaseContextLoader,
@@ -231,64 +370,112 @@ class AlquimiaGenerator(BaseGenerator):
         language: str = "english",
         seed_examples: Optional[list[str]] = None,
         custom_system_prompt: Optional[str] = None,  # Not used with Alquimia
-    ) -> Dataset:
-        """Generate a complete dataset from a context source.
+        selection_strategy: Optional[BaseChunkSelectionStrategy] = None,
+        conversation_mode: bool = False,
+    ) -> list[Dataset]:
+        """Generate datasets from a context source.
 
         Args:
             context_loader: Loader to chunk the source document
             source: Path to the context document
             assistant_id: ID for the assistant being tested
-            num_queries_per_chunk: Queries per chunk
+            num_queries_per_chunk: Queries/turns per chunk
             language: Language for queries
             seed_examples: Example queries for style guidance
             custom_system_prompt: Not used with Alquimia (ignored)
+            selection_strategy: Strategy for selecting/grouping chunks.
+                Defaults to SequentialStrategy (process all chunks once).
+            conversation_mode: If True, generate coherent multi-turn
+                conversations instead of independent queries.
 
         Returns:
-            Dataset: Complete dataset with Batch objects
+            list[Dataset]: Generated datasets (one per chunk group from strategy).
         """
         logger.info(f"Loading context from: {source}")
         chunks = context_loader.load(source)
         logger.info(f"Loaded {len(chunks)} chunks from source")
 
-        session_id = str(uuid.uuid4())
-        batches: list[Batch] = []
-        full_context = "\n\n".join(chunk.content for chunk in chunks)
+        # Use default sequential strategy if none provided
+        strategy = selection_strategy or SequentialStrategy()
+        logger.info(f"Using chunk selection strategy: {strategy}")
 
-        for chunk in chunks:
-            queries = await self.generate_queries(
-                chunk=chunk,
-                num_queries=num_queries_per_chunk,
-                seed_examples=seed_examples,
+        datasets: list[Dataset] = []
+
+        # Process each chunk group from the strategy
+        for chunk_group in strategy.select(chunks):
+            session_id = str(uuid.uuid4())
+            batches: list[Batch] = []
+            full_context = "\n\n".join(chunk.content for chunk in chunk_group)
+
+            if conversation_mode:
+                # Generate coherent conversations per chunk
+                for chunk in chunk_group:
+                    turns = await self.generate_conversation(
+                        chunk=chunk,
+                        num_turns=num_queries_per_chunk,
+                        seed_examples=seed_examples,
+                    )
+
+                    for turn in turns:
+                        qa_id = f"{chunk.chunk_id}_t{turn.turn_number}"
+                        batch = Batch(
+                            qa_id=qa_id,
+                            query=turn.query,
+                            assistant="",
+                            ground_truth_assistant="",
+                            observation=f"Conversation turn {turn.turn_number} from chunk: {chunk.chunk_id}",
+                            agentic=_build_conversation_metadata(chunk, turn),
+                            ground_truth_agentic={},
+                        )
+                        batches.append(batch)
+            else:
+                # Generate independent queries per chunk
+                for chunk in chunk_group:
+                    queries = await self.generate_queries(
+                        chunk=chunk,
+                        num_queries=num_queries_per_chunk,
+                        seed_examples=seed_examples,
+                    )
+
+                    for i, generated_query in enumerate(queries):
+                        qa_id = f"{chunk.chunk_id}_q{i + 1}"
+                        batch = Batch(
+                            qa_id=qa_id,
+                            query=generated_query.query,
+                            assistant="",
+                            ground_truth_assistant="",
+                            observation=f"Generated from chunk: {chunk.chunk_id}",
+                            agentic=_build_agentic_metadata(chunk, generated_query),
+                            ground_truth_agentic={},
+                        )
+                        batches.append(batch)
+
+            logger.info(
+                f"Generated {len(batches)} batches for chunk group "
+                f"({len(chunk_group)} chunks)"
             )
 
-            for i, generated_query in enumerate(queries):
-                qa_id = f"{chunk.chunk_id}_q{i + 1}"
-                batch = Batch(
-                    qa_id=qa_id,
-                    query=generated_query.query,
-                    assistant="",  # To be filled by runner
-                    ground_truth_assistant="",  # Not applicable for generated queries
-                    observation=f"Generated from chunk: {chunk.chunk_id}",
-                    agentic=_build_agentic_metadata(chunk, generated_query),
-                    ground_truth_agentic={},
-                )
-                batches.append(batch)
+            dataset = Dataset(
+                session_id=session_id,
+                assistant_id=assistant_id,
+                language=language,
+                context=full_context,
+                conversation=batches,
+            )
+            datasets.append(dataset)
 
-        logger.info(f"Generated {len(batches)} total queries across {len(chunks)} chunks")
-
-        return Dataset(
-            session_id=session_id,
-            assistant_id=assistant_id,
-            language=language,
-            context=full_context,
-            conversation=batches,
+        logger.info(
+            f"Generated {len(datasets)} dataset(s) with "
+            f"{sum(len(d.conversation) for d in datasets)} total batches"
         )
+
+        return datasets
 
 
 def _build_agentic_metadata(
     chunk: Chunk, generated_query: GeneratedQuery
 ) -> dict[str, Any]:
-    """Build agentic metadata for a batch.
+    """Build agentic metadata for a query batch.
 
     Args:
         chunk: The source chunk
@@ -302,6 +489,34 @@ def _build_agentic_metadata(
         metadata["difficulty"] = generated_query.difficulty
     if generated_query.query_type:
         metadata["query_type"] = generated_query.query_type
+    return metadata
+
+
+def _build_conversation_metadata(
+    chunk: Chunk, turn: ConversationTurn
+) -> dict[str, Any]:
+    """Build agentic metadata for a conversation turn batch.
+
+    Args:
+        chunk: The source chunk
+        turn: The conversation turn
+
+    Returns:
+        dict: Agentic metadata including conversation tracking
+    """
+    metadata: dict[str, Any] = {
+        "chunk_id": chunk.chunk_id,
+        "turn_number": turn.turn_number,
+        "conversation_mode": True,
+    }
+    if turn.turn_number > 1:
+        metadata["builds_on"] = f"{chunk.chunk_id}_t{turn.turn_number - 1}"
+    if turn.difficulty:
+        metadata["difficulty"] = turn.difficulty
+    if turn.query_type:
+        metadata["query_type"] = turn.query_type
+    if turn.expected_context:
+        metadata["expected_context"] = turn.expected_context
     return metadata
 
 

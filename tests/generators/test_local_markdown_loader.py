@@ -250,3 +250,168 @@ Content at level 6.
 
         assert len(chunks) == 1
         assert chunks[0].content == "Just one line of content."
+
+
+class TestLocalMarkdownLoaderMultipleFiles:
+    """Tests for loading multiple files."""
+
+    def test_load_multiple_files_as_list(self, tmp_path: Path):
+        """Test loading multiple files from a list."""
+        # Create multiple markdown files
+        file1 = tmp_path / "doc1.md"
+        file1.write_text("# Doc 1\n\nContent from doc 1.", encoding="utf-8")
+
+        file2 = tmp_path / "doc2.md"
+        file2.write_text("# Doc 2\n\nContent from doc 2.", encoding="utf-8")
+
+        loader = LocalMarkdownLoader()
+        chunks = loader.load([str(file1), str(file2)])
+
+        # Should have chunks from both files
+        assert len(chunks) >= 2
+
+        # Check that chunks have unique IDs with file prefixes
+        chunk_ids = [c.chunk_id for c in chunks]
+        assert len(chunk_ids) == len(set(chunk_ids)), "Chunk IDs should be unique"
+
+        # Verify source files are tracked
+        source_files = set(c.metadata.get("source_file") for c in chunks)
+        assert str(file1) in source_files
+        assert str(file2) in source_files
+
+    def test_load_glob_pattern(self, tmp_path: Path):
+        """Test loading files using glob pattern."""
+        # Create directory structure
+        docs_dir = tmp_path / "docs"
+        docs_dir.mkdir()
+
+        (docs_dir / "guide.md").write_text("# Guide\n\nGuide content.", encoding="utf-8")
+        (docs_dir / "api.md").write_text("# API\n\nAPI content.", encoding="utf-8")
+        (docs_dir / "readme.txt").write_text("Not markdown", encoding="utf-8")
+
+        loader = LocalMarkdownLoader()
+        chunks = loader.load(str(docs_dir / "*.md"))
+
+        # Should only load .md files
+        assert len(chunks) >= 2
+
+        source_files = [c.metadata.get("source_file") for c in chunks]
+        assert any("guide.md" in f for f in source_files)
+        assert any("api.md" in f for f in source_files)
+        assert not any("readme.txt" in f for f in source_files if f)
+
+    def test_load_recursive_glob_pattern(self, tmp_path: Path):
+        """Test loading files using recursive glob pattern."""
+        # Create nested directory structure
+        docs_dir = tmp_path / "docs"
+        docs_dir.mkdir()
+        sub_dir = docs_dir / "advanced"
+        sub_dir.mkdir()
+
+        (docs_dir / "intro.md").write_text("# Intro\n\nIntro content.", encoding="utf-8")
+        (sub_dir / "advanced.md").write_text(
+            "# Advanced\n\nAdvanced content.", encoding="utf-8"
+        )
+
+        loader = LocalMarkdownLoader()
+        chunks = loader.load(str(docs_dir / "**/*.md"))
+
+        # Should load from both directories
+        source_files = [c.metadata.get("source_file") for c in chunks]
+        assert any("intro.md" in f for f in source_files)
+        assert any("advanced.md" in f for f in source_files)
+
+    def test_load_directory_path(self, tmp_path: Path):
+        """Test loading all markdown files from a directory."""
+        docs_dir = tmp_path / "docs"
+        docs_dir.mkdir()
+
+        (docs_dir / "file1.md").write_text("# File 1\n\nContent 1.", encoding="utf-8")
+        (docs_dir / "file2.md").write_text("# File 2\n\nContent 2.", encoding="utf-8")
+        (docs_dir / "file3.markdown").write_text(
+            "# File 3\n\nContent 3.", encoding="utf-8"
+        )
+
+        loader = LocalMarkdownLoader()
+        chunks = loader.load(str(docs_dir))
+
+        # Should load all markdown files
+        assert len(chunks) >= 3
+
+        source_files = [c.metadata.get("source_file") for c in chunks]
+        assert any("file1.md" in f for f in source_files)
+        assert any("file2.md" in f for f in source_files)
+        assert any("file3.markdown" in f for f in source_files)
+
+    def test_load_multiple_files_unique_chunk_ids(self, tmp_path: Path):
+        """Test that chunk IDs are unique across multiple files with same headers."""
+        # Create files with identical headers
+        file1 = tmp_path / "doc1.md"
+        file1.write_text("# Introduction\n\nContent from doc 1.", encoding="utf-8")
+
+        file2 = tmp_path / "doc2.md"
+        file2.write_text("# Introduction\n\nContent from doc 2.", encoding="utf-8")
+
+        loader = LocalMarkdownLoader()
+        chunks = loader.load([str(file1), str(file2)])
+
+        # Chunk IDs should be unique even with same headers
+        chunk_ids = [c.chunk_id for c in chunks]
+        assert len(chunk_ids) == len(set(chunk_ids)), "Chunk IDs should be unique"
+
+        # IDs should include file prefix
+        assert any("doc1" in cid for cid in chunk_ids)
+        assert any("doc2" in cid for cid in chunk_ids)
+
+    def test_load_empty_list_raises(self):
+        """Test that empty list raises appropriate error."""
+        loader = LocalMarkdownLoader()
+
+        with pytest.raises(FileNotFoundError):
+            loader.load([])
+
+    def test_load_list_with_missing_file_raises(self, tmp_path: Path):
+        """Test that missing file in list raises error."""
+        existing = tmp_path / "exists.md"
+        existing.write_text("# Exists\n\nContent.", encoding="utf-8")
+
+        loader = LocalMarkdownLoader()
+
+        with pytest.raises(FileNotFoundError):
+            loader.load([str(existing), str(tmp_path / "missing.md")])
+
+    def test_load_glob_no_matches_raises(self, tmp_path: Path):
+        """Test that glob with no matches raises error."""
+        loader = LocalMarkdownLoader()
+
+        with pytest.raises(FileNotFoundError):
+            loader.load(str(tmp_path / "nonexistent/*.md"))
+
+    def test_load_empty_directory_raises(self, tmp_path: Path):
+        """Test that empty directory raises error."""
+        empty_dir = tmp_path / "empty"
+        empty_dir.mkdir()
+
+        loader = LocalMarkdownLoader()
+
+        with pytest.raises(FileNotFoundError):
+            loader.load(str(empty_dir))
+
+    def test_load_preserves_file_order(self, tmp_path: Path):
+        """Test that files are loaded in consistent order."""
+        docs_dir = tmp_path / "docs"
+        docs_dir.mkdir()
+
+        # Create files
+        for name in ["zebra.md", "apple.md", "mango.md"]:
+            (docs_dir / name).write_text(f"# {name}\n\nContent.", encoding="utf-8")
+
+        loader = LocalMarkdownLoader()
+        chunks = loader.load(str(docs_dir / "*.md"))
+
+        # Files should be sorted alphabetically
+        source_files = [c.metadata.get("source_file") for c in chunks]
+        assert source_files.index(next(f for f in source_files if "apple" in f)) < \
+               source_files.index(next(f for f in source_files if "mango" in f))
+        assert source_files.index(next(f for f in source_files if "mango" in f)) < \
+               source_files.index(next(f for f in source_files if "zebra" in f))

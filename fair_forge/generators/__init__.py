@@ -8,6 +8,15 @@ Available generators:
 - OpenAIGenerator: Uses OpenAI's models via LangChain (requires OPENAI_API_KEY)
 - GroqGenerator: Uses Groq's fast inference API via LangChain (requires GROQ_API_KEY)
 - LangChainGenerator: Base class for any LangChain-compatible model
+
+Chunk Selection Strategies:
+- SequentialStrategy: Process all chunks in order (default behavior)
+- RandomSamplingStrategy: Randomly sample chunks multiple times
+
+Features:
+- Independent query generation: Generate unrelated questions per chunk
+- Conversation mode: Generate coherent multi-turn conversations where each
+  turn builds on the previous one within a chunk
 """
 
 from typing import Literal, Optional
@@ -15,18 +24,22 @@ from typing import Literal, Optional
 from loguru import logger
 
 from fair_forge.schemas.generators import (
+    BaseChunkSelectionStrategy,
     BaseContextLoader,
     BaseGenerator,
     Chunk,
+    ConversationTurn,
+    GeneratedConversationOutput,
     GeneratedQueriesOutput,
     GeneratedQuery,
 )
 
 from .alquimia_generator import AlquimiaGenerator
 from .context_loaders import LocalMarkdownLoader
+from .groq_generator import GroqGenerator
 from .langchain_generator import LangChainGenerator
 from .openai_generator import OpenAIGenerator
-from .groq_generator import GroqGenerator
+from .strategies import RandomSamplingStrategy, SequentialStrategy
 
 
 def create_alquimia_generator(
@@ -221,18 +234,24 @@ def create_context_loader(
 
 
 __all__ = [
-    # Base classes
+    # Base classes and schemas
     "BaseGenerator",
     "BaseContextLoader",
+    "BaseChunkSelectionStrategy",
     "Chunk",
     "GeneratedQuery",
     "GeneratedQueriesOutput",
-    # Implementations
+    "ConversationTurn",
+    "GeneratedConversationOutput",
+    # Generator implementations
     "AlquimiaGenerator",
     "OpenAIGenerator",
     "GroqGenerator",
     "LangChainGenerator",
     "LocalMarkdownLoader",
+    # Chunk selection strategies
+    "SequentialStrategy",
+    "RandomSamplingStrategy",
     # Factory functions
     "create_alquimia_generator",
     "create_openai_generator",

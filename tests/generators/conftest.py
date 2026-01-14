@@ -189,3 +189,49 @@ def mock_alquimia_config() -> dict:
         "channel_id": "test-channel",
         "api_version": "",
     }
+
+
+@pytest.fixture
+def sample_conversation_turns():
+    """Fixture providing sample conversation turns."""
+    from fair_forge.schemas.generators import ConversationTurn
+
+    return [
+        ConversationTurn(
+            query="What is machine learning?",
+            turn_number=1,
+            difficulty="easy",
+            query_type="factual",
+            expected_context=None,
+        ),
+        ConversationTurn(
+            query="How does supervised learning differ from unsupervised?",
+            turn_number=2,
+            difficulty="medium",
+            query_type="comparative",
+            expected_context="Builds on the definition of ML from turn 1",
+        ),
+        ConversationTurn(
+            query="When would you choose unsupervised over supervised learning?",
+            turn_number=3,
+            difficulty="hard",
+            query_type="analytical",
+            expected_context="References both supervised and unsupervised from turn 2",
+        ),
+    ]
+
+
+@pytest.fixture
+def mock_conversation_response() -> str:
+    """Fixture providing mock conversation generation response string."""
+    return '''```json
+{
+    "turns": [
+        {"query": "What is the main topic?", "turn_number": 1, "difficulty": "easy", "query_type": "factual", "expected_context": null},
+        {"query": "Can you explain more details?", "turn_number": 2, "difficulty": "medium", "query_type": "inferential", "expected_context": "Builds on turn 1"},
+        {"query": "How does this compare to alternatives?", "turn_number": 3, "difficulty": "hard", "query_type": "comparative", "expected_context": "References turns 1 and 2"}
+    ],
+    "conversation_summary": "A conversation exploring the main topic in depth",
+    "chunk_summary": "Introduction to the platform"
+}
+```'''

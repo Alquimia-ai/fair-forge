@@ -846,7 +846,7 @@ Fair Forge includes a **generators** module for creating synthetic test datasets
 
 ### Architecture
 
-The generators module consists of 2 main components:
+The generators module consists of 3 main components:
 
 1. **Generators** (`fair_forge.generators`): Generate test queries from context
    - `BaseGenerator`: Abstract interface for custom generator implementations
@@ -858,6 +858,11 @@ The generators module consists of 2 main components:
 2. **Context Loaders** (`fair_forge.generators.context_loaders`): Load and chunk context documents
    - `BaseContextLoader`: Abstract interface for custom loaders
    - `LocalMarkdownLoader`: Load and chunk local markdown files
+
+3. **Chunk Selection Strategies** (`fair_forge.generators.strategies`): Control how chunks are selected
+   - `SequentialStrategy`: Process all chunks in order (default)
+   - `RandomSamplingStrategy`: Randomly sample chunks multiple times
+   - `BaseChunkSelectionStrategy`: Abstract interface for custom strategies
 
 ### Quick Start with OpenAI
 
@@ -878,19 +883,22 @@ generator = create_openai_generator(
     temperature=0.7,
 )
 
-# 3. Generate dataset
+# 3. Generate dataset (returns list[Dataset])
 async def generate():
-    dataset = await generator.generate_dataset(
+    datasets = await generator.generate_dataset(
         context_loader=loader,
         source="./docs/knowledge_base.md",
         assistant_id="my-assistant",
         num_queries_per_chunk=3,
     )
-    return dataset
+    return datasets
 
-dataset = asyncio.run(generate())
+datasets = asyncio.run(generate())
+dataset = datasets[0]  # Get the first dataset
 print(f"Generated {len(dataset.conversation)} test queries")
 ```
+
+> **Note:** `generate_dataset()` now returns `list[Dataset]` instead of `Dataset`. With the default `SequentialStrategy`, you get a single-element list.
 
 ### Quick Start with Groq
 
@@ -910,13 +918,14 @@ generator = create_groq_generator(
     temperature=0.7,
 )
 
-# Generate dataset
+# Generate dataset (returns list[Dataset])
 loader = create_markdown_loader()
-dataset = await generator.generate_dataset(
+datasets = await generator.generate_dataset(
     context_loader=loader,
     source="./docs/knowledge_base.md",
     assistant_id="my-assistant",
 )
+dataset = datasets[0]
 ```
 
 ### Quick Start with Alquimia
@@ -934,11 +943,12 @@ generator = create_alquimia_generator(
 )
 
 loader = create_markdown_loader()
-dataset = await generator.generate_dataset(
+datasets = await generator.generate_dataset(
     context_loader=loader,
     source="./docs/knowledge_base.md",
     assistant_id="my-assistant",
 )
+dataset = datasets[0]
 ```
 
 **Note:** AlquimiaGenerator does not support custom system prompts. Configure the agent's prompt in your Alquimia workspace to accept `context`, `num_queries`, and `seed_examples` as template variables.
@@ -985,7 +995,7 @@ for chunk in chunks:
 Guide the query generation style using seed examples:
 
 ```python
-dataset = await generator.generate_dataset(
+datasets = await generator.generate_dataset(
     context_loader=loader,
     source="./docs/knowledge_base.md",
     assistant_id="my-assistant",
@@ -995,6 +1005,7 @@ dataset = await generator.generate_dataset(
         "How do I configure the authentication system?",
     ],
 )
+dataset = datasets[0]
 ```
 
 #### Custom System Prompt (OpenAI/Groq only)
@@ -1014,12 +1025,102 @@ Generate exactly {num_queries} questions based on this context.
 You MUST respond with valid JSON:
 {{"queries": [{{"query": "...", "difficulty": "easy|medium|hard", "query_type": "factual|inferential"}}], "chunk_summary": "..."}}"""
 
-dataset = await generator.generate_dataset(
+datasets = await generator.generate_dataset(
     context_loader=loader,
     source="./docs/knowledge_base.md",
     assistant_id="my-assistant",
     custom_system_prompt=custom_prompt,
 )
+```
+
+### Chunk Selection Strategies
+
+Strategies control how chunks are selected and grouped during generation.
+
+#### SequentialStrategy (Default)
+
+Processes all chunks in order into a single dataset:
+
+```python
+from fair_forge.generators import SequentialStrategy
+
+# Default behavior - single dataset with all chunks
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs/knowledge_base.md",
+    assistant_id="my-assistant",
+)  # Returns list with 1 dataset
+```
+
+#### RandomSamplingStrategy
+
+Randomly samples chunks multiple times to create diverse test datasets:
+
+```python
+from fair_forge.generators import RandomSamplingStrategy
+
+# Create 3 datasets, each with 2 random chunks
+strategy = RandomSamplingStrategy(
+    num_samples=3,       # Number of datasets to create
+    chunks_per_sample=2, # Chunks per dataset
+    seed=42,             # For reproducibility
+    with_replacement=False,  # No duplicate chunks within a sample
+)
+
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs/knowledge_base.md",
+    assistant_id="my-assistant",
+    selection_strategy=strategy,
+)
+print(f"Generated {len(datasets)} datasets")  # 3 datasets
+```
+
+### Conversation Mode
+
+Generate coherent multi-turn conversations where each question builds on the previous:
+
+```python
+# Generate 3-turn conversations for each chunk
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs/knowledge_base.md",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=3,   # 3-turn conversations
+    conversation_mode=True,    # Enable conversation mode
+)
+
+dataset = datasets[0]
+for batch in dataset.conversation:
+    turn = batch.agentic.get('turn_number', 0)
+    print(f"Turn {turn}: {batch.query}")
+```
+
+Conversation mode generates questions where:
+- Turn 1: Initial question about the chunk topic
+- Turn 2: Follow-up that builds on Turn 1
+- Turn 3: Deeper exploration referencing previous turns
+
+This creates more realistic test scenarios that evaluate multi-turn conversation handling.
+
+#### Combining Strategies with Conversation Mode
+
+You can combine random sampling with conversation mode:
+
+```python
+from fair_forge.generators import RandomSamplingStrategy
+
+strategy = RandomSamplingStrategy(num_samples=2, chunks_per_sample=2, seed=42)
+
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs/knowledge_base.md",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=3,
+    selection_strategy=strategy,
+    conversation_mode=True,
+)
+# Returns 2 datasets, each with 3-turn conversations from 2 random chunks
 ```
 
 ### Creating Custom Context Loaders
@@ -1057,12 +1158,14 @@ Generated datasets are fully compatible with Fair Forge runners:
 from fair_forge.runners import AlquimiaRunner
 from fair_forge.storage import create_local_storage
 
-# Generate test dataset
-dataset = await generator.generate_dataset(...)
+# Generate test datasets
+datasets = await generator.generate_dataset(...)
 
 # Run tests against AI system
 runner = AlquimiaRunner(...)
-updated_dataset, summary = await runner.run_dataset(dataset)
+for dataset in datasets:
+    updated_dataset, summary = await runner.run_dataset(dataset)
+    print(f"Completed: {summary['successes']}/{summary['total_batches']} passed")
 
 # Analyze results with metrics
 from fair_forge.metrics.context import Context
