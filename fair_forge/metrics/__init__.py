@@ -1,15 +1,21 @@
-from .humanity import Humanity
-from .bias import Bias
-from .context import Context
-from .conversational import Conversational
-from .agentic import Agentic
-from .bestOf import BestOf
+"""Fair Forge metrics.
+
+Import metrics directly from their modules:
+    from fair_forge.metrics.context import Context
+    from fair_forge.metrics.conversational import Conversational
+    from fair_forge.metrics.humanity import Humanity
+    from fair_forge.metrics.toxicity import Toxicity
+    from fair_forge.metrics.bias import Bias
+    from fair_forge.metrics.best_of import BestOf
+    from fair_forge.metrics.agentic import Agentic
+"""
 
 __all__ = [
-    'Humanity',
-    'Bias',
-    'Context',
-    'Conversational',
-    'Agentic',
-    'BestOf'
+    "Humanity",
+    "Conversational",
+    "Context",
+    "Bias",
+    "Toxicity",
+    "BestOf",
+    "Agentic",
 ]

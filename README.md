@@ -20,34 +20,139 @@
 
 ## Installation
 
-To get started with Alquimia AI Fair Forge, follow these simple steps:
+### Requirements
 
-1. First. Activate your venv
+- **Python**: >= 3.11 (recommended: 3.11, 3.12, or 3.13)
+- **uv**: We recommend using [uv](https://docs.astral.sh/uv/) for fast and reliable Python package management
+
+### Quick Start
+
+1. Install uv if you haven't already:
 
 ```shell
-source venv/bin/activate
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-1. Then, build the package:
+2. Clone the repository:
 
 ```shell
-make package
+git clone https://github.com/Alquimia-ai/fair-forge.git
+cd fair-forge
 ```
 
-2. Then install it using pip:
+3. Create and activate a virtual environment:
 
 ```shell
-pip install dist/alquimia_fair_forge-0.0.1.tar.gz -q
+uv venv
+source .venv/bin/activate
+```
+
+4. Build the package:
+
+```shell
+make build
+```
+
+5. Install the package with the modules you need:
+
+```shell
+# Install with a specific module
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[toxicity]"
+
+# Install with multiple modules
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[toxicity,bias]"
+
+# Install everything
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[all]"
+```
+
+### Available Modules
+
+Fair Forge is modular - install only what you need:
+
+| Module | Description | Dependencies |
+|--------|-------------|--------------|
+| `context` | Context awareness metric (LLM-based) | Core only |
+| `conversational` | Grice's maxims evaluation (LLM-based) | Core only |
+| `bestof` | Tournament-style response comparison (LLM-based) | Core only |
+| `humanity` | Emotional analysis metric | numpy, pandas |
+| `toxicity` | Toxic language detection with DIDT framework | nltk, numpy, pandas, scikit-learn, umap-learn, hdbscan, sentence-transformers, torch |
+| `bias` | Bias detection across protected attributes | numpy, pandas, scikit-learn, umap-learn, hdbscan, sentence-transformers, torch |
+| `metrics` | All metrics above | All metric dependencies |
+| `runners` | Test execution against AI systems | alquimia-client, python-dotenv, httpx, aiosseclient |
+| `cloud` | Cloud storage backends (S3, LakeFS) | boto3, lakefs |
+| `all` | Everything | All dependencies |
+| `dev` | Development tools | pytest, ruff, mypy, sphinx, jupyter |
+
+### Installation Examples
+
+```shell
+# For toxicity analysis only
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[toxicity]"
+
+# For bias detection only
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[bias]"
+
+# For LLM-based metrics (context, conversational, bestof)
+# Note: You also need to install your LLM provider (e.g., langchain-openai, langchain-groq)
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[context]"
+uv pip install langchain-openai  # or your preferred provider
+
+# For running tests against AI systems
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[runners]"
+
+# For cloud storage support
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[cloud]"
+
+# For all metrics
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[metrics]"
+
+# For everything (all modules)
+uv pip install "dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[all]"
+```
+
+### Installing in Jupyter Notebooks
+
+When working in Jupyter notebooks, use this pattern to install from a local build:
+
+```python
+import sys
+!uv pip install --python {sys.executable} --force-reinstall "../../dist/alquimia_fair_forge-0.1.1-py3-none-any.whl[toxicity]"
+```
+
+Replace `toxicity` with the module(s) you need, or use `all` for everything.
+
+### For Development
+
+If you're contributing to this project:
+
+```shell
+# Clone and setup
+git clone https://github.com/Alquimia-ai/fair-forge.git
+cd fair-forge
+uv venv
+source .venv/bin/activate
+
+# Install all dependencies including dev tools
+uv sync
+
+# Run scripts in development
+uv run python your_script.py
+
+# Install in editable mode
+uv pip install -e ".[dev]"
 ```
 
 ## How It Works
 
-Alquimia AI Fair Forge evaluates AI models and assistants through four main metrics:
+Alquimia AI Fair Forge evaluates AI models and assistants through six comprehensive metrics:
 
-- **Conversational**: Measures the quality and effectiveness of conversations
-- **Humanity**: Evaluates how human-like and natural the responses are
-- **Bias**: Analyzes potential biases in the responses
+- **Conversational**: Measures the quality and effectiveness of conversations using Grice's maxims
+- **Humanity**: Evaluates how human-like and natural the responses are through emotional analysis
+- **Bias**: Analyzes potential biases across protected attributes (gender, race, religion, etc.)
+- **Toxicity**: Detects and quantifies toxic language patterns using clustering and lexicon analysis
 - **Context**: Assesses how well the assistant maintains and uses context
+- **BestOf**: Tournament-style evaluation to determine the best response among multiple candidates
 
 For detailed information about how each metric is computed, please refer to our [technical documentation](docs/journal.pdf) or [LaTeX source](docs/journal.tex).
 
@@ -93,8 +198,8 @@ To use Alquimia AI Fair Forge, you need to provide a dataset in the following JS
 To use your dataset with Fair Forge metrics, you need to create a custom retriever:
 
 ```python
-from fair_forge.schemas import Dataset
-from fair_forge import Retriever
+import json
+from fair_forge import Retriever, Dataset
 
 class CustomRetriever(Retriever):
     def load_dataset(self) -> list[Dataset]:
@@ -109,48 +214,80 @@ class CustomRetriever(Retriever):
 
 #### Context Metric
 
-```python
-from getpass import getpass
-from fair_forge.metrics import Context
+The Context metric evaluates how well AI responses align with the provided context. It uses an LLM as a judge to score responses.
 
-judge_api_key = SecretStr(getpass("Please enter your Judge API key: "))
+```python
+from fair_forge.metrics.context import Context
+from langchain_openai import ChatOpenAI
+
+# Initialize your LLM judge (any LangChain-compatible chat model)
+judge_model = ChatOpenAI(
+    model="gpt-4o",
+    temperature=0.0,
+)
 
 metrics = Context.run(
     CustomRetriever,
-    judge_api_key=judge_api_key,
-    verbose=True  # Enable detailed logging
+    model=judge_model,
+    use_structured_output=True,  # Use LangChain's structured output
+    verbose=True,
 )
+
+# Access results
+for metric in metrics:
+    print(f"QA ID: {metric.qa_id}")
+    print(f"Context Awareness Score: {metric.context_awareness}")
+    print(f"Insight: {metric.context_insight}")
 ```
 
 #### Humanity Metric
 
+The Humanity metric evaluates how human-like and natural the responses are through emotional analysis using the NRC Emotion Lexicon.
+
 ```python
-from fair_forge.metrics import Humanity
+from fair_forge.metrics.humanity import Humanity
 
 metrics = Humanity.run(
     CustomRetriever,
-    verbose=True  # Enable detailed logging
+    verbose=True,
 )
+
+# Access results
+for metric in metrics:
+    print(f"Session: {metric.session_id}")
+    print(f"Emotion Correlation: {metric.emotion_correlation}")
 ```
 
 #### Conversational Metric
 
-```python
-from getpass import getpass
-from fair_forge.metrics import Conversational
+The Conversational metric evaluates dialogue quality using Grice's maxims (quality, quantity, relation, manner) and sensibleness.
 
-judge_api_key = SecretStr(getpass("Please enter your Judge API key: "))
+```python
+from fair_forge.metrics.conversational import Conversational
+from langchain_openai import ChatOpenAI
+
+judge_model = ChatOpenAI(
+    model="gpt-4o",
+    temperature=0.0,
+)
 
 metrics = Conversational.run(
     CustomRetriever,
-    judge_api_key=judge_api_key,
-    verbose=True  # Enable detailed logging
+    model=judge_model,
+    use_structured_output=True,
+    verbose=True,
 )
+
+# Access results
+for metric in metrics:
+    print(f"QA ID: {metric.qa_id}")
+    print(f"Quality Maxim: {metric.conversational_quality_maxim}")
+    print(f"Sensibleness: {metric.conversational_sensibleness}")
 ```
 
 #### Bias Metric
 
-The Bias metric provides comprehensive bias analysis across multiple protected attributes including gender, race, religion, nationality, and sexual orientation. It uses a combination of clustering techniques, confidence intervals, and guardian-based bias detection to provide detailed insights into potential biases in AI assistant responses.
+The Bias metric provides comprehensive bias analysis across multiple protected attributes including gender, race, religion, nationality, and sexual orientation. It uses guardian-based bias detection and statistical confidence intervals to provide detailed insights into potential biases in AI assistant responses.
 
 The metric is highly flexible and allows you to implement your own bias detection mechanisms through the Guardian interface. Fair Forge provides two built-in guardians out of the box:
 
@@ -160,9 +297,9 @@ The metric is highly flexible and allows you to implement your own bias detectio
 You can also create your own guardian by implementing the Guardian interface:
 
 ```python
-from fair_forge import Guardian
-from fair_forge.schemas import ProtectedAttribute, GuardianBias
 from typing import Optional
+from fair_forge.core.guardian import Guardian
+from fair_forge.schemas.bias import ProtectedAttribute, GuardianBias
 
 class MyCustomGuardian(Guardian):
     def is_biased(self, question: str, answer: str, attribute: ProtectedAttribute, context: Optional[str] = None) -> GuardianBias:
@@ -177,10 +314,13 @@ class MyCustomGuardian(Guardian):
 Here's an example using the built-in IBMGranite guardian:
 
 ```python
+import os
 from getpass import getpass
-from fair_forge.metrics import Bias
-from fair_forge.guardians import IBMGranite, GuardianLLMConfig, OpenAIGuardianProvider
-from fair_forge.retrievers import LocalRetriever
+from pydantic import SecretStr
+from fair_forge.metrics.bias import Bias
+from fair_forge.guardians import IBMGranite
+from fair_forge.guardians.llms.providers import OpenAIGuardianProvider
+from fair_forge.schemas.bias import GuardianLLMConfig
 
 # Set up your environment variables
 GUARDIAN_URL = os.environ.get("GUARDIAN_URL")
@@ -189,7 +329,7 @@ GUARDIAN_API_KEY = SecretStr(getpass("Please enter your Guardian API key: "))
 
 # Configure and run the Bias metric
 metrics = Bias.run(
-    LocalRetriever,
+    CustomRetriever,  # Use your custom retriever
     guardian=IBMGranite,
     confidence_level=0.80,
     config=GuardianLLMConfig(
@@ -200,9 +340,6 @@ metrics = Bias.run(
         provider=OpenAIGuardianProvider,
         logprobs=True
     ),
-    toxicity_min_cluster_size=2,
-    toxicity_cluster_use_latent_space=True,
-    umap_n_neighbors=30,
     verbose=True
 )
 ```
@@ -210,42 +347,159 @@ metrics = Bias.run(
 And here's an example using your custom guardian:
 
 ```python
-from fair_forge.metrics import Bias
-from fair_forge.retrievers import LocalRetriever
-
-# Create an instance of your custom guardian
-my_guardian = MyCustomGuardian()
+from fair_forge.metrics.bias import Bias
 
 # Run the Bias metric with your custom guardian
 metrics = Bias.run(
-    LocalRetriever,
-    guardian=my_guardian,
+    CustomRetriever,
+    guardian=MyCustomGuardian,
     confidence_level=0.80,
+    verbose=True,
+)
+```
+
+The Bias metric supports the following configuration options:
+
+- `confidence_level`: Statistical confidence level for bias detection (default: 0.95)
+- `guardian`: The Guardian class to use for bias detection
+
+#### Toxicity Metric
+
+The Toxicity metric detects and quantifies toxic language patterns in AI responses with a focus on **fairness across demographic groups**. It combines clustering analysis, lexicon-based detection, and the DIDT fairness framework (Demographic Representation, Directed Toxicity, Associated Sentiment Bias) with pluggable statistical computation modes.
+
+**Key Features:**
+- **Statistical Modes**: Choose between Frequentist (point estimates) or Bayesian (full posterior distributions)
+- **DIDT Framework**: Comprehensive fairness analysis across demographic groups
+- **Group Detection**: Automatic detection of demographic group mentions via embedding similarity
+- **Clustering**: HDBSCAN+UMAP clustering to identify toxic patterns
+
+**Example with Frequentist Mode (Default):**
+
+```python
+from fair_forge.metrics.toxicity import Toxicity
+from fair_forge.loaders import HurtlexLoader
+from fair_forge import FrequentistMode
+
+# Run Toxicity with frequentist statistics (returns point estimates)
+metrics = Toxicity.run(
+    CustomRetriever,  # Use your custom retriever
+    embedding_model="all-MiniLM-L6-v2",
+    toxicity_loader=HurtlexLoader,
+    statistical_mode=FrequentistMode(),  # Optional: this is the default
+    group_prototypes={
+        'gender': ['man', 'woman', 'non-binary'],
+        'race': ['white', 'black', 'asian', 'latino'],
+        'religion': ['christian', 'muslim', 'jewish', 'hindu', 'buddhist']
+    },
+    # Clustering parameters
+    toxicity_min_cluster_size=5,
+    toxicity_cluster_selection_epsilon=0.01,
+    toxicity_cluster_use_latent_space=True,
+    # UMAP parameters
+    umap_n_components=2,
+    umap_n_neighbors=15,
+    umap_min_dist=0.1,
+    umap_random_state=42,
+    umap_metric="cosine",
+    # DIDT weights (default: 1/3 each)
+    w_DR=1.0/3.0,
+    w_ASB=1.0/3.0,
+    w_DTO=1.0/3.0,
     verbose=True
 )
 ```
 
-The Bias metric supports various configuration options for clustering and analysis:
+**Example with Bayesian Mode:**
 
-- `confidence_level`: Statistical confidence level for bias detection (default: 0.95)
-- `embedding_model`: Model for generating text embeddings (default: "all-MiniLM-L6-v2")
-- `toxicity_min_cluster_size`: Minimum size for clusters in HDBSCAN (default: 5)
-- `toxicity_cluster_selection_epsilon`: Epsilon value for cluster selection (default: 0.01)
-- `toxicity_cluster_selection_method`: Method used for cluster selection (default: "euclidean")
-- `toxicity_cluster_use_latent_space`: Whether to use latent space for clustering (default: True)
-- `umap_n_components`: Number of components for UMAP dimensionality reduction (default: 2)
-- `umap_n_neighbors`: Number of neighbors for UMAP (default: 15)
-- `umap_min_dist`: Minimum distance parameter for UMAP (default: 0.1)
-- `umap_random_state`: Random state for UMAP reproducibility (default: 42)
-- `umap_metric`: Metric used for UMAP (default: "cosine")
+```python
+from fair_forge.metrics.toxicity import Toxicity
+from fair_forge.loaders import HurtlexLoader
+from fair_forge import BayesianMode
 
-### Custom Toxicity Loaders
+# Run Toxicity with Bayesian statistics (returns posterior distributions with credible intervals)
+metrics = Toxicity.run(
+    CustomRetriever,
+    embedding_model="all-MiniLM-L6-v2",
+    toxicity_loader=HurtlexLoader,
+    statistical_mode=BayesianMode(
+        mc_samples=10000,      # Number of Monte Carlo samples
+        ci_level=0.95,         # Credible interval level (95%)
+        dirichlet_prior=1.0,   # Dirichlet prior for distribution divergence
+        beta_prior_a=1.0,      # Beta prior alpha for rate estimation
+        beta_prior_b=1.0       # Beta prior beta for rate estimation
+    ),
+    group_prototypes={
+        'gender': ['man', 'woman', 'non-binary'],
+        'race': ['white', 'black', 'asian', 'latino']
+    },
+    verbose=True
+)
+```
 
-The Bias metric uses toxicity analysis to identify potentially harmful content in clusters of responses. You can create your own toxicity dataset loader by implementing the ToxicityLoader interface:
+**Configuration Parameters:**
+
+Core Parameters:
+- `group_prototypes` (required if no `group_extractor`): Dictionary mapping group categories to prototype words for detection
+- `statistical_mode`: FrequentistMode() or BayesianMode() (default: FrequentistMode())
+- `embedding_model`: Model for text embeddings (default: "all-MiniLM-L6-v2")
+- `toxicity_loader`: Loader for toxicity lexicon (default: HurtlexLoader)
+- `sentiment_analyzer`: Optional SentimentAnalyzer instance for ASB calculation. If not provided, ASB will be 0.
+
+DIDT Framework Weights:
+- `w_DR`: Weight for Demographic Representation (default: 1/3)
+- `w_DTO`: Weight for Directed Toxicity per Group (default: 1/3)
+- `w_ASB`: Weight for Associated Sentiment Bias (default: 1/3)
+
+Group Extractor Parameters:
+- `group_extractor`: Optional custom BaseGroupExtractor instance. If not provided, uses EmbeddingGroupExtractor with the parameters below.
+- `group_prototypes`: Dictionary mapping group categories to prototype words (required if `group_extractor` is None)
+- `group_thresholds`: Custom similarity thresholds per group (default: 0.5 for all)
+- `group_default_threshold`: Default threshold for group detection (default: 0.5)
+- `group_extractor_batch_size`: Batch size for group extraction (default: 64)
+- `group_extractor_normalize_embeddings`: Whether to normalize embeddings for group extraction (default: True)
+
+Group Profiling Parameters:
+- `group_toxicity_threshold`: Minimum toxicity score to count as toxic (default: 0.0)
+- `group_reference_q`: Optional reference distribution for DR calculation. If not provided, uses uniform distribution across groups.
+
+Clustering Parameters:
+- `toxicity_min_cluster_size`: Minimum cluster size for HDBSCAN (default: 5)
+- `toxicity_cluster_selection_epsilon`: Epsilon for cluster selection (default: 0.01)
+- `toxicity_cluster_selection_method`: Cluster distance metric (default: "euclidean")
+- `toxicity_cluster_use_latent_space`: Use latent space for clustering (default: True)
+
+UMAP Parameters:
+- `umap_n_components`: Dimensionality of latent space (default: 2)
+- `umap_n_neighbors`: Number of neighbors for local structure (default: 15)
+- `umap_min_dist`: Minimum distance between points (default: 0.1)
+- `umap_random_state`: Random seed for reproducibility (default: 42)
+- `umap_metric`: Distance metric (default: "cosine")
+
+**Output Structure:**
+
+The Toxicity metric returns results containing:
+
+For **Frequentist Mode**:
+- `cluster_profiling`: Toxicity scores per cluster
+- `group_profiling.frequentist`: Point estimates for DR, DTO, ASB, DIDT
+- `group_profiling.N_i`: Count of mentions per group
+- `group_profiling.K_i`: Count of toxic mentions per group
+- `group_profiling.p_i`: Observed proportions per group
+- `group_profiling.T_i`: Toxicity rates per group
+
+For **Bayesian Mode**:
+- `cluster_profiling`: Toxicity scores per cluster
+- `group_profiling.bayesian.summary`: Posterior means and 95% credible intervals for DR, DTO, ASB, DIDT
+- `group_profiling.bayesian.priors`: Prior parameters used
+- `group_profiling.bayesian.mc_samples`: Number of Monte Carlo samples
+
+**Custom Toxicity Loaders**
+
+You can create your own toxicity dataset loader by implementing the ToxicityLoader interface:
 
 ```python
 from fair_forge import ToxicityLoader
-from fair_forge.schemas import ToxicityDataset
+from fair_forge.schemas.toxicity import ToxicityDataset
 
 class MyCustomToxicityLoader(ToxicityLoader):
     def load(self, language: str) -> list[ToxicityDataset]:
@@ -259,18 +513,47 @@ class MyCustomToxicityLoader(ToxicityLoader):
         ]
 ```
 
-Then use your custom loader with the Bias metric:
+Then use your custom loader with the Toxicity metric:
 
 ```python
-metrics = Bias.run(
-    LocalRetriever,
-    guardian=my_guardian,
+from fair_forge.metrics.toxicity import Toxicity
+
+metrics = Toxicity.run(
+    CustomRetriever,
     toxicity_loader=MyCustomToxicityLoader,
-    verbose=True
+    group_prototypes={'gender': ['man', 'woman']},
+    verbose=True,
 )
 ```
 
-The toxicity loader is used during cluster analysis to calculate the percentage of potentially offensive words in each cluster of responses. This helps identify patterns of harmful content in the assistant's responses.
+#### BestOf Metric
+
+The BestOf metric implements a tournament-style evaluation to determine the best response among multiple candidates. It uses a judge LLM to compare responses in pairs and determines the winner through elimination rounds.
+
+```python
+from fair_forge.metrics.best_of import BestOf
+from langchain_openai import ChatOpenAI
+
+judge_model = ChatOpenAI(
+    model="gpt-4o",
+    temperature=0.0,
+)
+
+metrics = BestOf.run(
+    CustomRetriever,
+    model=judge_model,
+    use_structured_output=True,
+    criteria="BestOf",  # Label for the evaluation criteria
+    verbose=True,
+)
+```
+
+The BestOf metric:
+- Creates tournament brackets from multiple response candidates
+- Uses LLM judges to evaluate pairs of responses
+- Tracks the winner through multiple rounds
+- Provides detailed reasoning for each decision
+- Returns the final winner with confidence scores
 
 When `verbose=True` is set, the following information will be logged:
 
@@ -295,10 +578,263 @@ The IBM Granite Guardian model is specifically trained to detect various risks i
 
 For practical examples of how to use Alquimia AI Fair Forge, please refer to our example implementations in the repository:
 
-- [Openshift AI Pipeline](examples/fair-forge.pipeline) - A simple implementation showing how to set up and use the basic metrics using Elyra pipeline to be executed.
+- [Context Metric Notebook](examples/context/context.ipynb) - Interactive notebook demonstrating the Context metric
+- [Bias Metric Notebook](examples/bias/bias.ipynb) - Interactive notebook demonstrating the Bias metric
 - [Custom Retriever Example](examples/helpers/retriever.py) - Implementation of a custom dataset retriever
+- [Sample Dataset](examples/data/dataset.json) - Example dataset format
 
 Each example includes detailed comments and explanations to help you understand the implementation details. Feel free to use these examples as a starting point for your own implementations.
+
+## Runners Module
+
+Fair Forge includes a modular **runners** system for executing test suites against AI systems. The runners module provides a flexible architecture for testing agents, models, and APIs with comprehensive storage backends.
+
+### Architecture
+
+The runners module consists of 2 main components:
+
+1. **Runners** (`fair_forge.runners`): Execute test batches against AI systems
+   - `BaseRunner`: Abstract interface for custom runner implementations
+   - `AlquimiaRunner`: Built-in implementation for Alquimia AI agents
+
+2. **Storage** (`fair_forge.storage`): Load test datasets and save results
+   - `LocalStorage`: Local filesystem storage
+   - `LakeFSStorage`: Cloud-based version control with LakeFS
+
+### Quick Start with AlquimiaRunner
+
+```python
+import asyncio
+from pathlib import Path
+from datetime import datetime
+from fair_forge.runners import AlquimiaRunner
+from fair_forge.storage import create_local_storage
+
+# 1. Configure storage
+storage = create_local_storage(
+    tests_dir=Path("./test_datasets"),
+    results_dir=Path("./test_results"),
+)
+
+# 2. Configure runner
+runner = AlquimiaRunner(
+    base_url="https://api.alquimia.ai",
+    api_key="your-api-key",
+    agent_id="your-agent-id",
+    channel_id="your-channel-id",
+)
+
+# 3. Load and execute tests
+async def run_tests():
+    datasets = storage.load_datasets()
+
+    for dataset in datasets:
+        updated_dataset, summary = await runner.run_dataset(dataset)
+        print(f"Completed: {summary['successes']}/{summary['total_batches']} passed")
+
+        # Save results
+        storage.save_results([updated_dataset], "run_001", datetime.now())
+
+asyncio.run(run_tests())
+```
+
+### Storage Backends
+
+#### Local Storage
+
+Store test datasets and results on local filesystem:
+
+```python
+from fair_forge.storage import create_local_storage
+
+storage = create_local_storage(
+    tests_dir="./test_datasets",
+    results_dir="./test_results",
+    enabled_suites=None,  # None = load all suites
+)
+```
+
+**Directory Structure**:
+```
+test_datasets/
+├── prompt_injection.json
+├── toxicity.json
+└── general_qa.json
+
+test_results/
+└── test_run_20260108_143022_abc123.json
+```
+
+#### LakeFS Storage
+
+Store test datasets and results in LakeFS for version control:
+
+```python
+from fair_forge.storage import create_lakefs_storage
+
+storage = create_lakefs_storage(
+    host="https://lakefs.example.com",
+    username="admin",
+    password="your-password",
+    repo_id="fair-forge-tests",
+    enabled_suites=None,
+    tests_prefix="tests/",
+    results_prefix="results/",
+    branch_name="main",
+)
+```
+
+#### Storage Factory
+
+Use the factory function for dynamic backend selection:
+
+```python
+from fair_forge.storage import create_storage
+
+# Local storage
+storage = create_storage(
+    backend="local",
+    tests_dir="./tests",
+    results_dir="./results",
+)
+
+# LakeFS storage
+storage = create_storage(
+    backend="lakefs",
+    host="https://lakefs.example.com",
+    username="admin",
+    password="password",
+    repo_id="my-repo",
+)
+```
+
+### Tests Format
+
+Test suites use Fair Forge's standard Dataset schema:
+
+```json
+{
+  "session_id": "test_suite_001",
+  "assistant_id": "my_agent",
+  "language": "english",
+  "context": "Test suite description",
+  "conversation": [
+    {
+      "qa_id": "test_001",
+      "query": "What is AI?",
+      "assistant": "",
+      "ground_truth_assistant": "AI is artificial intelligence",
+      "observation": "Basic knowledge test",
+      "agentic": {},
+      "ground_truth_agentic": {}
+    }
+  ]
+}
+```
+
+### Test Suite Filtering
+
+Filter which test suites to load using the `enabled_suites` parameter:
+
+```python
+# Load only specific test suites
+storage = create_local_storage(
+    tests_dir="./test_datasets",
+    results_dir="./test_results",
+    enabled_suites=["prompt_injection", "toxicity"],
+)
+
+# Load all test suites
+storage = create_local_storage(
+    tests_dir="./test_datasets",
+    results_dir="./test_results",
+    enabled_suites=None,
+)
+```
+
+The `enabled_suites` filter matches against JSON filenames without extension.
+
+### Creating Custom Runners
+
+Implement custom runners by extending the `BaseRunner` interface:
+
+```python
+from fair_forge.schemas.runner import BaseRunner
+from fair_forge.schemas.common import Batch, Dataset
+from typing import Any
+
+class CustomRunner(BaseRunner):
+    """Custom runner for your AI system."""
+
+    def __init__(self, api_key: str, endpoint: str):
+        self.api_key = api_key
+        self.endpoint = endpoint
+
+    async def run_batch(
+        self,
+        batch: Batch,
+        session_id: str,
+        **kwargs: Any
+    ) -> tuple[Batch, bool, float]:
+        """Execute a single test case."""
+        import time
+        start = time.time()
+
+        try:
+            # Call your AI system API
+            response = await self._call_api(batch.query, session_id)
+
+            # Update batch with response
+            updated_batch = batch.model_copy(
+                update={"assistant": response}
+            )
+
+            exec_time = (time.time() - start) * 1000
+            return updated_batch, True, exec_time
+
+        except Exception as e:
+            exec_time = (time.time() - start) * 1000
+            error_batch = batch.model_copy(
+                update={"assistant": f"[ERROR] {str(e)}"}
+            )
+            return error_batch, False, exec_time
+
+    async def run_dataset(
+        self,
+        dataset: Dataset,
+        **kwargs: Any
+    ) -> tuple[Dataset, dict[str, Any]]:
+        """Execute all test cases in a dataset."""
+        # Implement dataset execution logic
+        # See AlquimiaRunner for reference implementation
+        pass
+```
+
+### Integration with Fair Forge Metrics
+
+Test results are fully compatible with Fair Forge metrics for comprehensive analysis:
+
+```python
+import json
+from fair_forge import Retriever, Dataset
+from fair_forge.metrics.toxicity import Toxicity
+from fair_forge.metrics.bias import Bias
+from fair_forge.metrics.context import Context
+
+# Create a custom retriever for your test results
+class TestResultsRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        with open("test_results/test_run_latest.json") as f:
+            data = json.load(f)
+            return [Dataset.model_validate(d) for d in data]
+
+# Analyze test results with metrics
+toxicity_metrics = Toxicity.run(TestResultsRetriever, ...)
+bias_metrics = Bias.run(TestResultsRetriever, ...)
+context_metrics = Context.run(TestResultsRetriever, ...)
+```
+
+This enables comprehensive evaluation of agent behavior using toxicity, bias, conversational quality, and other metrics on your test execution results.
 
 ## Contributing
 
@@ -309,9 +845,8 @@ To contribute a new metric to Fair Forge, follow these steps:
 2. Follow the basic structure:
 
 ```python
-from fair_forge import FairForge, Retriever
 from typing import Type, Optional
-from fair_forge.schemas import Batch
+from fair_forge import FairForge, Retriever, Batch
 
 class MyMetric(FairForge):
     def __init__(self, retriever: Type[Retriever], **kwargs):
@@ -328,6 +863,7 @@ class MyMetric(FairForge):
         # Implement your metric logic here
         for interaction in batch:
             # Process each interaction
+            # Append results to self.metrics
             pass
 ```
 
@@ -340,15 +876,19 @@ class MyMetric(FairForge):
    - `language`: Optional language parameter (defaults to "english")
 
 
-4. In file `metrics/__init__.py` add your metric file export:
+4. In file `fair_forge/metrics/__init__.py` add your metric to the `__all__` list:
 
 ```python
-from .my_metric import MyMetric
-
 __all__ = [
-    'MyMetric'
+    # ... existing metrics
+    "MyMetric",
 ]
 ```
+
+   Users will import your metric directly from its module:
+   ```python
+   from fair_forge.metrics.my_metric import MyMetric
+   ```
 
 5. Document your metric in the `docs/journal.tex` file, including:
    - Mathematical formulation
@@ -357,10 +897,6 @@ __all__ = [
    - References to relevant research
 
 6. Submit a pull request with your implementation
-
-## Contributing
-
-We welcome contributions! Please feel free to submit a Pull Request.
 
 ## License
 

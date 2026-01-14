@@ -128,64 +128,6 @@ The true probability of a non-biased response is estimated as:
     p_{truth} = \frac{k}{n}
 \end{equation}
 
-\subsection{Clustering Analysis and Latent Space Representation}
-
-The bias analysis incorporates a sophisticated clustering approach to identify patterns in assistant responses. The process involves several key steps:
-
-\subsubsection{Embedding Generation}
-
-Responses are first converted into dense vector representations using a sentence transformer model:
-
-\begin{equation}
-    E = \text{Transformer}(R)
-\end{equation}
-
-where $R$ represents the set of assistant responses and $E$ is the resulting embedding matrix.
-
-\subsubsection{Dimensionality Reduction}
-
-The high-dimensional embeddings are reduced to a lower-dimensional space using UMAP (Uniform Manifold Approximation and Projection):
-
-\begin{equation}
-    L = \text{UMAP}(E, n_{components}, n_{neighbors}, min_{dist})
-\end{equation}
-
-where:
-\begin{itemize}
-    \item $L$ is the reduced latent space representation
-    \item $n_{components}$ is the target dimensionality (default: 2)
-    \item $n_{neighbors}$ is the number of neighbors for local structure preservation
-    \item $min_{dist}$ is the minimum distance between points in the embedding
-\end{itemize}
-
-\subsubsection{Cluster Detection}
-
-The latent space is then analyzed using HDBSCAN (Hierarchical Density-Based Spatial Clustering of Applications with Noise):
-
-\begin{equation}
-    C = \text{HDBSCAN}(L, min_{cluster\_size}, \epsilon)
-\end{equation}
-
-where:
-\begin{itemize}
-    \item $C$ represents the cluster assignments
-    \item $min_{cluster\_size}$ is the minimum number of samples in a cluster
-    \item $\epsilon$ is the cluster selection epsilon parameter
-\end{itemize}
-
-\subsubsection{Toxicity Scoring}
-
-Each cluster is evaluated for potential toxicity using a Laplace-smoothed scoring mechanism:
-
-\begin{equation}
-    \text{Score}(c) = \frac{n_{toxic} + 1}{n_{total} + 2}
-\end{equation}
-
-where:
-\begin{itemize}
-    \item $n_{toxic}$ is the count of toxic words in the cluster
-    \item $n_{total}$ is the total word count in the cluster
-\end{itemize}
 
 \subsection{Risk Detection Framework}
 
@@ -337,6 +279,246 @@ The context adherence evaluation complements other metrics by providing:
     \item Continuous improvement feedback
 \end{itemize}
 
+\section{Toxicity Detection with Statistical Modes and DIDT Framework}
+
+The toxicity metric provides comprehensive detection and quantification of toxic language patterns in AI assistant responses with a focus on fairness across demographic groups. The metric combines clustering analysis, lexicon-based detection, and a rigorous fairness framework (DIDT) with pluggable statistical computation modes (Frequentist and Bayesian).
+
+\subsection{Statistical Computation Modes (Strategy Pattern)}
+
+The toxicity metric implements the Strategy Pattern to support multiple statistical computation approaches without coupling to specific implementations. This allows users to choose between frequentist point estimates or full Bayesian posterior distributions.
+
+\subsubsection{StatisticalMode Interface}
+
+All statistical modes provide four core primitives:
+
+\begin{enumerate}
+    \item \textbf{Distribution Divergence}: Compute divergence between observed and reference distributions
+    \item \textbf{Rate Estimation}: Estimate rates with uncertainty quantification
+    \item \textbf{Aggregation}: Combine multiple metrics with weights
+    \item \textbf{Dispersion}: Compute spread/variability across groups
+\end{enumerate}
+
+\subsubsection{Frequentist Mode}
+
+Returns point estimates (scalars):
+
+\begin{equation}
+    D_{KL}(P||Q) = \sum_{i} p_i \log\frac{p_i}{q_i}
+\end{equation}
+
+where $P$ is the observed distribution and $Q$ is the reference distribution.
+
+Rate estimation uses maximum likelihood:
+
+\begin{equation}
+    \hat{\theta} = \frac{k}{n}
+\end{equation}
+
+where $k$ is the number of successes and $n$ is the number of trials.
+
+\subsubsection{Bayesian Mode}
+
+Returns full posterior distributions with credible intervals:
+
+For distribution divergence, we use a Dirichlet-Multinomial model with prior $\alpha$:
+
+\begin{equation}
+    P(p|\mathbf{n}, \alpha) = \text{Dir}(p|\mathbf{n} + \alpha)
+\end{equation}
+
+where $\mathbf{n}$ are observed counts. Divergence is computed via Monte Carlo sampling:
+
+\begin{equation}
+    D_{KL} \approx \frac{1}{S}\sum_{s=1}^{S} D_{KL}(p^{(s)}||q)
+\end{equation}
+
+For rate estimation, we use a Beta-Binomial model:
+
+\begin{equation}
+    P(\theta|k,n) = \text{Beta}(\theta|k + \alpha, n - k + \beta)
+\end{equation}
+
+\subsection{The DIDT Fairness Framework}
+
+The DIDT framework quantifies fairness across demographic groups through four components:
+
+\subsubsection{DR: Demographic Representation}
+
+Measures how evenly demographic groups are represented:
+
+\begin{equation}
+    \text{DR} = D_{KL}(P||Q)
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $P = \{p_i\}$ is the observed distribution of group mentions
+    \item $Q = \{q_i\}$ is the reference (expected) distribution
+    \item Lower DR indicates more balanced representation
+\end{itemize}
+
+\subsubsection{DTO: Directed Toxicity per Group}
+
+Measures dispersion in toxicity rates across groups:
+
+\begin{equation}
+    \text{DTO} = \text{Var}(\{T_i\})
+\end{equation}
+
+where $T_i = k_i / n_i$ is the toxicity rate for group $i$, with $k_i$ toxic mentions out of $n_i$ total mentions.
+
+In Bayesian mode:
+
+\begin{equation}
+    T_i \sim \text{Beta}(k_i + \alpha, n_i - k_i + \beta)
+\end{equation}
+
+\subsubsection{ASB: Associated Sentiment Bias}
+
+Placeholder for sentiment analysis across groups (currently returns 0):
+
+\begin{equation}
+    \text{ASB} = 0
+\end{equation}
+
+\subsubsection{DIDT: Composite Index}
+
+Weighted aggregation of all components:
+
+\begin{equation}
+    \text{DIDT} = w_{\text{DR}} \cdot \text{DR} + w_{\text{DTO}} \cdot \text{DTO} + w_{\text{ASB}} \cdot \text{ASB}
+\end{equation}
+
+where weights are normalized: $\sum w_i = 1$ (default: $w_i = 1/3$).
+
+\subsection{Group Detection via Embedding Similarity}
+
+Groups are detected using cosine similarity between response embeddings and prototype embeddings:
+
+\begin{equation}
+    \text{sim}(r, p_g) = \frac{r \cdot p_g}{\|r\| \|p_g\|}
+\end{equation}
+
+A response $r$ is assigned to group $g$ if:
+
+\begin{equation}
+    \text{sim}(r, p_g) > \tau_g
+\end{equation}
+
+where $\tau_g$ is the threshold for group $g$ (default: 0.5).
+
+\subsection{Clustering Analysis and Latent Space Representation}
+
+In addition to group-based fairness analysis, the metric performs clustering to identify toxic patterns.
+
+\subsubsection{Embedding Generation}
+
+Responses are converted into dense vectors using sentence transformers:
+
+\begin{equation}
+    E = \text{Transformer}(R)
+\end{equation}
+
+\subsubsection{Dimensionality Reduction}
+
+UMAP reduces embeddings to latent space \cite{mcinnes2018umap}:
+
+\begin{equation}
+    L = \text{UMAP}(E, n_{components}, n_{neighbors}, min_{dist})
+\end{equation}
+
+\subsubsection{Cluster Detection}
+
+HDBSCAN identifies clusters in latent space \cite{mcinnes2017hdbscan}:
+
+\begin{equation}
+    C = \text{HDBSCAN}(L, min_{cluster\_size}, \epsilon)
+\end{equation}
+
+\subsubsection{Cluster Toxicity Scoring}
+
+Each cluster $c$ receives a toxicity score:
+
+\begin{equation}
+    \text{ToxicityScore}(c) = \frac{n_{toxic}}{n_{total}}
+\end{equation}
+
+where $n_{toxic}$ is the count of toxic words from HurtLex \cite{bassignana2018hurtlex} found in cluster $c$.
+
+\section{Best-of-N Evaluation Through Tournament Selection}
+
+The BestOf metric implements a tournament-style evaluation framework to determine the optimal response among multiple candidates. This approach mirrors human evaluation processes and provides robust, comparative assessment of response quality.
+
+\subsection{Tournament Structure}
+
+For a set of $n$ candidate responses $\mathcal{R} = \{r_1, r_2, \ldots, r_n\}$, the tournament is organized as a single-elimination bracket:
+
+\begin{equation}
+    \text{Rounds} = \lceil \log_2(n) \rceil
+\end{equation}
+
+Each match in round $k$ is defined as:
+
+\begin{equation}
+    M_k^{(i,j)} = \text{Judge}(r_i, r_j, q, c)
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $q$ is the user query
+    \item $c$ is the conversation context
+    \item $\text{Judge}$ is an LLM-based evaluation function
+\end{itemize}
+
+\subsection{Pairwise Comparison}
+
+For each match, the judge evaluates both responses according to multiple criteria:
+
+\begin{equation}
+    \text{Score}(r_i, r_j) = \sum_{k=1}^{m} w_k \cdot f_k(r_i, r_j)
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $f_k$ represents individual evaluation criteria (relevance, accuracy, coherence, helpfulness)
+    \item $w_k$ are the weights assigned to each criterion
+    \item $m$ is the total number of criteria
+\end{itemize}
+
+\subsection{Winner Selection}
+
+The winner of each match is determined by:
+
+\begin{equation}
+    \text{Winner}(r_i, r_j) = \begin{cases}
+        r_i & \text{if } \text{Score}(r_i, r_j) > \text{Score}(r_j, r_i) \\
+        r_j & \text{otherwise}
+    \end{cases}
+\end{equation}
+
+Each evaluation includes:
+\begin{itemize}
+    \item Confidence score $\in [0, 1]$
+    \item Detailed verdict explanation
+    \item Structured reasoning chain
+    \item Comparative analysis of strengths and weaknesses
+\end{itemize}
+
+\subsection{Metrics Output}
+
+The final BestOf metric produces:
+
+\begin{equation}
+    \text{BestOfMetric} = \{w_{final}, \mathcal{C}, \theta\}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $w_{final}$ is the tournament winner
+    \item $\mathcal{C}$ is the complete set of contests with verdicts
+    \item $\theta$ is the aggregate confidence score
+\end{itemize}
+
 \begin{thebibliography}{9}
 \bibitem{plutchik2001nature}
 Plutchik, R. (2001).
@@ -367,6 +549,21 @@ Adolphs, L., et al. (2020).
 DeepSeek. (2024).
 \newblock DeepSeek-R1: Advanced reasoning model.
 \newblock {\em DeepSeek AI Documentation}.
+
+\bibitem{mcinnes2018umap}
+McInnes, L., Healy, J., \& Melville, J. (2018).
+\newblock UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction.
+\newblock {\em arXiv preprint arXiv:1802.03426}.
+
+\bibitem{mcinnes2017hdbscan}
+McInnes, L., Healy, J., \& Astels, S. (2017).
+\newblock hdbscan: Hierarchical density based clustering.
+\newblock {\em The Journal of Open Source Software}, 2(11), 205.
+
+\bibitem{bassignana2018hurtlex}
+Bassignana, E., Basile, V., \& Patti, V. (2018).
+\newblock Hurtlex: A multilingual lexicon of words to hurt.
+\newblock {\em Proceedings of the Fifth Italian Conference on Computational Linguistics (CLiC-it 2018)}.
 \end{thebibliography}
 
 \end{document}

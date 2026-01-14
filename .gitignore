@@ -1,10 +1,57 @@
 .DS_Store
+
+# Virtual environments
 venv/
+.venv/
+env/
+ENV/
+test_runner/.env
+
+# Build artifacts
 dist/
+build/
+*.egg-info/
 alquimia_fair_forge.egg-info/
+
+# Python cache
 __pycache__/
+test_runner/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Distribution / packaging
 *.gz
+*.whl
+
+# Logs
 *.log
+
+# LaTeX
 *.aux
 *.out
+
+# Jupyter
 .ipynb_checkpoints
+*.ipynb_checkpoints/
+examples/pipeline/.virtual_documents/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.pytest_cache/
