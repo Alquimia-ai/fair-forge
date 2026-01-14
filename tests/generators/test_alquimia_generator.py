@@ -1,12 +1,21 @@
 """Tests for AlquimiaGenerator."""
 
+import sys
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from pathlib import Path
+from types import ModuleType
 
 from fair_forge.generators import AlquimiaGenerator, LocalMarkdownLoader
 from fair_forge.schemas.generators import Chunk, GeneratedQuery, GeneratedQueriesOutput
 from fair_forge.schemas.common import Dataset, Batch
+
+
+def _create_mock_alquimia_module(mock_client):
+    """Create a mock alquimia_client module with the given client class."""
+    mock_module = ModuleType("alquimia_client")
+    mock_module.AlquimiaClient = MagicMock(return_value=mock_client)
+    return mock_module
 
 
 class TestAlquimiaGeneratorInitialization:
@@ -240,12 +249,10 @@ class TestAlquimiaGeneratorGenerateDataset:
         loader = LocalMarkdownLoader()
 
         mock_client = _create_mock_alquimia_client(mock_alquimia_response)
+        mock_module = _create_mock_alquimia_module(mock_client)
 
-        with patch(
-            "alquimia_client.AlquimiaClient",
-            return_value=mock_client,
-        ):
-            dataset = await generator.generate_dataset(
+        with patch.dict(sys.modules, {"alquimia_client": mock_module}):
+            datasets = await generator.generate_dataset(
                 context_loader=loader,
                 source=str(temp_markdown_file),
                 assistant_id="test-assistant",
@@ -253,6 +260,8 @@ class TestAlquimiaGeneratorGenerateDataset:
                 language="english",
             )
 
+            assert len(datasets) > 0
+            dataset = datasets[0]
             assert isinstance(dataset, Dataset)
             assert dataset.assistant_id == "test-assistant"
             assert dataset.language == "english"
@@ -270,18 +279,17 @@ class TestAlquimiaGeneratorGenerateDataset:
         loader = LocalMarkdownLoader()
 
         mock_client = _create_mock_alquimia_client(mock_alquimia_response)
+        mock_module = _create_mock_alquimia_module(mock_client)
 
-        with patch(
-            "alquimia_client.AlquimiaClient",
-            return_value=mock_client,
-        ):
-            dataset = await generator.generate_dataset(
+        with patch.dict(sys.modules, {"alquimia_client": mock_module}):
+            datasets = await generator.generate_dataset(
                 context_loader=loader,
                 source=str(temp_markdown_file),
                 assistant_id="test-assistant",
                 num_queries_per_chunk=2,
             )
 
+            dataset = datasets[0]
             for batch in dataset.conversation:
                 assert isinstance(batch, Batch)
                 assert batch.qa_id
@@ -303,18 +311,17 @@ class TestAlquimiaGeneratorGenerateDataset:
         loader = LocalMarkdownLoader()
 
         mock_client = _create_mock_alquimia_client(mock_alquimia_response)
+        mock_module = _create_mock_alquimia_module(mock_client)
 
-        with patch(
-            "alquimia_client.AlquimiaClient",
-            return_value=mock_client,
-        ):
-            dataset = await generator.generate_dataset(
+        with patch.dict(sys.modules, {"alquimia_client": mock_module}):
+            datasets = await generator.generate_dataset(
                 context_loader=loader,
                 source=str(temp_markdown_file),
                 assistant_id="test-assistant",
                 num_queries_per_chunk=2,
             )
 
+            dataset = datasets[0]
             qa_ids = [batch.qa_id for batch in dataset.conversation]
             assert len(qa_ids) == len(set(qa_ids)), "All qa_ids should be unique"
 
@@ -330,17 +337,16 @@ class TestAlquimiaGeneratorGenerateDataset:
         loader = LocalMarkdownLoader()
 
         mock_client = _create_mock_alquimia_client(mock_alquimia_response)
+        mock_module = _create_mock_alquimia_module(mock_client)
 
-        with patch(
-            "alquimia_client.AlquimiaClient",
-            return_value=mock_client,
-        ):
-            dataset = await generator.generate_dataset(
+        with patch.dict(sys.modules, {"alquimia_client": mock_module}):
+            datasets = await generator.generate_dataset(
                 context_loader=loader,
                 source=str(temp_markdown_file),
                 assistant_id="test-assistant",
             )
 
+            dataset = datasets[0]
             # Context should be non-empty and contain content from the file
             assert dataset.context
             assert len(dataset.context) > 0
@@ -358,18 +364,17 @@ class TestAlquimiaGeneratorGenerateDataset:
         seed_examples = ["Sample question 1?", "Sample question 2?"]
 
         mock_client = _create_mock_alquimia_client(mock_alquimia_response)
+        mock_module = _create_mock_alquimia_module(mock_client)
 
-        with patch(
-            "alquimia_client.AlquimiaClient",
-            return_value=mock_client,
-        ):
-            dataset = await generator.generate_dataset(
+        with patch.dict(sys.modules, {"alquimia_client": mock_module}):
+            datasets = await generator.generate_dataset(
                 context_loader=loader,
                 source=str(temp_markdown_file),
                 assistant_id="test-assistant",
                 seed_examples=seed_examples,
             )
 
+            dataset = datasets[0]
             assert isinstance(dataset, Dataset)
             # Verify seed examples were passed to infer calls
             calls = mock_client.infer.call_args_list
