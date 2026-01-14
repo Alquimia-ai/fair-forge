@@ -75,7 +75,7 @@ class AlquimiaGenerator(BaseGenerator):
         except ImportError as e:
             raise ImportError(
                 "alquimia-client is required for AlquimiaGenerator. "
-                "Install it with: pip install alquimia-client"
+                "Install it with: uv pip install alquimia-client"
             ) from e
 
         async with AlquimiaClient(
