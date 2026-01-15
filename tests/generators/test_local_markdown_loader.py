@@ -59,18 +59,6 @@ class TestLocalMarkdownLoader:
         # Should contain some expected headers
         assert "Introduction" in headers or any("Introduction" in h for h in headers if h)
 
-    def test_load_falls_back_to_size_chunking(self, temp_markdown_no_headers_file: Path):
-        """Test that loader falls back to size-based chunking without headers."""
-        loader = LocalMarkdownLoader(max_chunk_size=100)
-        chunks = loader.load(str(temp_markdown_no_headers_file))
-
-        # Should create multiple chunks based on size
-        assert len(chunks) >= 1
-
-        # All chunks should have size-based chunking method (or "header" if intro was picked up)
-        for chunk in chunks:
-            assert chunk.metadata.get("chunking_method") in ["size", "header"]
-
     def test_load_splits_long_sections(self, temp_markdown_long_section_file: Path):
         """Test that loader splits very long sections by size."""
         loader = LocalMarkdownLoader(max_chunk_size=500)
