@@ -9,11 +9,19 @@ from their modules to avoid loading unnecessary dependencies:
     from fair_forge.schemas.conversational import ConversationalMetric
     from fair_forge.schemas.context import ContextMetric
     from fair_forge.schemas.best_of import BestOfMetric
+    from fair_forge.schemas.generators import BaseGenerator, BaseContextLoader
 """
 from .common import Batch, Dataset, Logprobs
 from .metrics import BaseMetric
 from .runner import BaseRunner
 from .storage import BaseStorage
+from .generators import (
+    BaseGenerator,
+    BaseContextLoader,
+    Chunk,
+    GeneratedQuery,
+    GeneratedQueriesOutput,
+)
 
 __all__ = [
     # Common
@@ -25,4 +33,10 @@ __all__ = [
     # Runners and Storage
     "BaseRunner",
     "BaseStorage",
+    # Generators
+    "BaseGenerator",
+    "BaseContextLoader",
+    "Chunk",
+    "GeneratedQuery",
+    "GeneratedQueriesOutput",
 ]

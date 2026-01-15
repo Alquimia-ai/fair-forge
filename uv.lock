@@ -11,6 +11,7 @@ resolution-markers = [
 name = "aenum"
 version = "3.1.16"
 source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/09/7a/61ed58e8be9e30c3fe518899cc78c284896d246d51381bab59b5db11e1f3/aenum-3.1.16.tar.gz", hash = "sha256:bfaf9589bdb418ee3a986d85750c7318d9d2839c1b1a1d6fe8fc53ec201cf140", size = 137693, upload-time = "2026-01-12T22:34:38.819Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e3/52/6ad8f63ec8da1bf40f96996d25d5b650fdd38f5975f8c813732c47388f18/aenum-3.1.16-py3-none-any.whl", hash = "sha256:9035092855a98e41b66e3d0998bd7b96280e85ceb3a04cc035636138a1943eaf", size = 165627, upload-time = "2025-04-25T03:17:58.89Z" },
 ]
@@ -228,6 +229,9 @@ dev = [
     { name = "sphinx-rtd-theme" },
     { name = "types-tqdm" },
 ]
+generators-alquimia = [
+    { name = "alquimia-client" },
+]
 humanity = [
     { name = "numpy" },
     { name = "pandas" },
@@ -282,9 +286,10 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiosseclient", marker = "extra == 'runners'", specifier = ">=0.1.8" },
+    { name = "alquimia-client", marker = "extra == 'generators-alquimia'", specifier = ">=0.1.0" },
     { name = "alquimia-client", marker = "extra == 'runners'", specifier = ">=0.1.0" },
     { name = "alquimia-fair-forge", extras = ["context", "conversational", "bestof", "humanity", "toxicity", "bias"], marker = "extra == 'metrics'" },
-    { name = "alquimia-fair-forge", extras = ["metrics", "runners", "cloud"], marker = "extra == 'all'" },
+    { name = "alquimia-fair-forge", extras = ["metrics", "runners", "generators", "generators-alquimia", "cloud"], marker = "extra == 'all'" },
     { name = "boto3", marker = "extra == 'cloud'", specifier = ">=1.28.0" },
     { name = "hdbscan", marker = "extra == 'toxicity'", specifier = ">=0.8.41" },
     { name = "httpx", marker = "extra == 'runners'", specifier = ">=0.28.1" },
@@ -323,7 +328,7 @@ requires-dist = [
     { name = "types-tqdm", marker = "extra == 'dev'", specifier = ">=4.66.0" },
     { name = "umap-learn", marker = "extra == 'toxicity'", specifier = ">=0.5.6,<0.6.0" },
 ]
-provides-extras = ["context", "conversational", "bestof", "humanity", "toxicity", "bias", "metrics", "runners", "cloud", "all", "dev"]
+provides-extras = ["context", "conversational", "bestof", "humanity", "toxicity", "bias", "metrics", "runners", "generators", "generators-alquimia", "cloud", "all", "dev"]
 
 [package.metadata.requires-dev]
 dev = [
