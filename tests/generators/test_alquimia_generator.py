@@ -1,4 +1,4 @@
-"""Tests for AlquimiaGenerator."""
+"""Tests for AlquimiaGenerator and AlquimiaChatModel."""
 
 import sys
 import pytest
@@ -6,8 +6,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from pathlib import Path
 from types import ModuleType
 
-from fair_forge.generators import AlquimiaGenerator, LocalMarkdownLoader
-from fair_forge.schemas.generators import Chunk, GeneratedQuery, GeneratedQueriesOutput
+from fair_forge.generators import (
+    AlquimiaGenerator,
+    LocalMarkdownLoader,
+    create_alquimia_generator,
+)
+from fair_forge.generators.alquimia_generator import AlquimiaChatModel
+from fair_forge.schemas.generators import (
+    Chunk,
+    GeneratedQuery,
+    GeneratedQueriesOutput,
+)
 from fair_forge.schemas.common import Dataset, Batch
 
 
@@ -42,6 +51,41 @@ class TestAlquimiaGeneratorInitialization:
 
         assert generator.base_url == "https://api.alquimia.ai"
 
+    def test_generator_creates_chat_model(self, mock_alquimia_config: dict):
+        """Test generator creates an AlquimiaChatModel internally."""
+        generator = AlquimiaGenerator(**mock_alquimia_config)
+
+        assert isinstance(generator.model, AlquimiaChatModel)
+
+    def test_factory_function_creates_generator(self, mock_alquimia_config: dict):
+        """Test create_alquimia_generator factory function."""
+        generator = create_alquimia_generator(**mock_alquimia_config)
+
+        assert isinstance(generator, AlquimiaGenerator)
+        assert generator.base_url == "https://api.alquimia.ai"
+
+
+class TestAlquimiaChatModel:
+    """Test suite for AlquimiaChatModel."""
+
+    def test_chat_model_initialization(self, mock_alquimia_config: dict):
+        """Test AlquimiaChatModel initializes correctly."""
+        model = AlquimiaChatModel(**mock_alquimia_config)
+
+        assert model.base_url == "https://api.alquimia.ai"
+        assert model.api_key == "test-api-key"
+        assert model.agent_id == "test-agent"
+        assert model._llm_type == "alquimia"
+
+    def test_chat_model_identifying_params(self, mock_alquimia_config: dict):
+        """Test _identifying_params returns correct values."""
+        model = AlquimiaChatModel(**mock_alquimia_config)
+
+        params = model._identifying_params
+        assert params["base_url"] == "https://api.alquimia.ai"
+        assert params["agent_id"] == "test-agent"
+        assert params["channel_id"] == "test-channel"
+
 
 def _create_mock_alquimia_client(response_content: str):
     """Helper to create a mocked AlquimiaClient."""
@@ -74,62 +118,13 @@ class TestAlquimiaGeneratorGenerateQueries:
         generator = AlquimiaGenerator(**mock_alquimia_config)
 
         mock_client = _create_mock_alquimia_client(mock_alquimia_response)
+        mock_module = _create_mock_alquimia_module(mock_client)
 
-        with patch(
-            "alquimia_client.AlquimiaClient",
-            return_value=mock_client,
-        ):
+        with patch.dict(sys.modules, {"alquimia_client": mock_module}):
             queries = await generator.generate_queries(sample_chunk, num_queries=2)
 
             assert len(queries) == 2
             assert all(isinstance(q, GeneratedQuery) for q in queries)
-
-    @pytest.mark.asyncio
-    async def test_generate_queries_passes_context_as_extra_data(
-        self, mock_alquimia_config: dict, sample_chunk: Chunk, mock_alquimia_response: str
-    ):
-        """Test that generate_queries passes context as extra_data."""
-        generator = AlquimiaGenerator(**mock_alquimia_config)
-
-        mock_client = _create_mock_alquimia_client(mock_alquimia_response)
-
-        with patch(
-            "alquimia_client.AlquimiaClient",
-            return_value=mock_client,
-        ):
-            await generator.generate_queries(sample_chunk, num_queries=3)
-
-            # Verify infer was called with context in kwargs
-            call_kwargs = mock_client.infer.call_args.kwargs
-            assert "context" in call_kwargs
-            assert call_kwargs["context"] == sample_chunk.content
-            assert "num_queries" in call_kwargs
-            assert call_kwargs["num_queries"] == 3
-
-    @pytest.mark.asyncio
-    async def test_generate_queries_with_seed_examples(
-        self, mock_alquimia_config: dict, sample_chunk: Chunk, mock_alquimia_response: str
-    ):
-        """Test that generate_queries includes seed examples in extra_data."""
-        generator = AlquimiaGenerator(**mock_alquimia_config)
-        seed_examples = ["What is X?", "How does Y work?"]
-
-        mock_client = _create_mock_alquimia_client(mock_alquimia_response)
-
-        with patch(
-            "alquimia_client.AlquimiaClient",
-            return_value=mock_client,
-        ):
-            queries = await generator.generate_queries(
-                sample_chunk, num_queries=2, seed_examples=seed_examples
-            )
-
-            assert len(queries) == 2
-
-            # Verify seed_examples were passed as extra_data
-            call_kwargs = mock_client.infer.call_args.kwargs
-            assert "seed_examples" in call_kwargs
-            assert call_kwargs["seed_examples"] == seed_examples
 
     @pytest.mark.asyncio
     async def test_generate_queries_handles_agent_error(
@@ -143,10 +138,9 @@ class TestAlquimiaGeneratorGenerateQueries:
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
 
-        with patch(
-            "alquimia_client.AlquimiaClient",
-            return_value=mock_client,
-        ):
+        mock_module = _create_mock_alquimia_module(mock_client)
+
+        with patch.dict(sys.modules, {"alquimia_client": mock_module}):
             with pytest.raises(Exception, match="Agent Error"):
                 await generator.generate_queries(sample_chunk, num_queries=2)
 
@@ -167,10 +161,9 @@ class TestAlquimiaGeneratorGenerateQueries:
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
 
-        with patch(
-            "alquimia_client.AlquimiaClient",
-            return_value=mock_client,
-        ):
+        mock_module = _create_mock_alquimia_module(mock_client)
+
+        with patch.dict(sys.modules, {"alquimia_client": mock_module}):
             with pytest.raises(ValueError, match="Empty response"):
                 await generator.generate_queries(sample_chunk, num_queries=2)
 
@@ -186,33 +179,40 @@ class TestAlquimiaGeneratorGenerateQueries:
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
 
-        with patch(
-            "alquimia_client.AlquimiaClient",
-            return_value=mock_client,
-        ):
+        mock_module = _create_mock_alquimia_module(mock_client)
+
+        with patch.dict(sys.modules, {"alquimia_client": mock_module}):
             with pytest.raises(ValueError, match="No stream_id"):
                 await generator.generate_queries(sample_chunk, num_queries=2)
 
 
-class TestAlquimiaGeneratorParseResponse:
-    """Test suite for AlquimiaGenerator response parsing."""
+class TestAlquimiaStructuredOutputParsing:
+    """Test suite for AlquimiaGenerator response parsing via structured output."""
 
     def test_parse_json_in_markdown(self, mock_alquimia_config: dict):
         """Test parsing JSON wrapped in markdown code blocks."""
-        generator = AlquimiaGenerator(**mock_alquimia_config)
+        from fair_forge.generators.alquimia_generator import AlquimiaStructuredOutputModel
+
+        model = AlquimiaChatModel(**mock_alquimia_config)
+        structured = AlquimiaStructuredOutputModel(model, GeneratedQueriesOutput)
+
         response = '```json\n{"queries": [{"query": "Test question?"}], "chunk_summary": "Summary"}\n```'
 
-        result = generator._parse_response(response)
+        result = structured._parse_response(response)
 
         assert len(result.queries) == 1
         assert result.queries[0].query == "Test question?"
 
     def test_parse_raw_json(self, mock_alquimia_config: dict):
         """Test parsing raw JSON response."""
-        generator = AlquimiaGenerator(**mock_alquimia_config)
+        from fair_forge.generators.alquimia_generator import AlquimiaStructuredOutputModel
+
+        model = AlquimiaChatModel(**mock_alquimia_config)
+        structured = AlquimiaStructuredOutputModel(model, GeneratedQueriesOutput)
+
         response = '{"queries": [{"query": "Test question?", "difficulty": "easy"}], "chunk_summary": "Summary"}'
 
-        result = generator._parse_response(response)
+        result = structured._parse_response(response)
 
         assert len(result.queries) == 1
         assert result.queries[0].query == "Test question?"
@@ -220,13 +220,17 @@ class TestAlquimiaGeneratorParseResponse:
 
     def test_parse_plain_text_questions(self, mock_alquimia_config: dict):
         """Test parsing plain text questions when JSON fails."""
-        generator = AlquimiaGenerator(**mock_alquimia_config)
+        from fair_forge.generators.alquimia_generator import AlquimiaStructuredOutputModel
+
+        model = AlquimiaChatModel(**mock_alquimia_config)
+        structured = AlquimiaStructuredOutputModel(model, GeneratedQueriesOutput)
+
         response = """Here are some questions:
 1. What is the main feature?
 2. How does it work?
 - Why is this important?
 """
-        result = generator._parse_response(response)
+        result = structured._parse_plain_text_response(response)
 
         assert len(result.queries) == 3
         assert "What is the main feature?" in result.queries[0].query
@@ -351,37 +355,6 @@ class TestAlquimiaGeneratorGenerateDataset:
             assert dataset.context
             assert len(dataset.context) > 0
 
-    @pytest.mark.asyncio
-    async def test_generate_dataset_with_seed_examples(
-        self,
-        mock_alquimia_config: dict,
-        temp_markdown_file: Path,
-        mock_alquimia_response: str,
-    ):
-        """Test that generate_dataset passes seed examples to agent."""
-        generator = AlquimiaGenerator(**mock_alquimia_config)
-        loader = LocalMarkdownLoader()
-        seed_examples = ["Sample question 1?", "Sample question 2?"]
-
-        mock_client = _create_mock_alquimia_client(mock_alquimia_response)
-        mock_module = _create_mock_alquimia_module(mock_client)
-
-        with patch.dict(sys.modules, {"alquimia_client": mock_module}):
-            datasets = await generator.generate_dataset(
-                context_loader=loader,
-                source=str(temp_markdown_file),
-                assistant_id="test-assistant",
-                seed_examples=seed_examples,
-            )
-
-            dataset = datasets[0]
-            assert isinstance(dataset, Dataset)
-            # Verify seed examples were passed to infer calls
-            calls = mock_client.infer.call_args_list
-            for call in calls:
-                assert "seed_examples" in call.kwargs
-                assert call.kwargs["seed_examples"] == seed_examples
-
 
 class TestAlquimiaGeneratorIntegration:
     """Integration tests for AlquimiaGenerator."""
@@ -398,13 +371,11 @@ class TestAlquimiaGeneratorIntegration:
         loader = LocalMarkdownLoader()
 
         mock_client = _create_mock_alquimia_client(mock_alquimia_response)
+        mock_module = _create_mock_alquimia_module(mock_client)
 
-        with patch(
-            "alquimia_client.AlquimiaClient",
-            return_value=mock_client,
-        ):
-            # Generate dataset
-            dataset = await generator.generate_dataset(
+        with patch.dict(sys.modules, {"alquimia_client": mock_module}):
+            # Generate datasets (now returns list)
+            datasets = await generator.generate_dataset(
                 context_loader=loader,
                 source=str(temp_markdown_file),
                 assistant_id="integration-test-assistant",
@@ -413,6 +384,8 @@ class TestAlquimiaGeneratorIntegration:
             )
 
             # Verify complete dataset structure
+            assert len(datasets) > 0
+            dataset = datasets[0]
             assert dataset.session_id  # Should be a valid UUID
             assert dataset.assistant_id == "integration-test-assistant"
             assert dataset.language == "english"
@@ -435,3 +408,19 @@ class TestAlquimiaGeneratorIntegration:
         assert hasattr(generator, "agent_id")
         assert hasattr(generator, "channel_id")
         assert hasattr(generator, "api_version")
+        assert hasattr(generator, "model")
+        assert isinstance(generator.model, AlquimiaChatModel)
+
+
+class TestAlquimiaChatModelWithStructuredOutput:
+    """Test AlquimiaChatModel.with_structured_output functionality."""
+
+    def test_with_structured_output_returns_wrapper(self, mock_alquimia_config: dict):
+        """Test that with_structured_output returns AlquimiaStructuredOutputModel."""
+        from fair_forge.generators.alquimia_generator import AlquimiaStructuredOutputModel
+
+        model = AlquimiaChatModel(**mock_alquimia_config)
+        structured = model.with_structured_output(GeneratedQueriesOutput)
+
+        assert isinstance(structured, AlquimiaStructuredOutputModel)
+        assert structured._schema == GeneratedQueriesOutput

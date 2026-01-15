@@ -101,28 +101,12 @@ runners = [
     "aiosseclient>=0.1.8",
 ]
 
-# Generators module (base)
-generators = [
-    "httpx>=0.28.1",
-]
+# Generators module (base - requires user to install their LLM provider)
+generators = []
 
-# Generators with OpenAI support
-generators-openai = [
-    "httpx>=0.28.1",
-    "langchain-openai>=0.2.0",
-]
-
-# Generators with Groq support
-generators-groq = [
-    "httpx>=0.28.1",
-    "langchain-groq>=0.2.0",
-]
-
-# Generators with all LLM providers
-generators-all = [
-    "httpx>=0.28.1",
-    "langchain-openai>=0.2.0",
-    "langchain-groq>=0.2.0",
+# Generators with Alquimia support (adapter for Alquimia client)
+generators-alquimia = [
+    "alquimia-client>=0.1.0",
 ]
 
 # Cloud storage support
@@ -133,7 +117,7 @@ cloud = [
 
 # Everything
 all = [
-    "alquimia-fair-forge[metrics,runners,generators,cloud]",
+    "alquimia-fair-forge[metrics,runners,generators,generators-alquimia,cloud]",
 ]
 
 # Development tools
@@ -318,6 +302,7 @@ module = [
     "umap.*",
     "lakefs.*",
     "boto3.*",
+    "alquimia_client.*",
 ]
 ignore_missing_imports = true
 
