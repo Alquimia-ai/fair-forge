@@ -400,12 +400,12 @@ class BaseGenerator:
             formatted_prompt += """
 
 You MUST respond with a valid JSON object in this exact format:
-{
+{{
     "queries": [
-        {"query": "Your question here", "difficulty": "easy|medium|hard", "query_type": "factual|inferential|comparative|analytical"}
+        {{"query": "Your question here", "difficulty": "easy|medium|hard", "query_type": "factual|inferential|comparative|analytical"}}
     ],
     "chunk_summary": "Brief 1-2 sentence summary of the context"
-}"""
+}}"""
 
         try:
             output = await self._call_llm(
@@ -464,15 +464,15 @@ You MUST respond with a valid JSON object in this exact format:
             formatted_prompt += """
 
 You MUST respond with a valid JSON object in this exact format:
-{
+{{
     "turns": [
-        {"query": "First question about the topic", "turn_number": 1, "difficulty": "easy", "query_type": "factual", "expected_context": null},
-        {"query": "Follow-up question building on first", "turn_number": 2, "difficulty": "medium", "query_type": "inferential", "expected_context": "References the answer to turn 1"},
-        {"query": "Deeper question exploring implications", "turn_number": 3, "difficulty": "hard", "query_type": "analytical", "expected_context": "Builds on turns 1 and 2"}
+        {{"query": "First question about the topic", "turn_number": 1, "difficulty": "easy", "query_type": "factual", "expected_context": null}},
+        {{"query": "Follow-up question building on first", "turn_number": 2, "difficulty": "medium", "query_type": "inferential", "expected_context": "References the answer to turn 1"}},
+        {{"query": "Deeper question exploring implications", "turn_number": 3, "difficulty": "hard", "query_type": "analytical", "expected_context": "Builds on turns 1 and 2"}}
     ],
     "conversation_summary": "Brief description of the conversation flow",
     "chunk_summary": "Brief 1-2 sentence summary of the context"
-}"""
+}}"""
 
         try:
             output = await self._call_llm_conversation(

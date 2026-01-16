@@ -5,15 +5,14 @@ BaseChatModel, allowing it to be used with the BaseGenerator interface.
 """
 
 import asyncio
-import json
 import re
 import uuid
 from datetime import datetime
-from typing import Any, Iterator, List, Optional
+from typing import Any, List, Optional
 
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.runnables import Runnable, RunnableConfig
 from loguru import logger
@@ -21,8 +20,11 @@ from pydantic import Field
 
 from fair_forge.schemas.generators import (
     BaseGenerator,
+    Chunk,
+    ConversationTurn,
     GeneratedConversationOutput,
     GeneratedQueriesOutput,
+    GeneratedQuery,
 )
 
 
@@ -60,6 +62,9 @@ class AlquimiaChatModel(BaseChatModel):
     channel_id: str = Field(description="Channel identifier")
     api_version: str = Field(default="", description="API version")
 
+    # Extra data to pass to the Alquimia agent (set before invoking)
+    _extra_data: dict[str, Any] = {}
+
     @property
     def _llm_type(self) -> str:
         """Return the type of LLM."""
@@ -74,67 +79,17 @@ class AlquimiaChatModel(BaseChatModel):
             "channel_id": self.channel_id,
         }
 
-    def _extract_extra_data_from_messages(
-        self, messages: List[BaseMessage]
-    ) -> dict[str, Any]:
-        """Extract extra data (context, num_queries, etc.) from system message.
-
-        The system prompt contains the context and configuration that should
-        be passed to the Alquimia agent as extra_data kwargs.
+    def set_extra_data(self, extra_data: dict[str, Any]) -> None:
+        """Set extra data to pass to the Alquimia agent.
 
         Args:
-            messages: List of messages to extract data from
-
-        Returns:
-            dict: Extra data to pass to the Alquimia agent
+            extra_data: Dictionary with context, num_queries, seed_examples, etc.
         """
-        extra_data: dict[str, Any] = {}
+        self._extra_data = extra_data
 
-        for message in messages:
-            if isinstance(message, SystemMessage):
-                content = str(message.content)
-
-                # Extract context from the system prompt
-                context_match = re.search(
-                    r"Context:\s*\n(.*?)(?:\n\n|\nExample|\nGenerate)",
-                    content,
-                    re.DOTALL,
-                )
-                if context_match:
-                    extra_data["context"] = context_match.group(1).strip()
-
-                # Extract num_queries from the system prompt
-                num_queries_match = re.search(
-                    r"Generate exactly (\d+) questions", content
-                )
-                if num_queries_match:
-                    extra_data["num_queries"] = int(num_queries_match.group(1))
-
-                # Extract num_turns for conversation mode
-                num_turns_match = re.search(
-                    r"conversation with exactly (\d+) turns", content
-                )
-                if num_turns_match:
-                    extra_data["num_turns"] = int(num_turns_match.group(1))
-                    extra_data["conversation_mode"] = True
-
-                # Extract seed examples if present
-                seed_match = re.search(
-                    r"Example questions \(match this style\):\s*\n(.*?)\n\n",
-                    content,
-                    re.DOTALL,
-                )
-                if seed_match:
-                    seed_text = seed_match.group(1)
-                    seeds = [
-                        line.strip().lstrip("- ")
-                        for line in seed_text.split("\n")
-                        if line.strip()
-                    ]
-                    if seeds:
-                        extra_data["seed_examples"] = seeds
-
-        return extra_data
+    def clear_extra_data(self) -> None:
+        """Clear the extra data."""
+        self._extra_data = {}
 
     async def _ainvoke_agent(
         self,
@@ -243,7 +198,7 @@ class AlquimiaChatModel(BaseChatModel):
             messages: List of messages in the conversation
             stop: Optional list of stop sequences (not used by Alquimia)
             run_manager: Callback manager for LLM run
-            **kwargs: Additional keyword arguments
+            **kwargs: Additional keyword arguments (can include extra_data)
 
         Returns:
             ChatResult: The generated response
@@ -255,13 +210,14 @@ class AlquimiaChatModel(BaseChatModel):
                 user_query = str(message.content)
                 break
 
-        # Extract extra data from system message
-        extra_data = self._extract_extra_data_from_messages(messages)
+        # Use extra_data from kwargs, instance attribute, or empty dict
+        extra_data = kwargs.get("extra_data", self._extra_data or {})
 
         # Generate a session ID for this invocation
         session_id = f"gen_{uuid.uuid4().hex[:12]}"
 
         logger.debug(f"Invoking Alquimia agent with session {session_id}")
+        logger.debug(f"Extra data: {extra_data}")
 
         # Call the Alquimia agent
         response = self._invoke_agent_sync(user_query, session_id, extra_data)
@@ -381,13 +337,6 @@ class AlquimiaStructuredOutputModel(Runnable):
         Returns:
             Parsed output with data extracted from text
         """
-        from fair_forge.schemas.generators import (
-            ConversationTurn,
-            GeneratedConversationOutput,
-            GeneratedQueriesOutput,
-            GeneratedQuery,
-        )
-
         if self._schema == GeneratedQueriesOutput:
             queries = []
             lines = response.strip().split("\n")
@@ -452,11 +401,8 @@ class AlquimiaStructuredOutputModel(Runnable):
 class AlquimiaGenerator(BaseGenerator):
     """Generator implementation using Alquimia's agent API.
 
-    This generator wraps the Alquimia client as a LangChain-compatible model,
-    allowing it to be used with the BaseGenerator interface.
-
-    The context, seed examples, and number of queries are passed as extra
-    data kwargs that get injected into the agent's system prompt.
+    This generator calls the Alquimia agent directly, passing context,
+    seed examples, and configuration as extra_data kwargs.
 
     Args:
         base_url: Alquimia API base URL
@@ -464,7 +410,6 @@ class AlquimiaGenerator(BaseGenerator):
         agent_id: Agent/assistant identifier for query generation
         channel_id: Channel identifier
         api_version: API version (optional)
-        use_structured_output: If True, use structured output parsing
 
     Example:
         ```python
@@ -490,7 +435,6 @@ class AlquimiaGenerator(BaseGenerator):
         agent_id: str,
         channel_id: str,
         api_version: str = "",
-        use_structured_output: bool = True,
         **kwargs,
     ):
         """Initialize the Alquimia generator.
@@ -501,7 +445,6 @@ class AlquimiaGenerator(BaseGenerator):
             agent_id: Agent/assistant identifier
             channel_id: Channel identifier
             api_version: API version
-            use_structured_output: If True, use structured output parsing
             **kwargs: Additional configuration
         """
         # Create the Alquimia chat model adapter
@@ -520,11 +463,237 @@ class AlquimiaGenerator(BaseGenerator):
         self.channel_id = channel_id
         self.api_version = api_version
 
-        # Initialize parent with the adapter
+        # Initialize parent - always use_structured_output=False since we handle parsing
         super().__init__(
             model=model,
-            use_structured_output=use_structured_output,
+            use_structured_output=False,
             **kwargs,
+        )
+
+    async def generate_queries(
+        self,
+        chunk: Chunk,
+        num_queries: int = 3,
+        seed_examples: Optional[list[str]] = None,
+        custom_system_prompt: Optional[str] = None,
+    ) -> list[GeneratedQuery]:
+        """Generate independent queries for a single chunk using Alquimia.
+
+        Passes context and configuration directly as extra_data to the agent.
+
+        Args:
+            chunk: Context chunk to generate queries from
+            num_queries: Number of queries to generate
+            seed_examples: Optional example queries for style guidance
+            custom_system_prompt: Optional custom system prompt (ignored for Alquimia)
+
+        Returns:
+            list[GeneratedQuery]: Generated queries
+        """
+        logger.debug(f"Generating {num_queries} queries for chunk {chunk.chunk_id}")
+
+        # Build extra_data to pass to the Alquimia agent
+        extra_data: dict[str, Any] = {
+            "context": chunk.content,
+            "num_queries": num_queries,
+        }
+
+        if seed_examples:
+            extra_data["seed_examples"] = seed_examples
+
+        # Set extra_data on the model and invoke
+        self.model.set_extra_data(extra_data)
+
+        try:
+            # Generate a simple query to trigger the agent
+            session_id = f"gen_{uuid.uuid4().hex[:12]}"
+            response = await self.model._ainvoke_agent(
+                query=f"Generate {num_queries} questions based on the provided context.",
+                session_id=session_id,
+                extra_data=extra_data,
+            )
+
+            # Parse the response
+            output = self._parse_queries_response(response)
+            logger.debug(
+                f"Generated {len(output.queries)} queries for chunk {chunk.chunk_id}"
+            )
+            return output.queries
+
+        except Exception as e:
+            logger.error(f"Failed to generate queries for chunk {chunk.chunk_id}: {e}")
+            raise
+        finally:
+            self.model.clear_extra_data()
+
+    async def generate_conversation(
+        self,
+        chunk: Chunk,
+        num_turns: int = 3,
+        seed_examples: Optional[list[str]] = None,
+        custom_system_prompt: Optional[str] = None,
+    ) -> list[ConversationTurn]:
+        """Generate a coherent multi-turn conversation from a chunk.
+
+        Passes context and configuration directly as extra_data to the agent.
+
+        Args:
+            chunk: Context chunk for conversation
+            num_turns: Number of conversation turns
+            seed_examples: Optional example questions for style
+            custom_system_prompt: Optional custom system prompt (ignored for Alquimia)
+
+        Returns:
+            list[ConversationTurn]: Generated conversation turns
+        """
+        logger.debug(f"Generating {num_turns}-turn conversation for chunk {chunk.chunk_id}")
+
+        # Build extra_data to pass to the Alquimia agent
+        extra_data: dict[str, Any] = {
+            "context": chunk.content,
+            "num_turns": num_turns,
+            "conversation_mode": True,
+        }
+
+        if seed_examples:
+            extra_data["seed_examples"] = seed_examples
+
+        # Set extra_data on the model and invoke
+        self.model.set_extra_data(extra_data)
+
+        try:
+            # Generate a simple query to trigger the agent
+            session_id = f"gen_{uuid.uuid4().hex[:12]}"
+            response = await self.model._ainvoke_agent(
+                query=f"Generate a {num_turns}-turn conversation based on the provided context.",
+                session_id=session_id,
+                extra_data=extra_data,
+            )
+
+            # Parse the response
+            output = self._parse_conversation_response(response)
+            logger.debug(
+                f"Generated {len(output.turns)} turns for chunk {chunk.chunk_id}"
+            )
+            return output.turns
+
+        except Exception as e:
+            logger.error(
+                f"Failed to generate conversation for chunk {chunk.chunk_id}: {e}"
+            )
+            raise
+        finally:
+            self.model.clear_extra_data()
+
+    def _parse_queries_response(self, response: str) -> GeneratedQueriesOutput:
+        """Parse the agent response into GeneratedQueriesOutput.
+
+        Args:
+            response: Raw response from the agent
+
+        Returns:
+            GeneratedQueriesOutput: Parsed output
+        """
+        # Try to extract JSON from markdown code blocks
+        pattern = r"```json\s*(\{.*?\})\s*```"
+        match = re.search(pattern, response, re.DOTALL)
+        if match:
+            json_str = match.group(1)
+            try:
+                return GeneratedQueriesOutput.model_validate_json(json_str)
+            except Exception:
+                pass
+
+        # Try to find raw JSON
+        json_match = re.search(r"\{.*\}", response, re.DOTALL)
+        if json_match:
+            try:
+                return GeneratedQueriesOutput.model_validate_json(json_match.group(0))
+            except Exception:
+                pass
+
+        # Fall back to plain text parsing
+        queries = []
+        lines = response.strip().split("\n")
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            if line.endswith("?"):
+                cleaned = re.sub(r"^[\d]+[\.\)]\s*", "", line)
+                cleaned = re.sub(r"^[-*•]\s*", "", cleaned)
+                if cleaned:
+                    queries.append(GeneratedQuery(query=cleaned))
+
+        if not queries:
+            queries.append(GeneratedQuery(query=response.strip()))
+
+        return GeneratedQueriesOutput(
+            queries=queries,
+            chunk_summary="Parsed from plain text response",
+        )
+
+    def _parse_conversation_response(self, response: str) -> GeneratedConversationOutput:
+        """Parse the agent response into GeneratedConversationOutput.
+
+        Args:
+            response: Raw response from the agent
+
+        Returns:
+            GeneratedConversationOutput: Parsed output
+        """
+        # Try to extract JSON from markdown code blocks
+        pattern = r"```json\s*(\{.*?\})\s*```"
+        match = re.search(pattern, response, re.DOTALL)
+        if match:
+            json_str = match.group(1)
+            try:
+                return GeneratedConversationOutput.model_validate_json(json_str)
+            except Exception:
+                pass
+
+        # Try to find raw JSON
+        json_match = re.search(r"\{.*\}", response, re.DOTALL)
+        if json_match:
+            try:
+                return GeneratedConversationOutput.model_validate_json(json_match.group(0))
+            except Exception:
+                pass
+
+        # Fall back to plain text parsing
+        turns = []
+        lines = response.strip().split("\n")
+        turn_number = 1
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            if line.endswith("?"):
+                cleaned = re.sub(r"^[\d]+[\.\)]\s*", "", line)
+                cleaned = re.sub(r"^[-*•]\s*", "", cleaned)
+                if cleaned:
+                    turns.append(
+                        ConversationTurn(
+                            query=cleaned,
+                            turn_number=turn_number,
+                        )
+                    )
+                    turn_number += 1
+
+        if not turns:
+            turns.append(
+                ConversationTurn(
+                    query=response.strip(),
+                    turn_number=1,
+                )
+            )
+
+        return GeneratedConversationOutput(
+            turns=turns,
+            conversation_summary="Parsed from plain text response",
+            chunk_summary="Parsed from plain text response",
         )
 
 

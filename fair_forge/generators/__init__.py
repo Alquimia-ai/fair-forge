@@ -81,13 +81,12 @@ def create_alquimia_generator(
     agent_id: str,
     channel_id: str,
     api_version: str = "",
-    use_structured_output: bool = True,
 ) -> AlquimiaGenerator:
     """Create an Alquimia agent-based generator.
 
     The generator uses the Alquimia client to invoke an agent that generates
     test queries. Context, seed examples, and num_queries are passed as
-    extra data kwargs that get injected into the agent's system prompt.
+    extra_data kwargs directly to the Alquimia agent.
 
     Args:
         base_url: Alquimia API base URL
@@ -95,7 +94,6 @@ def create_alquimia_generator(
         agent_id: Agent/assistant identifier for query generation
         channel_id: Channel identifier
         api_version: API version (optional)
-        use_structured_output: If True, use structured output parsing
 
     Returns:
         AlquimiaGenerator: Configured generator instance
@@ -117,7 +115,6 @@ def create_alquimia_generator(
         agent_id=agent_id,
         channel_id=channel_id,
         api_version=api_version,
-        use_structured_output=use_structured_output,
     )
 
 
