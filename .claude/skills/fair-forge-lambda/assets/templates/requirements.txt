@@ -1,0 +1,5 @@
+# LLM provider - adjust based on your choice
+# langchain-groq for Groq
+# langchain-openai for OpenAI
+# langchain-anthropic for Anthropic
+langchain-groq
