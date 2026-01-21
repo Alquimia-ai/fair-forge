@@ -17,6 +17,7 @@ Generators are async and require context to be passed in the payload.
 """run.py - Generators pattern"""
 import asyncio
 import os
+import tempfile
 from typing import Any
 
 from fair_forge.generators import BaseGenerator, LocalMarkdownLoader
@@ -33,11 +34,14 @@ async def _async_run(payload: dict) -> dict[str, Any]:
     config = payload.get("config", {})
     api_key = config.get("api_key") or os.environ.get("LLM_API_KEY")
 
+    if not api_key:
+        return {"success": False, "error": "No API key provided"}
+
     # Initialize LLM
     model = ChatGroq(
         model=config.get("model", "qwen/qwen3-32b"),
         api_key=api_key,
-        temperature=0.7,  # Higher for creative generation
+        temperature=config.get("temperature", 0.7),
     )
 
     # Initialize generator
@@ -49,21 +53,19 @@ async def _async_run(payload: dict) -> dict[str, Any]:
         min_chunk_size=config.get("min_chunk_size", 200),
     )
 
-    # Get context from payload or file
+    # Get context from payload
     context_content = payload.get("context", "")
     assistant_id = config.get("assistant_id", "test-assistant")
 
-    # For Lambda, we need to handle context differently
-    # Option 1: Context passed directly in payload
-    # Option 2: Context file path (if mounted/available)
+    if not context_content:
+        return {"success": False, "error": "No context provided"}
 
-    if context_content:
-        # Write context to temp file for loader
-        import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
-            f.write(context_content)
-            temp_path = f.name
+    # Write context to temp file for loader
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+        f.write(context_content)
+        temp_path = f.name
 
+    try:
         datasets = await generator.generate_dataset(
             context_loader=loader,
             source=temp_path,
@@ -73,12 +75,9 @@ async def _async_run(payload: dict) -> dict[str, Any]:
             seed_examples=config.get("seed_examples"),
             conversation_mode=config.get("conversation_mode", False),
         )
-
+    finally:
         # Cleanup temp file
-        import os as os_module
-        os_module.unlink(temp_path)
-    else:
-        return {"success": False, "error": "No context provided"}
+        os.unlink(temp_path)
 
     return {
         "success": True,

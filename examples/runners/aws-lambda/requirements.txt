@@ -1,0 +1,5 @@
+# Runners module doesn't require additional LLM providers
+# The AlquimiaRunner uses the Alquimia API directly
+#
+# Pin langchain versions to avoid compatibility issues
+langchain-core>=0.3.0,<0.4.0

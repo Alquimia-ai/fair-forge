@@ -3,7 +3,6 @@
 # langchain-openai for OpenAI
 # langchain-anthropic for Anthropic
 #
-# IMPORTANT: Pin langchain versions to avoid compatibility issues
-# with fair-forge's langchain-core dependency
+# Pin langchain versions to avoid compatibility issues
 langchain-core>=0.3.0,<0.4.0
 langchain-groq>=0.2.0,<0.3.0

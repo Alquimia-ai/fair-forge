@@ -35,7 +35,23 @@ examples/{module}/aws-lambda/
 
 Copy templates from `assets/templates/` and scripts from `scripts/`.
 
-### 2. Implement run.py
+### 2. CRITICAL: Update Dockerfile Paths
+
+The Dockerfile is built with the **repo root as context** (not the aws-lambda directory). You MUST update the COPY paths to use full paths from the repo root:
+
+```dockerfile
+# UPDATE these lines in the Dockerfile:
+COPY examples/{module}/aws-lambda/requirements.txt .
+COPY examples/{module}/aws-lambda/handler.py examples/{module}/aws-lambda/run.py ${LAMBDA_TASK_ROOT}/
+```
+
+For example, for generators:
+```dockerfile
+COPY examples/generators/aws-lambda/requirements.txt .
+COPY examples/generators/aws-lambda/handler.py examples/generators/aws-lambda/run.py ${LAMBDA_TASK_ROOT}/
+```
+
+### 3. Implement run.py
 
 Edit `run.py` with your module logic. See reference docs for patterns:
 
@@ -43,7 +59,7 @@ Edit `run.py` with your module logic. See reference docs for patterns:
 - `references/runners.md` - Runners implementation patterns
 - `references/generators.md` - Generators implementation patterns
 
-### 3. Update requirements.txt
+### 4. Update requirements.txt
 
 Add your LLM provider or other dependencies:
 
@@ -53,7 +69,7 @@ langchain-openai    # OpenAI
 langchain-anthropic # Anthropic
 ```
 
-### 4. Deploy
+### 5. Deploy
 
 From `examples/{module}/aws-lambda/`:
 
@@ -68,7 +84,7 @@ Examples:
 ./scripts/deploy.sh generators us-east-2  # Generators module
 ```
 
-### 5. Update / Cleanup
+### 6. Update / Cleanup
 
 ```bash
 ./scripts/update.sh {extra-name} us-east-2   # Rebuild and update
@@ -79,11 +95,23 @@ Examples:
 
 Multi-stage build:
 1. **Builder stage**: Builds fair-forge wheel from local source
-2. **Final stage**: Installs wheel with module extras, copies handler
+2. **Final stage**: Pre-installs numpy/scipy, installs wheel with module extras, copies handler
+
+### numpy/scipy Compilation Workaround
+
+The Lambda base image lacks compilers needed to build numpy/scipy from source. The Dockerfile pre-installs specific versions with pre-built manylinux wheels:
 
 ```dockerfile
+# Pre-install numpy and scipy with manylinux wheels
+RUN pip install "numpy==1.26.4" "scipy==1.14.1" --target "${LAMBDA_TASK_ROOT}"
+
+# Constraints file prevents pip from upgrading these
+RUN echo "numpy==1.26.4" > /tmp/constraints.txt && \
+    echo "scipy==1.14.1" >> /tmp/constraints.txt
+
+# Install fair-forge with constraints
 ARG MODULE_EXTRA=bestof
-RUN pip install "/tmp/$(ls /tmp/*.whl)[${MODULE_EXTRA}]"
+RUN WHEEL=$(ls /tmp/*.whl) && pip install "${WHEEL}[${MODULE_EXTRA}]" --target "${LAMBDA_TASK_ROOT}" -c /tmp/constraints.txt
 ```
 
 ## Bundled Resources
@@ -110,3 +138,28 @@ Default settings (adjust in deploy.sh):
 - **Timeout**: 300 seconds (5 minutes)
 - **Memory**: 2048 MB
 - **Python**: 3.11
+
+## Troubleshooting
+
+### "file does not exist" during Docker build
+The Dockerfile paths for `requirements.txt`, `handler.py`, and `run.py` must be updated to use full paths from the repo root. See step 2 above.
+
+### scipy/numpy compilation errors
+The template Dockerfile includes a workaround that pre-installs numpy and scipy from manylinux wheels. If you see errors like "NumPy requires GCC >= 9.3", ensure you're using the updated Dockerfile template.
+
+### Wheel path duplication error
+If you see `/tmp//tmp/filename.whl`, the wheel installation command is incorrect. Use:
+```dockerfile
+RUN WHEEL=$(ls /tmp/*.whl) && pip install "${WHEEL}[${MODULE_EXTRA}]" ...
+```
+NOT:
+```dockerfile
+RUN pip install "/tmp/$(ls /tmp/*.whl)[${MODULE_EXTRA}]" ...
+```
+
+### langchain import errors (e.g., "cannot import name 'ModelProfile'")
+This indicates a version mismatch between langchain packages. Pin compatible versions in `requirements.txt`:
+```
+langchain-core>=0.3.0,<0.4.0
+langchain-groq>=0.2.0,<0.3.0
+```
