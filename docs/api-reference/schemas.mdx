@@ -1,0 +1,296 @@
+---
+title: Schemas API
+description: API reference for Fair Forge data schemas
+---
+
+# Schemas API Reference
+
+## Common Schemas
+
+```python
+from fair_forge.schemas.common import Dataset, Batch
+```
+
+### Dataset
+
+```python
+class Dataset(BaseModel):
+    session_id: str
+    assistant_id: str
+    language: str | None = None
+    context: str
+    conversation: list[Batch]
+```
+
+### Batch
+
+```python
+class Batch(BaseModel):
+    qa_id: str
+    query: str
+    assistant: str
+    ground_truth_assistant: str | None = None
+    observation: str | None = None
+    agentic: dict | None = None
+    ground_truth_agentic: dict | None = None
+    logprobs: dict | None = None
+```
+
+---
+
+## Metric Schemas
+
+### ToxicityMetric
+
+```python
+from fair_forge.schemas.toxicity import ToxicityMetric
+
+class ToxicityMetric(BaseMetric):
+    session_id: str
+    assistant_id: str
+    cluster_profiling: dict[float, float]
+    group_profiling: GroupProfiling | None
+    assistant_space: AssistantSpace
+```
+
+### BiasMetric
+
+```python
+from fair_forge.schemas.bias import BiasMetric
+
+class BiasMetric(BaseMetric):
+    session_id: str
+    assistant_id: str
+    confidence_intervals: list[ConfidenceInterval]
+    guardian_interactions: dict[str, list[GuardianInteraction]]
+```
+
+### ContextMetric
+
+```python
+from fair_forge.schemas.context import ContextMetric
+
+class ContextMetric(BaseMetric):
+    session_id: str
+    assistant_id: str
+    qa_id: str
+    context_awareness: float
+    context_insight: str
+    context_thinkings: str
+```
+
+### ConversationalMetric
+
+```python
+from fair_forge.schemas.conversational import ConversationalMetric
+
+class ConversationalMetric(BaseMetric):
+    session_id: str
+    assistant_id: str
+    qa_id: str
+    conversational_memory: float
+    conversational_language: float
+    conversational_quality_maxim: float
+    conversational_quantity_maxim: float
+    conversational_relation_maxim: float
+    conversational_manner_maxim: float
+    conversational_sensibleness: float
+    conversational_insight: str
+    conversational_thinkings: str
+```
+
+### HumanityMetric
+
+```python
+from fair_forge.schemas.humanity import HumanityMetric
+
+class HumanityMetric(BaseMetric):
+    session_id: str
+    assistant_id: str
+    qa_id: str
+    humanity_assistant_emotional_entropy: float
+    humanity_ground_truth_spearman: float
+    humanity_assistant_anger: float
+    humanity_assistant_anticipation: float
+    humanity_assistant_disgust: float
+    humanity_assistant_fear: float
+    humanity_assistant_joy: float
+    humanity_assistant_sadness: float
+    humanity_assistant_surprise: float
+    humanity_assistant_trust: float
+```
+
+### BestOfMetric
+
+```python
+from fair_forge.schemas.best_of import BestOfMetric
+
+class BestOfMetric(BaseMetric):
+    session_id: str
+    assistant_id: str
+    bestof_winner_id: str
+    bestof_contests: list[BestOfContest]
+```
+
+---
+
+## Support Schemas
+
+### GroupProfiling
+
+```python
+class GroupProfiling(BaseModel):
+    mode: Literal["frequentist", "bayesian"]
+    groups: list[str]
+    N_i: dict[str, int]
+    K_i: dict[str, int]
+    frequentist: FrequentistGroupProfiling | None
+    bayesian: BayesianGroupProfiling | None
+```
+
+### FrequentistGroupProfiling
+
+```python
+class FrequentistGroupProfiling(BaseModel):
+    DR: float   # Demographic Representation
+    ASB: float  # Associated Sentiment Bias
+    DTO: float  # Directed Toxicity per Group
+    DIDT: float # Aggregate metric
+```
+
+### BayesianGroupProfiling
+
+```python
+class BayesianGroupProfiling(BaseModel):
+    mc_samples: int
+    ci_level: float
+    priors: float
+    summary: dict[str, BayesianSummary]
+```
+
+### ConfidenceInterval
+
+```python
+class ConfidenceInterval(BaseModel):
+    protected_attribute: str
+    lower_bound: float
+    upper_bound: float
+    probability: float
+    samples: int
+```
+
+### GuardianInteraction
+
+```python
+class GuardianInteraction(BaseModel):
+    is_biased: bool
+    attribute: str
+    certainty: float
+    qa_id: str
+```
+
+### BestOfContest
+
+```python
+class BestOfContest(BaseModel):
+    round: int
+    left_id: str
+    right_id: str
+    winner_id: str
+    verdict: str
+    confidence: float
+    reasoning: dict
+```
+
+### GuardianLLMConfig
+
+```python
+from fair_forge.schemas.bias import GuardianLLMConfig
+
+class GuardianLLMConfig(BaseModel):
+    model: str
+    api_key: str
+    url: str
+    temperature: float = 0.5
+    provider: Type
+    logprobs: bool = False
+```
+
+---
+
+## Statistical Schemas
+
+### StatisticalMode
+
+```python
+from fair_forge.statistical.base import StatisticalMode
+
+class StatisticalMode(ABC):
+    @abstractmethod
+    def distribution_divergence(
+        self,
+        observed: dict,
+        reference: dict,
+        divergence_type: str = "kl",
+    ) -> float | dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def rate_estimation(
+        self,
+        successes: int,
+        trials: int,
+    ) -> float | dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def aggregate_metrics(
+        self,
+        metrics: dict[str, float | dict],
+        weights: dict[str, float],
+    ) -> float | dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def dispersion_metric(
+        self,
+        values: list[float],
+        center: float | None = None,
+    ) -> float | dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def get_result_type(self) -> str:
+        pass
+```
+
+### FrequentistMode
+
+```python
+from fair_forge.statistical import FrequentistMode
+
+class FrequentistMode(StatisticalMode):
+    def get_result_type(self) -> str:
+        return "point_estimate"
+```
+
+### BayesianMode
+
+```python
+from fair_forge.statistical import BayesianMode
+
+class BayesianMode(StatisticalMode):
+    def __init__(
+        self,
+        mc_samples: int = 5000,
+        ci_level: float = 0.95,
+        dirichlet_prior: float = 1.0,
+        beta_prior_a: float = 1.0,
+        beta_prior_b: float = 1.0,
+        rng_seed: int | None = 42,
+    ):
+        pass
+
+    def get_result_type(self) -> str:
+        return "distribution"
+```

@@ -1,0 +1,203 @@
+---
+title: Generators Overview
+description: Generate synthetic test datasets from your documentation
+---
+
+# Generators Overview
+
+Fair Forge generators create synthetic test datasets from your documentation, enabling automated testing of AI assistants without manual dataset creation.
+
+## Why Use Generators?
+
+<CardGroup cols={2}>
+  <Card title="Save Time" icon="clock">
+    Automatically create test cases from existing documentation
+  </Card>
+  <Card title="Better Coverage" icon="grid">
+    Generate diverse questions across all your content
+  </Card>
+  <Card title="Consistent Quality" icon="check">
+    Structured question generation with difficulty levels
+  </Card>
+  <Card title="Easy Updates" icon="arrows-rotate">
+    Regenerate tests when documentation changes
+  </Card>
+</CardGroup>
+
+## Installation
+
+```bash
+uv pip install "fair-forge[generators]"
+uv pip install langchain-groq  # Or your preferred LLM provider
+```
+
+## Quick Start
+
+```python
+from fair_forge.generators import BaseGenerator, create_markdown_loader
+from langchain_groq import ChatGroq
+
+# Create a context loader
+loader = create_markdown_loader(
+    max_chunk_size=2000,
+    header_levels=[1, 2, 3],
+)
+
+# Create generator with an LLM
+model = ChatGroq(model="llama-3.1-8b-instant", temperature=0.4)
+generator = BaseGenerator(model=model, use_structured_output=True)
+
+# Generate test dataset
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./documentation.md",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=3,
+    language="english",
+)
+
+# Use with metrics
+for dataset in datasets:
+    print(f"Generated {len(dataset.conversation)} test queries")
+```
+
+## Key Components
+
+### BaseGenerator
+
+The main class for generating test datasets:
+
+```python
+from fair_forge.generators import BaseGenerator
+
+generator = BaseGenerator(
+    model=your_langchain_model,
+    use_structured_output=True,
+)
+```
+
+### Context Loaders
+
+Load and chunk your documentation:
+
+```python
+from fair_forge.generators import create_markdown_loader
+
+loader = create_markdown_loader(
+    max_chunk_size=2000,
+    header_levels=[1, 2, 3],
+)
+```
+
+### Selection Strategies
+
+Control how chunks are selected:
+
+```python
+from fair_forge.generators import SequentialStrategy, RandomSamplingStrategy
+
+# Process all chunks sequentially (default)
+strategy = SequentialStrategy()
+
+# Sample random chunks multiple times
+strategy = RandomSamplingStrategy(
+    num_samples=3,
+    chunks_per_sample=5,
+)
+```
+
+## Generation Modes
+
+### Independent Queries
+
+Generate standalone questions:
+
+```python
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs",
+    num_queries_per_chunk=3,
+    conversation_mode=False,  # Default
+)
+```
+
+### Conversation Mode
+
+Generate coherent multi-turn conversations:
+
+```python
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs",
+    num_queries_per_chunk=3,
+    conversation_mode=True,  # Each turn builds on previous
+)
+```
+
+## Output Format
+
+Generated datasets follow the standard Fair Forge schema:
+
+```python
+Dataset(
+    session_id="generated-uuid",
+    assistant_id="my-assistant",
+    language="english",
+    context="Combined chunk content...",
+    conversation=[
+        Batch(
+            qa_id="chunk-1_q1",
+            query="Generated question?",
+            assistant="",  # Empty - to be filled by runner
+            agentic={
+                "difficulty": "medium",
+                "query_type": "factual",
+                "chunk_id": "doc_section_1",
+            },
+        ),
+        ...
+    ]
+)
+```
+
+## Workflow
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Documentation  │────▶│    Generator    │────▶│  Test Datasets  │
+│  (Markdown)     │     │  (LLM-powered)  │     │  (JSON/Dataset) │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                                                        │
+                                                        ▼
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│    Metrics      │◀────│    Runners      │◀────│   AI System     │
+│  (Evaluation)   │     │  (Execution)    │     │  (Under Test)   │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+```
+
+## Supported LLM Providers
+
+| Provider | Import | Notes |
+|----------|--------|-------|
+| Groq | `langchain_groq.ChatGroq` | Fast, free tier available |
+| OpenAI | `langchain_openai.ChatOpenAI` | GPT-4, GPT-3.5 |
+| Google | `langchain_google_genai.ChatGoogleGenerativeAI` | Gemini models |
+| Anthropic | `langchain_anthropic.ChatAnthropic` | Claude models |
+| Ollama | `langchain_ollama.ChatOllama` | Local models |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="BaseGenerator" icon="gear" href="/generators/base-generator">
+    Learn about the generator class
+  </Card>
+  <Card title="Context Loaders" icon="file-import" href="/generators/context-loaders">
+    Learn about loading documentation
+  </Card>
+  <Card title="Strategies" icon="sitemap" href="/generators/strategies">
+    Learn about chunk selection
+  </Card>
+  <Card title="AWS Lambda Example" icon="aws" href="/examples/aws-lambda">
+    Deploy as serverless function
+  </Card>
+</CardGroup>

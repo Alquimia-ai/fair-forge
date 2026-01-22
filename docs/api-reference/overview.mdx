@@ -1,0 +1,144 @@
+---
+title: API Reference Overview
+description: Complete API reference for Fair Forge
+---
+
+# API Reference
+
+Complete API documentation for all Fair Forge modules.
+
+## Modules
+
+<CardGroup cols={2}>
+  <Card title="Metrics" icon="chart-pie" href="/api-reference/metrics">
+    Toxicity, Bias, Context, Conversational, Humanity, BestOf
+  </Card>
+  <Card title="Generators" icon="wand-magic-sparkles" href="/api-reference/generators">
+    BaseGenerator, context loaders, strategies
+  </Card>
+  <Card title="Runners" icon="play" href="/api-reference/runners">
+    AlquimiaRunner, BaseRunner interface
+  </Card>
+  <Card title="Schemas" icon="file-code" href="/api-reference/schemas">
+    Dataset, Batch, metric-specific schemas
+  </Card>
+</CardGroup>
+
+## Import Patterns
+
+### Metrics
+
+```python
+from fair_forge.metrics.toxicity import Toxicity
+from fair_forge.metrics.bias import Bias
+from fair_forge.metrics.context import Context
+from fair_forge.metrics.conversational import Conversational
+from fair_forge.metrics.humanity import Humanity
+from fair_forge.metrics.best_of import BestOf
+```
+
+### Core
+
+```python
+from fair_forge.core.retriever import Retriever
+from fair_forge.core.base import FairForge
+from fair_forge.core.guardian import Guardian
+from fair_forge.core.sentiment import SentimentAnalyzer
+```
+
+### Schemas
+
+```python
+from fair_forge.schemas.common import Dataset, Batch
+from fair_forge.schemas.toxicity import ToxicityMetric
+from fair_forge.schemas.bias import BiasMetric, GuardianLLMConfig
+```
+
+### Statistical
+
+```python
+from fair_forge.statistical import FrequentistMode, BayesianMode
+from fair_forge.statistical.base import StatisticalMode
+```
+
+### Generators
+
+```python
+from fair_forge.generators import (
+    BaseGenerator,
+    create_markdown_loader,
+    SequentialStrategy,
+    RandomSamplingStrategy,
+)
+```
+
+### Runners
+
+```python
+from fair_forge.runners import AlquimiaRunner
+from fair_forge.schemas.runner import BaseRunner
+```
+
+### Storage
+
+```python
+from fair_forge.storage import (
+    create_local_storage,
+    create_lakefs_storage,
+)
+```
+
+### Guardians
+
+```python
+from fair_forge.guardians import LLamaGuard, IBMGranite
+from fair_forge.guardians.llms.providers import OpenAIGuardianProvider
+```
+
+## Quick Reference
+
+### Run a Metric
+
+```python
+results = Metric.run(
+    RetrieverClass,
+    **metric_parameters,
+    verbose=True,
+)
+```
+
+### Create a Retriever
+
+```python
+class MyRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        return [Dataset(...)]
+```
+
+### Generate Test Data
+
+```python
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=3,
+)
+```
+
+### Execute Tests
+
+```python
+updated_dataset, summary = await runner.run_dataset(dataset)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Metrics API" icon="chart-pie" href="/api-reference/metrics">
+    Detailed metrics reference
+  </Card>
+  <Card title="Schemas API" icon="file-code" href="/api-reference/schemas">
+    Data structure reference
+  </Card>
+</CardGroup>

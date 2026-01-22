@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "alquimia-fair-forge"
-version = "0.1.1"
+version = "0.1.2"
 description = "Alquimia Fair Forge library - Performance measurement for AI models and assistants"
 readme = "README.md"
 license = {text = "MIT"}
@@ -101,6 +101,14 @@ runners = [
     "aiosseclient>=0.1.8",
 ]
 
+# Generators module (base - requires user to install their LLM provider)
+generators = []
+
+# Generators with Alquimia support (adapter for Alquimia client)
+generators-alquimia = [
+    "alquimia-client>=0.1.0",
+]
+
 # Cloud storage support
 cloud = [
     "boto3>=1.28.0",
@@ -109,7 +117,7 @@ cloud = [
 
 # Everything
 all = [
-    "alquimia-fair-forge[metrics,runners,cloud]",
+    "alquimia-fair-forge[metrics,runners,generators,generators-alquimia,cloud]",
 ]
 
 # Development tools
@@ -182,6 +190,7 @@ include = [
     "fair_forge/artifacts/**/*",
     "fair_forge/runners/**/*.py",
     "fair_forge/storage/**/*.py",
+    "fair_forge/generators/**/*.py",
     "README.md",
     "LICENSE",
     "CONTRIBUTING.md",
@@ -293,6 +302,7 @@ module = [
     "umap.*",
     "lakefs.*",
     "boto3.*",
+    "alquimia_client.*",
 ]
 ignore_missing_imports = true
 

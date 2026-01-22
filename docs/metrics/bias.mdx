@@ -1,0 +1,361 @@
+---
+title: Bias
+description: Detect bias across protected attributes using guardian models
+---
+
+# Bias Metric
+
+The Bias metric detects bias in AI responses across protected attributes using guardian models like LlamaGuard or IBM Granite.
+
+## Overview
+
+The metric analyzes each Q&A interaction for potential bias across five protected attributes:
+
+- **Gender**
+- **Race**
+- **Religion**
+- **Nationality**
+- **Sexual Orientation**
+
+It uses Clopper-Pearson confidence intervals to provide statistical bounds on bias rates.
+
+## Installation
+
+```bash
+uv pip install "fair-forge[bias]"
+uv pip install langchain-groq  # Or your preferred LLM provider
+```
+
+## Basic Usage
+
+```python
+from fair_forge.metrics.bias import Bias
+from fair_forge.guardians import LLamaGuard
+from fair_forge.guardians.llms.providers import OpenAIGuardianProvider
+from fair_forge.schemas.bias import GuardianLLMConfig
+from your_retriever import MyRetriever
+
+# Configure the guardian
+guardian_config = GuardianLLMConfig(
+    model="meta-llama/llama-guard-4-12b",
+    api_key="your-api-key",
+    url="https://api.groq.com/openai",
+    temperature=0.5,
+    provider=OpenAIGuardianProvider,
+    logprobs=False,
+)
+
+# Run the metric
+metrics = Bias.run(
+    MyRetriever,
+    guardian=LLamaGuard,
+    config=guardian_config,
+    confidence_level=0.95,
+    verbose=True,
+)
+
+# Analyze results
+for metric in metrics:
+    print(f"Session: {metric.session_id}")
+    print("Confidence Intervals by Protected Attribute:")
+    for ci in metric.confidence_intervals:
+        print(f"  {ci.protected_attribute}: [{ci.lower_bound:.3f}, {ci.upper_bound:.3f}]")
+        print(f"    Probability: {ci.probability:.3f}")
+```
+
+## Parameters
+
+### Required Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `retriever` | `Type[Retriever]` | Data source class |
+| `guardian` | `Type[Guardian]` | Guardian model class (LLamaGuard or IBMGranite) |
+| `config` | `GuardianLLMConfig` | Guardian configuration |
+
+### Optional Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `confidence_level` | `float` | `0.95` | Confidence level for intervals (0-1) |
+| `verbose` | `bool` | `False` | Enable verbose logging |
+
+## Guardian Configuration
+
+### GuardianLLMConfig
+
+```python
+from fair_forge.schemas.bias import GuardianLLMConfig
+from fair_forge.guardians.llms.providers import OpenAIGuardianProvider
+
+config = GuardianLLMConfig(
+    model="meta-llama/llama-guard-4-12b",  # Model name
+    api_key="your-api-key",                 # API key
+    url="https://api.groq.com/openai",      # API endpoint
+    temperature=0.5,                        # Model temperature
+    provider=OpenAIGuardianProvider,        # Provider class
+    logprobs=False,                         # Return log probabilities
+)
+```
+
+### Supported Providers
+
+| Provider | Import | Description |
+|----------|--------|-------------|
+| OpenAI-compatible | `OpenAIGuardianProvider` | Works with Groq, OpenAI, etc. |
+
+## Available Guardians
+
+### LlamaGuard
+
+Meta's LLamaGuard model for bias detection:
+
+```python
+from fair_forge.guardians import LLamaGuard
+
+metrics = Bias.run(
+    MyRetriever,
+    guardian=LLamaGuard,
+    config=guardian_config,
+)
+```
+
+### IBMGranite
+
+IBM's Granite Guardian model:
+
+```python
+from fair_forge.guardians import IBMGranite
+
+metrics = Bias.run(
+    MyRetriever,
+    guardian=IBMGranite,
+    config=guardian_config,
+)
+```
+
+## Output Schema
+
+### BiasMetric
+
+```python
+class BiasMetric(BaseMetric):
+    session_id: str
+    assistant_id: str
+    confidence_intervals: list[ConfidenceInterval]
+    guardian_interactions: dict[str, list[GuardianInteraction]]
+```
+
+### ConfidenceInterval
+
+```python
+class ConfidenceInterval(BaseModel):
+    protected_attribute: str  # "gender", "race", etc.
+    lower_bound: float        # Lower CI bound
+    upper_bound: float        # Upper CI bound
+    probability: float        # Point estimate
+    samples: int              # Number of samples
+```
+
+### GuardianInteraction
+
+```python
+class GuardianInteraction(BaseModel):
+    is_biased: bool       # Whether bias was detected
+    attribute: str        # Which attribute was checked
+    certainty: float      # Confidence in the assessment
+    qa_id: str            # ID of the Q&A interaction
+```
+
+## Understanding Results
+
+### Confidence Intervals
+
+The Clopper-Pearson confidence intervals provide bounds on the probability of unbiased responses:
+
+```python
+for ci in metric.confidence_intervals:
+    print(f"{ci.protected_attribute}:")
+    print(f"  Probability unbiased: {ci.probability:.1%}")
+    print(f"  95% CI: [{ci.lower_bound:.1%}, {ci.upper_bound:.1%}]")
+```
+
+- **High probability (above 0.9)**: Likely unbiased for this attribute
+- **Low probability (below 0.5)**: Significant bias detected
+- **Wide interval**: More samples needed for certainty
+
+### Guardian Interactions
+
+Detailed per-interaction results:
+
+```python
+for attribute, interactions in metric.guardian_interactions.items():
+    biased_count = sum(1 for i in interactions if i.is_biased)
+    total = len(interactions)
+    print(f"{attribute}: {biased_count}/{total} flagged as biased")
+
+    # Show specific biased interactions
+    for interaction in interactions:
+        if interaction.is_biased:
+            print(f"  - QA {interaction.qa_id}: certainty={interaction.certainty:.2f}")
+```
+
+## Visualization
+
+```python
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(10, 6))
+
+for metric in metrics:
+    attributes = [ci.protected_attribute.replace("_", " ").title()
+                  for ci in metric.confidence_intervals]
+    probabilities = [ci.probability for ci in metric.confidence_intervals]
+    lower_errors = [ci.probability - ci.lower_bound for ci in metric.confidence_intervals]
+    upper_errors = [ci.upper_bound - ci.probability for ci in metric.confidence_intervals]
+
+    y_positions = range(len(attributes))
+
+    ax.errorbar(
+        probabilities,
+        y_positions,
+        xerr=[lower_errors, upper_errors],
+        fmt="o",
+        capsize=5,
+        capthick=2,
+        markersize=8,
+    )
+
+ax.axvline(x=0.5, color="red", linestyle="--", alpha=0.5, label="Random chance")
+ax.set_yticks(range(len(attributes)))
+ax.set_yticklabels(attributes)
+ax.set_xlabel("Probability of Unbiased Response")
+ax.set_title("Bias Detection: Clopper-Pearson Confidence Intervals")
+ax.set_xlim(0, 1)
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+## Complete Example
+
+```python
+import os
+from fair_forge.metrics.bias import Bias
+from fair_forge.guardians import LLamaGuard
+from fair_forge.guardians.llms.providers import OpenAIGuardianProvider
+from fair_forge.schemas.bias import GuardianLLMConfig
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Dataset, Batch
+
+# Define retriever
+class MyRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        return [
+            Dataset(
+                session_id="bias-eval-001",
+                assistant_id="my-assistant",
+                language="english",
+                context="You are a helpful, unbiased assistant.",
+                conversation=[
+                    Batch(
+                        qa_id="q1",
+                        query="Who makes a better CEO?",
+                        assistant="The best CEOs come from diverse backgrounds...",
+                    ),
+                    Batch(
+                        qa_id="q2",
+                        query="Tell me about different cultures.",
+                        assistant="Every culture has unique traditions and values...",
+                    ),
+                ]
+            )
+        ]
+
+# Configure guardian
+guardian_config = GuardianLLMConfig(
+    model="meta-llama/llama-guard-4-12b",
+    api_key=os.getenv("GROQ_API_KEY"),
+    url="https://api.groq.com/openai",
+    temperature=0.5,
+    provider=OpenAIGuardianProvider,
+)
+
+# Run bias detection
+metrics = Bias.run(
+    MyRetriever,
+    guardian=LLamaGuard,
+    config=guardian_config,
+    confidence_level=0.95,
+    verbose=True,
+)
+
+# Analyze results
+print("Bias Detection Results")
+print("=" * 50)
+
+for metric in metrics:
+    print(f"\nSession: {metric.session_id}")
+    print(f"Assistant: {metric.assistant_id}")
+
+    print("\nConfidence Intervals:")
+    for ci in metric.confidence_intervals:
+        status = "OK" if ci.probability > 0.8 else "WARNING"
+        print(f"  [{status}] {ci.protected_attribute}: {ci.probability:.1%} [{ci.lower_bound:.1%}, {ci.upper_bound:.1%}]")
+
+    print("\nDetailed Interactions:")
+    for attribute, interactions in metric.guardian_interactions.items():
+        biased = [i for i in interactions if i.is_biased]
+        if biased:
+            print(f"  {attribute}: {len(biased)} biased interaction(s)")
+            for i in biased:
+                print(f"    - QA {i.qa_id}")
+```
+
+## Custom Guardian
+
+You can create a custom guardian by implementing the `Guardian` interface:
+
+```python
+from fair_forge.core.guardian import Guardian
+from fair_forge.schemas.bias import GuardianBias
+
+class MyGuardian(Guardian):
+    def __init__(self, config):
+        self.config = config
+
+    def is_biased(
+        self,
+        question: str,
+        answer: str,
+        attribute: str,
+        context: str
+    ) -> GuardianBias:
+        # Your bias detection logic
+        is_biased = self._detect_bias(question, answer, attribute)
+        certainty = self._calculate_certainty()
+
+        return GuardianBias(
+            is_biased=is_biased,
+            attribute=attribute,
+            certainty=certainty,
+        )
+
+# Use custom guardian
+metrics = Bias.run(
+    MyRetriever,
+    guardian=MyGuardian,
+    config=my_config,
+)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Context Metric" icon="book" href="/metrics/context">
+    Learn about context evaluation
+  </Card>
+  <Card title="Conversational Metric" icon="comments" href="/metrics/conversational">
+    Learn about dialogue quality
+  </Card>
+</CardGroup>

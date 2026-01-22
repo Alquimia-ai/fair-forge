@@ -1,0 +1,375 @@
+---
+title: BestOf
+description: Tournament-style evaluation to compare multiple AI assistants
+---
+
+# BestOf Metric
+
+The BestOf metric runs tournament-style comparisons between multiple AI assistants to determine which performs best.
+
+## Overview
+
+The metric:
+
+- Pairs assistants in elimination rounds
+- Uses an LLM judge to evaluate each matchup
+- Advances winners until a final champion is determined
+- Handles ties (both advance) and byes (odd number of contestants)
+
+## Installation
+
+```bash
+uv pip install "fair-forge[bestof]"
+uv pip install langchain-groq  # Or your preferred LLM provider
+```
+
+## Basic Usage
+
+```python
+from fair_forge.metrics.best_of import BestOf
+from langchain_groq import ChatGroq
+from your_retriever import MultiAssistantRetriever
+
+# Initialize the judge model
+judge_model = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    api_key="your-api-key",
+    temperature=0.0,
+)
+
+# Run the tournament
+metrics = BestOf.run(
+    MultiAssistantRetriever,
+    model=judge_model,
+    use_structured_output=True,
+    criteria="Overall response quality, helpfulness, and clarity",
+    verbose=True,
+)
+
+# Get the winner
+tournament = metrics[0]
+print(f"Tournament Winner: {tournament.bestof_winner_id}")
+```
+
+## Parameters
+
+### Required Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `retriever` | `Type[Retriever]` | Data source with multiple assistants |
+| `model` | `BaseChatModel` | LangChain-compatible judge model |
+
+### Optional Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `criteria` | `str` | `"BestOf"` | Evaluation criteria for judging |
+| `use_structured_output` | `bool` | `False` | Use LangChain structured output |
+| `bos_json_clause` | `str` | `"```json"` | JSON block start marker |
+| `eos_json_clause` | `str` | `"```"` | JSON block end marker |
+| `verbose` | `bool` | `False` | Enable verbose logging |
+
+## Data Requirements
+
+BestOf requires datasets from **multiple assistants** answering the **same questions**:
+
+```python
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Dataset, Batch
+
+class MultiAssistantRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        questions = [
+            "What are the benefits of renewable energy?",
+            "Explain machine learning in simple terms.",
+        ]
+
+        assistants = {
+            "assistant_a": ["Response A1...", "Response A2..."],
+            "assistant_b": ["Response B1...", "Response B2..."],
+            "assistant_c": ["Response C1...", "Response C2..."],
+            "assistant_d": ["Response D1...", "Response D2..."],
+        }
+
+        datasets = []
+        for assistant_id, responses in assistants.items():
+            batches = [
+                Batch(qa_id=f"q{i}", query=q, assistant=r)
+                for i, (q, r) in enumerate(zip(questions, responses))
+            ]
+            datasets.append(Dataset(
+                session_id=f"eval-{assistant_id}",
+                assistant_id=assistant_id,
+                language="english",
+                context="",
+                conversation=batches,
+            ))
+
+        return datasets
+```
+
+## Output Schema
+
+### BestOfMetric
+
+```python
+class BestOfMetric(BaseMetric):
+    session_id: str
+    assistant_id: str
+    bestof_winner_id: str              # Final tournament winner
+    bestof_contests: list[BestOfContest]  # All matchup results
+```
+
+### BestOfContest
+
+```python
+class BestOfContest(BaseModel):
+    round: int            # Tournament round number
+    left_id: str          # First contestant ID
+    right_id: str         # Second contestant ID
+    winner_id: str        # Winner of this matchup
+    verdict: str          # Brief summary of decision
+    confidence: float     # Judge's confidence (0-1)
+    reasoning: dict       # Detailed analysis
+```
+
+## Tournament Structure
+
+### Example: 4 Contestants
+
+```
+Round 1:
+  assistant_alpha vs assistant_beta    -> winner: assistant_alpha
+  assistant_gamma vs assistant_delta   -> winner: assistant_gamma
+
+Round 2 (Finals):
+  assistant_alpha vs assistant_gamma   -> winner: assistant_gamma
+
+Tournament Winner: assistant_gamma
+```
+
+### Special Cases
+
+**Ties**: Both assistants advance to the next round
+**Byes**: With odd numbers, one assistant gets a free pass
+
+## Complete Example
+
+```python
+import os
+import json
+from pathlib import Path
+from fair_forge.metrics.best_of import BestOf
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Dataset, Batch
+from langchain_groq import ChatGroq
+
+class TournamentRetriever(Retriever):
+    """Retriever with 4 assistants of varying quality."""
+
+    def load_dataset(self) -> list[Dataset]:
+        # Same questions for all assistants
+        questions = [
+            "What are the benefits of renewable energy?",
+            "Explain machine learning in simple terms.",
+            "What are best practices for code reviews?",
+        ]
+
+        # Different quality responses
+        assistants_responses = {
+            "assistant_alpha": [
+                "Renewable energy offers reduced emissions, lower long-term costs, and energy independence.",
+                "Machine learning is a type of AI where computers learn patterns from data to make predictions.",
+                "Good code reviews include checking for bugs, readability, and following coding standards.",
+            ],
+            "assistant_beta": [
+                "Renewable energy is good. It doesn't pollute as much.",
+                "ML is statistics with more computing power.",
+                "Just check if the code works.",
+            ],
+            "assistant_gamma": [
+                "Renewable energy provides environmental benefits (reduced greenhouse gases), economic advantages (job creation, lower operational costs), and strategic benefits (energy security, reduced dependence on imports).",
+                "Machine learning is like teaching a computer by showing examples instead of giving explicit rules. It learns patterns and can then apply them to new situations.",
+                "Effective code reviews focus on: 1) Correctness, 2) Design and architecture, 3) Code clarity, 4) Test coverage, 5) Security implications.",
+            ],
+            "assistant_delta": [
+                "Sun power good. Wind power good. No smoke.",
+                "Computer learns things.",
+                "Review code. Find bugs.",
+            ],
+        }
+
+        datasets = []
+        for assistant_id, responses in assistants_responses.items():
+            batches = [
+                Batch(qa_id=f"q{i+1}", query=q, assistant=r)
+                for i, (q, r) in enumerate(zip(questions, responses))
+            ]
+            datasets.append(Dataset(
+                session_id=f"tournament-{assistant_id}",
+                assistant_id=assistant_id,
+                language="english",
+                context="",
+                conversation=batches,
+            ))
+
+        return datasets
+
+# Initialize judge
+judge = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    api_key=os.getenv("GROQ_API_KEY"),
+    temperature=0.0,
+)
+
+# Run tournament
+metrics = BestOf.run(
+    TournamentRetriever,
+    model=judge,
+    use_structured_output=True,
+    criteria="Overall response quality, helpfulness, accuracy, and clarity",
+    verbose=True,
+)
+
+# Analyze results
+tournament = metrics[0]
+
+print(f"Tournament Winner: {tournament.bestof_winner_id}")
+print(f"\nTotal Contests: {len(tournament.bestof_contests)}")
+print("\n" + "=" * 60)
+
+# Group by round
+rounds = {}
+for contest in tournament.bestof_contests:
+    if contest.round not in rounds:
+        rounds[contest.round] = []
+    rounds[contest.round].append(contest)
+
+for round_num in sorted(rounds.keys()):
+    print(f"\nRound {round_num}:")
+    print("-" * 40)
+    for contest in rounds[round_num]:
+        print(f"  {contest.left_id} vs {contest.right_id}")
+        print(f"    Winner: {contest.winner_id}")
+        print(f"    Confidence: {contest.confidence:.2f}")
+        print(f"    Verdict: {contest.verdict[:80]}...")
+```
+
+## Visualization
+
+### Tournament Bracket
+
+```python
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+
+fig, ax = plt.subplots(figsize=(14, 8))
+
+tournament = metrics[0]
+num_rounds = max(c.round for c in tournament.bestof_contests)
+contestants = sorted({ds.assistant_id for ds in TournamentRetriever().load_dataset()})
+
+# Position contestants
+y_positions = {c: (i + 0.5) * 2 for i, c in enumerate(contestants)}
+
+# Draw initial positions
+for contestant in contestants:
+    ax.text(0.5, y_positions[contestant], contestant,
+            ha='right', va='center', fontsize=10, fontweight='bold')
+
+# Draw contests
+colors = {'winner': 'green', 'loser': 'red'}
+for contest in tournament.bestof_contests:
+    x = contest.round * 3
+    y1 = y_positions[contest.left_id]
+    y2 = y_positions[contest.right_id]
+
+    left_color = colors['winner'] if contest.winner_id == contest.left_id else colors['loser']
+    right_color = colors['winner'] if contest.winner_id == contest.right_id else colors['loser']
+
+    ax.plot([x-1, x], [y1, y1], color=left_color, linewidth=2)
+    ax.plot([x-1, x], [y2, y2], color=right_color, linewidth=2)
+    ax.plot([x, x], [y1, y2], 'k-', linewidth=1)
+
+# Mark winner
+ax.text(num_rounds * 3 + 1, sum(y_positions.values())/len(y_positions),
+        f"Winner:\n{tournament.bestof_winner_id}",
+        ha='center', va='center', fontsize=12, fontweight='bold',
+        bbox=dict(boxstyle='round', facecolor='gold', alpha=0.8))
+
+ax.axis('off')
+ax.set_title('Tournament Bracket', fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+```
+
+## Evaluation Criteria
+
+Customize the `criteria` parameter to focus on specific aspects:
+
+```python
+# General quality
+criteria = "Overall response quality, helpfulness, and clarity"
+
+# Technical accuracy
+criteria = "Technical accuracy, completeness, and correctness"
+
+# User experience
+criteria = "User friendliness, clarity, and actionability"
+
+# Domain-specific
+criteria = "Medical accuracy, safety considerations, and clarity of instructions"
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Model Selection" icon="list-check">
+    Compare multiple LLMs to find the best for your use case
+  </Card>
+  <Card title="A/B Testing" icon="code-compare">
+    Evaluate different prompt strategies or configurations
+  </Card>
+  <Card title="Quality Benchmarking" icon="chart-line">
+    Establish baseline quality across assistant versions
+  </Card>
+  <Card title="Continuous Improvement" icon="arrows-rotate">
+    Track improvements between model versions
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Consistent Questions">
+    Ensure all assistants answer the exact same questions for fair comparison.
+  </Accordion>
+
+  <Accordion title="Include Diverse Queries">
+    Test different types of interactions:
+    - Factual questions
+    - Creative tasks
+    - Problem-solving
+    - Multi-turn conversations
+  </Accordion>
+
+  <Accordion title="Define Clear Criteria">
+    Be specific about what matters for your use case in the `criteria` parameter.
+  </Accordion>
+
+  <Accordion title="Use Strong Judge Models">
+    Larger models (GPT-4, Claude-3, Llama-3-70B) provide more reliable judgments.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Generators" icon="wand-magic-sparkles" href="/generators/overview">
+    Generate test datasets automatically
+  </Card>
+  <Card title="Runners" icon="play" href="/runners/overview">
+    Execute tests against AI systems
+  </Card>
+</CardGroup>

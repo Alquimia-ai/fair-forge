@@ -1,0 +1,231 @@
+---
+title: Context Loaders
+description: Load and chunk documentation for test generation
+---
+
+# Context Loaders
+
+Context loaders prepare your documentation for test generation by parsing and chunking content.
+
+## Markdown Loader
+
+The primary loader for markdown documentation:
+
+```python
+from fair_forge.generators import create_markdown_loader
+
+loader = create_markdown_loader(
+    max_chunk_size=2000,
+    header_levels=[1, 2, 3],
+)
+
+# Load and chunk content
+chunks = loader.load("./documentation.md")
+
+for chunk in chunks:
+    print(f"Chunk: {chunk.chunk_id}")
+    print(f"Content: {chunk.content[:100]}...")
+```
+
+## Parameters
+
+### create_markdown_loader
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `max_chunk_size` | `int` | `2000` | Maximum characters per chunk |
+| `header_levels` | `list[int]` | `[1, 2, 3]` | Header levels to split on |
+| `min_chunk_size` | `int` | `100` | Minimum characters per chunk |
+
+## Chunk Structure
+
+Each chunk contains:
+
+```python
+class ContentChunk:
+    chunk_id: str      # Unique identifier
+    content: str       # Text content
+    metadata: dict     # Additional metadata
+```
+
+The `chunk_id` is derived from the file name and headers:
+
+```
+my_docs_getting_started_installation
+└── file ─┘ └─ header 1 ─┘ └ header 2 ┘
+```
+
+## Examples
+
+### Basic Loading
+
+```python
+from fair_forge.generators import create_markdown_loader
+
+loader = create_markdown_loader(max_chunk_size=2000)
+
+# Load single file
+chunks = loader.load("./README.md")
+print(f"Created {len(chunks)} chunks")
+
+# Load directory
+chunks = loader.load("./docs/")
+print(f"Created {len(chunks)} chunks from all .md files")
+```
+
+### Custom Chunk Sizes
+
+```python
+# Small chunks for focused content
+loader = create_markdown_loader(
+    max_chunk_size=500,
+    min_chunk_size=50,
+)
+
+# Large chunks for comprehensive sections
+loader = create_markdown_loader(
+    max_chunk_size=4000,
+    min_chunk_size=500,
+)
+```
+
+### Header-Based Splitting
+
+```python
+# Split only on H1 and H2
+loader = create_markdown_loader(
+    header_levels=[1, 2],
+)
+
+# Split on all header levels
+loader = create_markdown_loader(
+    header_levels=[1, 2, 3, 4, 5, 6],
+)
+```
+
+## With Generator
+
+```python
+from fair_forge.generators import BaseGenerator, create_markdown_loader
+from langchain_groq import ChatGroq
+
+# Create loader
+loader = create_markdown_loader(
+    max_chunk_size=2000,
+    header_levels=[1, 2, 3],
+)
+
+# Preview chunks
+chunks = loader.load("./docs/api.md")
+print(f"Will generate from {len(chunks)} chunks:")
+for chunk in chunks:
+    print(f"  - {chunk.chunk_id}: {len(chunk.content)} chars")
+
+# Use with generator
+model = ChatGroq(model="llama-3.1-8b-instant")
+generator = BaseGenerator(model=model, use_structured_output=True)
+
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs/api.md",
+    assistant_id="api-assistant",
+    num_queries_per_chunk=3,
+)
+```
+
+## Document Structure Best Practices
+
+### Good Structure
+
+```markdown
+# Product Documentation
+
+Overview content here...
+
+## Getting Started
+
+Introduction to getting started...
+
+### Installation
+
+Step-by-step installation guide...
+
+### Configuration
+
+Configuration options...
+
+## API Reference
+
+API documentation...
+
+### Authentication
+
+Auth details...
+```
+
+This creates logical, well-sized chunks.
+
+### Avoid
+
+```markdown
+# Everything in One Section
+
+Very long content without any headers...
+thousands of lines...
+no structure...
+```
+
+This results in one huge chunk or arbitrary splitting.
+
+## Supported Formats
+
+| Format | Extension | Support |
+|--------|-----------|---------|
+| Markdown | `.md` | Full support |
+| MDX | `.mdx` | Parsed as markdown |
+
+## Custom Loaders
+
+Create custom loaders for other formats:
+
+```python
+from fair_forge.generators.context_loaders.base import BaseContextLoader
+from fair_forge.generators.schemas import ContentChunk
+
+class CustomLoader(BaseContextLoader):
+    def load(self, source: str) -> list[ContentChunk]:
+        # Your loading logic
+        chunks = []
+
+        # Parse your content
+        content = self._read_content(source)
+        sections = self._split_into_sections(content)
+
+        for i, section in enumerate(sections):
+            chunks.append(ContentChunk(
+                chunk_id=f"section_{i}",
+                content=section,
+                metadata={"source": source},
+            ))
+
+        return chunks
+
+# Use with generator
+datasets = await generator.generate_dataset(
+    context_loader=CustomLoader(),
+    source="./data.custom",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=3,
+)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Strategies" icon="sitemap" href="/generators/strategies">
+    Learn about chunk selection strategies
+  </Card>
+  <Card title="BaseGenerator" icon="gear" href="/generators/base-generator">
+    Learn about the generator class
+  </Card>
+</CardGroup>

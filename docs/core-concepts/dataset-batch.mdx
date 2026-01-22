@@ -1,0 +1,295 @@
+---
+title: Dataset & Batch
+description: Understanding the core data structures in Fair Forge
+---
+
+# Dataset & Batch
+
+Fair Forge uses two primary data structures to represent conversation data: `Dataset` and `Batch`.
+
+## Dataset
+
+A `Dataset` represents a complete conversation session with an AI assistant.
+
+```python
+from fair_forge.schemas.common import Dataset
+
+dataset = Dataset(
+    session_id="session-123",
+    assistant_id="my-assistant-v1",
+    language="english",
+    context="You are a helpful customer service assistant.",
+    conversation=[...],  # list[Batch]
+)
+```
+
+### Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `session_id` | `str` | Yes | Unique identifier for the conversation session |
+| `assistant_id` | `str` | Yes | Identifier of the assistant being evaluated |
+| `language` | `str \| None` | No | Language of the conversation (e.g., "english", "spanish") |
+| `context` | `str` | Yes | System context/instructions provided to the assistant |
+| `conversation` | `list[Batch]` | Yes | List of Q&A interactions in the conversation |
+
+### Example
+
+```python
+from fair_forge.schemas.common import Dataset, Batch
+
+dataset = Dataset(
+    session_id="customer-support-001",
+    assistant_id="support-bot-v2",
+    language="english",
+    context="""You are a helpful customer service assistant for TechStore.
+    Be polite, concise, and always offer to help further.""",
+    conversation=[
+        Batch(
+            qa_id="q1",
+            query="Hi, I need help with my order",
+            assistant="Hello! I'd be happy to help with your order. Could you please provide your order number?",
+            ground_truth_assistant="Greet the customer and ask for order number.",
+        ),
+        Batch(
+            qa_id="q2",
+            query="It's ORDER-12345",
+            assistant="Thank you! I found your order. It was shipped yesterday and should arrive by Friday. Is there anything else I can help with?",
+            ground_truth_assistant="Look up the order and provide shipping status.",
+        ),
+    ],
+)
+```
+
+## Batch
+
+A `Batch` represents a single question-answer interaction within a conversation.
+
+```python
+from fair_forge.schemas.common import Batch
+
+batch = Batch(
+    qa_id="q1",
+    query="What is the capital of France?",
+    assistant="The capital of France is Paris.",
+    ground_truth_assistant="Paris is the capital of France.",
+)
+```
+
+### Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `qa_id` | `str` | Yes | Unique identifier for this interaction |
+| `query` | `str` | Yes | User's question or message |
+| `assistant` | `str` | Yes | Assistant's response |
+| `ground_truth_assistant` | `str \| None` | No | Expected/ideal response for comparison |
+| `observation` | `str \| None` | No | Additional notes or observations |
+| `agentic` | `dict \| None` | No | Metadata about the interaction |
+| `ground_truth_agentic` | `dict \| None` | No | Expected metadata |
+| `logprobs` | `dict \| None` | No | Log probabilities from the model |
+
+### Field Details
+
+<AccordionGroup>
+  <Accordion title="qa_id">
+    A unique identifier for the interaction within the conversation. Use a consistent naming scheme:
+    ```python
+    qa_id="q1"           # Simple numbering
+    qa_id="order-inquiry-001"  # Descriptive naming
+    qa_id="session123_turn5"   # Session-based
+    ```
+  </Accordion>
+
+  <Accordion title="query">
+    The user's input message or question. This is what the assistant is responding to:
+    ```python
+    query="What are your business hours?"
+    query="Can you help me debug this Python code?"
+    query="Tell me a joke about programming"
+    ```
+  </Accordion>
+
+  <Accordion title="assistant">
+    The assistant's actual response. This is what gets evaluated:
+    ```python
+    assistant="Our business hours are Monday to Friday, 9 AM to 5 PM EST."
+    ```
+  </Accordion>
+
+  <Accordion title="ground_truth_assistant">
+    The expected or ideal response. Used by some metrics for comparison:
+    ```python
+    ground_truth_assistant="Mon-Fri 9-5 EST"
+    ```
+    This is optional but recommended for metrics like Context and Conversational.
+  </Accordion>
+
+  <Accordion title="observation">
+    Additional context or notes about the interaction:
+    ```python
+    observation="Customer seems frustrated in this exchange"
+    observation="This is a follow-up to the previous question"
+    ```
+  </Accordion>
+
+  <Accordion title="agentic">
+    Metadata dictionary for storing additional information:
+    ```python
+    agentic={
+        "difficulty": "medium",
+        "query_type": "factual",
+        "chunk_id": "doc_section_3",
+        "turn_number": 2,
+    }
+    ```
+    Used by generators to store query metadata.
+  </Accordion>
+
+  <Accordion title="logprobs">
+    Log probabilities from the model (if available):
+    ```python
+    logprobs={
+        "tokens": ["The", "capital", "is", "Paris"],
+        "token_logprobs": [-0.1, -0.05, -0.02, -0.01],
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## JSON Format
+
+The data structures can be easily serialized to/from JSON:
+
+### Dataset JSON
+
+```json
+{
+  "session_id": "session-123",
+  "assistant_id": "my-assistant",
+  "language": "english",
+  "context": "You are a helpful assistant.",
+  "conversation": [
+    {
+      "qa_id": "q1",
+      "query": "What is AI?",
+      "assistant": "AI stands for Artificial Intelligence...",
+      "ground_truth_assistant": "Artificial Intelligence is...",
+      "observation": null,
+      "agentic": null,
+      "ground_truth_agentic": null,
+      "logprobs": null
+    }
+  ]
+}
+```
+
+### Loading from JSON
+
+```python
+import json
+from fair_forge.schemas.common import Dataset
+
+# Load from file
+with open('data.json') as f:
+    data = json.load(f)
+
+# Validate and create Dataset
+dataset = Dataset.model_validate(data)
+
+# Or load multiple datasets
+datasets = [Dataset.model_validate(d) for d in data_list]
+```
+
+### Saving to JSON
+
+```python
+import json
+from fair_forge.schemas.common import Dataset
+
+# Convert to dict
+data = dataset.model_dump()
+
+# Save to file
+with open('output.json', 'w') as f:
+    json.dump(data, f, indent=2)
+```
+
+## Pydantic Validation
+
+Both `Dataset` and `Batch` are Pydantic models with built-in validation:
+
+```python
+from pydantic import ValidationError
+from fair_forge.schemas.common import Dataset, Batch
+
+# This will raise ValidationError - missing required field
+try:
+    batch = Batch(query="Hello")  # Missing qa_id and assistant
+except ValidationError as e:
+    print(e)
+
+# This works - minimal required fields
+batch = Batch(
+    qa_id="q1",
+    query="Hello",
+    assistant="Hi there!",
+)
+
+# Optional fields default to None
+print(batch.ground_truth_assistant)  # None
+print(batch.observation)  # None
+```
+
+## Usage with Metrics
+
+Different metrics use different fields:
+
+| Metric | Key Fields Used |
+|--------|----------------|
+| **Toxicity** | `assistant`, `session_id`, `assistant_id` |
+| **Bias** | `query`, `assistant`, `context` |
+| **Context** | `query`, `assistant`, `context`, `ground_truth_assistant` |
+| **Conversational** | `query`, `assistant`, `observation`, `ground_truth_assistant` |
+| **Humanity** | `assistant`, `ground_truth_assistant` |
+| **BestOf** | `query`, `assistant` (across multiple datasets) |
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Descriptive IDs" icon="tag">
+    Choose meaningful `qa_id` values that help identify issues:
+    ```python
+    qa_id="billing-refund-q3"
+    ```
+  </Card>
+  <Card title="Include Ground Truth" icon="check">
+    When possible, include `ground_truth_assistant` for better evaluation:
+    ```python
+    ground_truth_assistant="Expected response..."
+    ```
+  </Card>
+  <Card title="Set Context Properly" icon="file-text">
+    The `context` field should contain system instructions:
+    ```python
+    context="You are a helpful, harmless assistant..."
+    ```
+  </Card>
+  <Card title="Use Metadata" icon="database">
+    Store useful metadata in `agentic` for analysis:
+    ```python
+    agentic={"category": "support", "priority": "high"}
+    ```
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Statistical Modes" icon="calculator" href="/core-concepts/statistical-modes">
+    Learn about Frequentist vs Bayesian analysis
+  </Card>
+  <Card title="Metrics Overview" icon="chart-pie" href="/metrics/overview">
+    See how metrics use these structures
+  </Card>
+</CardGroup>

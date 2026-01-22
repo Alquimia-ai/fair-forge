@@ -1,0 +1,192 @@
+---
+title: Installation
+description: Install Fair Forge and its dependencies
+---
+
+# Installation
+
+Fair Forge uses a modular dependency system, allowing you to install only the components you need.
+
+## Requirements
+
+- Python 3.10 or higher
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+
+## Basic Installation
+
+<CodeGroup>
+```bash uv (Recommended)
+uv pip install fair-forge
+```
+
+```bash pip
+pip install fair-forge
+```
+</CodeGroup>
+
+## Optional Dependencies
+
+Fair Forge provides optional dependency groups for each metric and feature:
+
+### Metrics
+
+| Extra | Description | Dependencies |
+|-------|-------------|--------------|
+| `toxicity` | Toxicity metric with clustering | sentence-transformers, hdbscan, umap-learn |
+| `bias` | Bias metric with guardian models | openai, transformers |
+| `context` | Context metric with LLM judge | langchain-core |
+| `conversational` | Conversational metric | langchain-core |
+| `humanity` | Humanity metric with NRC lexicon | (included in core) |
+| `bestof` | BestOf tournament metric | langchain-core |
+
+### Features
+
+| Extra | Description | Dependencies |
+|-------|-------------|--------------|
+| `generators` | Synthetic dataset generation | langchain-core, transformers |
+| `generators-alquimia` | Generators with Alquimia support | langchain-core, transformers |
+| `runners` | Test execution runners | httpx, asyncio |
+| `cloud` | Cloud storage backends | lakefs-sdk |
+
+### Combined Extras
+
+| Extra | Description |
+|-------|-------------|
+| `all` | All metrics and features |
+| `dev` | Development dependencies (pytest, ruff, mypy) |
+
+## Installation Examples
+
+<CodeGroup>
+```bash Single Metric
+# Install with toxicity metric support
+uv pip install "fair-forge[toxicity]"
+```
+
+```bash Multiple Metrics
+# Install multiple metrics
+uv pip install "fair-forge[toxicity,bias,context]"
+```
+
+```bash Full Installation
+# Install everything
+uv pip install "fair-forge[all]"
+```
+
+```bash Generators + Runners
+# Install for test generation and execution
+uv pip install "fair-forge[generators,runners]"
+```
+</CodeGroup>
+
+## LLM Provider Dependencies
+
+Several metrics require LangChain-compatible chat models. Install your preferred provider:
+
+<CodeGroup>
+```bash Groq (Fast & Free Tier)
+uv pip install langchain-groq
+```
+
+```bash OpenAI
+uv pip install langchain-openai
+```
+
+```bash Google Gemini
+uv pip install langchain-google-genai
+```
+
+```bash Anthropic
+uv pip install langchain-anthropic
+```
+
+```bash Ollama (Local)
+uv pip install langchain-ollama
+```
+</CodeGroup>
+
+## Development Installation
+
+For contributing to Fair Forge:
+
+```bash
+# Clone the repository
+git clone https://github.com/Alquimia-ai/fair-forge.git
+cd fair-forge
+
+# Install with development dependencies
+uv sync
+
+# Run tests
+uv run pytest
+
+# Run linting
+uv run ruff check .
+uv run ruff format .
+
+# Run type checking
+uv run mypy fair_forge
+```
+
+## Verifying Installation
+
+```python
+import fair_forge
+
+# Check version
+print(f"Fair Forge version: {fair_forge.__version__}")
+
+# Verify imports
+from fair_forge.metrics.toxicity import Toxicity
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Dataset, Batch
+
+print("Installation successful!")
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="ImportError: No module named 'sentence_transformers'">
+    Install the toxicity extras:
+    ```bash
+    uv pip install "fair-forge[toxicity]"
+    ```
+  </Accordion>
+
+  <Accordion title="ImportError: No module named 'langchain_groq'">
+    Install your preferred LLM provider:
+    ```bash
+    uv pip install langchain-groq
+    ```
+  </Accordion>
+
+  <Accordion title="CUDA/GPU issues with sentence-transformers">
+    For CPU-only installation:
+    ```bash
+    uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+    uv pip install "fair-forge[toxicity]"
+    ```
+  </Accordion>
+
+  <Accordion title="Python version incompatibility">
+    Ensure you're using Python 3.10+:
+    ```bash
+    python --version
+    # If needed, use pyenv to install a compatible version
+    pyenv install 3.11.0
+    pyenv local 3.11.0
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Run your first evaluation
+  </Card>
+  <Card title="Core Concepts" icon="lightbulb" href="/core-concepts/architecture">
+    Understand the architecture
+  </Card>
+</CardGroup>

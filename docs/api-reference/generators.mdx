@@ -1,0 +1,122 @@
+---
+title: Generators API
+description: API reference for Fair Forge generators
+---
+
+# Generators API Reference
+
+## BaseGenerator
+
+```python
+from fair_forge.generators import BaseGenerator
+```
+
+### Constructor
+
+```python
+def __init__(
+    self,
+    model: BaseChatModel,
+    use_structured_output: bool = False,
+):
+    pass
+```
+
+### generate_dataset()
+
+```python
+async def generate_dataset(
+    self,
+    context_loader: BaseContextLoader,
+    source: str,
+    assistant_id: str,
+    num_queries_per_chunk: int = 3,
+    language: str = "english",
+    conversation_mode: bool = False,
+    selection_strategy: SelectionStrategy | None = None,
+    seed_examples: list[str] | None = None,
+) -> list[Dataset]
+```
+
+---
+
+## Context Loaders
+
+### create_markdown_loader()
+
+```python
+from fair_forge.generators import create_markdown_loader
+
+def create_markdown_loader(
+    max_chunk_size: int = 2000,
+    min_chunk_size: int = 100,
+    header_levels: list[int] = [1, 2, 3],
+) -> BaseContextLoader
+```
+
+### BaseContextLoader
+
+```python
+from fair_forge.generators.context_loaders.base import BaseContextLoader
+
+class BaseContextLoader(ABC):
+    @abstractmethod
+    def load(self, source: str) -> list[ContentChunk]:
+        pass
+```
+
+### ContentChunk
+
+```python
+class ContentChunk:
+    chunk_id: str
+    content: str
+    metadata: dict
+```
+
+---
+
+## Selection Strategies
+
+### SequentialStrategy
+
+```python
+from fair_forge.generators import SequentialStrategy
+
+class SequentialStrategy:
+    """Process all chunks sequentially into a single dataset."""
+    pass
+```
+
+### RandomSamplingStrategy
+
+```python
+from fair_forge.generators import RandomSamplingStrategy
+
+class RandomSamplingStrategy:
+    def __init__(
+        self,
+        num_samples: int,
+        chunks_per_sample: int,
+        seed: int | None = None,
+    ):
+        pass
+```
+
+---
+
+## Generated Output
+
+### Batch Metadata
+
+Generated batches include metadata in `agentic`:
+
+```python
+batch.agentic = {
+    "difficulty": str,      # "easy", "medium", "hard"
+    "query_type": str,      # "factual", "inferential", "comparative", "application"
+    "chunk_id": str,        # Source chunk ID
+    "turn_number": int,     # (conversation mode) Turn number
+    "builds_on": str,       # (conversation mode) Previous query reference
+}
+```
