@@ -1,0 +1,226 @@
+---
+title: Quickstart
+description: Get started with Fair Forge in minutes
+---
+
+# Quickstart
+
+This guide will help you get started with Fair Forge and run your first AI evaluation.
+
+## Prerequisites
+
+- Python 3.10 or higher
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+
+## Installation
+
+<CodeGroup>
+```bash uv (Recommended)
+# Install core package
+uv pip install alquimia-fair-forge
+
+# Install with specific metric dependencies
+uv pip install "alquimia-fair-forge[toxicity]"
+uv pip install "alquimia-fair-forge[bias]"
+uv pip install "alquimia-fair-forge[context]"
+```
+
+```bash pip
+# Install core package
+pip install alquimia-fair-forge
+
+# Install with all dependencies
+pip install "alquimia-fair-forge[all]"
+```
+</CodeGroup>
+
+## Step 1: Create a Retriever
+
+The first step is to create a retriever that loads your conversation data. A retriever is a class that inherits from `Retriever` and implements the `load_dataset()` method.
+
+```python
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Dataset, Batch
+
+class MyRetriever(Retriever):
+    """Custom retriever to load your AI conversation data."""
+
+    def load_dataset(self) -> list[Dataset]:
+        return [
+            Dataset(
+                session_id="evaluation-session-1",
+                assistant_id="my-assistant-v1",
+                language="english",
+                context="You are a helpful customer service assistant.",
+                conversation=[
+                    Batch(
+                        qa_id="q1",
+                        query="What are your return policies?",
+                        assistant="Our return policy allows returns within 30 days...",
+                        ground_truth_assistant="Returns are accepted within 30 days with receipt.",
+                    ),
+                    Batch(
+                        qa_id="q2",
+                        query="How can I track my order?",
+                        assistant="You can track your order by logging into your account...",
+                        ground_truth_assistant="Log into your account and visit Order History.",
+                    ),
+                ]
+            )
+        ]
+```
+
+## Step 2: Run a Metric
+
+Once you have a retriever, you can run any metric. Here's an example using the Context metric:
+
+```python
+from fair_forge.metrics.context import Context
+from langchain_groq import ChatGroq
+
+# Initialize a judge model (any LangChain-compatible model)
+judge_model = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    api_key="your-api-key",
+    temperature=0.0,
+)
+
+# Run the Context metric
+metrics = Context.run(
+    MyRetriever,
+    model=judge_model,
+    use_structured_output=True,
+    verbose=True,
+)
+
+# Analyze results
+for metric in metrics:
+    print(f"QA ID: {metric.qa_id}")
+    print(f"Context Awareness: {metric.context_awareness}")
+    print(f"Insight: {metric.context_insight}")
+    print("-" * 40)
+```
+
+## Step 3: Analyze Results
+
+Each metric returns a list of results. The structure depends on the metric type:
+
+<Tabs>
+  <Tab title="Context">
+    ```python
+    for metric in metrics:
+        print(f"QA: {metric.qa_id}")
+        print(f"Score: {metric.context_awareness}")  # 0-1 scale
+        print(f"Insight: {metric.context_insight}")
+    ```
+  </Tab>
+  <Tab title="Toxicity">
+    ```python
+    for metric in metrics:
+        print(f"Session: {metric.session_id}")
+        print(f"Cluster Profiling: {metric.cluster_profiling}")
+        if metric.group_profiling:
+            gp = metric.group_profiling.frequentist
+            print(f"DIDT Score: {gp.DIDT}")
+    ```
+  </Tab>
+  <Tab title="Conversational">
+    ```python
+    for metric in metrics:
+        print(f"QA: {metric.qa_id}")
+        print(f"Quality Maxim: {metric.conversational_quality_maxim}")
+        print(f"Quantity Maxim: {metric.conversational_quantity_maxim}")
+        print(f"Relation Maxim: {metric.conversational_relation_maxim}")
+        print(f"Manner Maxim: {metric.conversational_manner_maxim}")
+    ```
+  </Tab>
+</Tabs>
+
+## Complete Example
+
+Here's a complete example that evaluates an AI assistant using multiple metrics:
+
+```python
+import os
+from fair_forge.metrics.context import Context
+from fair_forge.metrics.conversational import Conversational
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Dataset, Batch
+from langchain_groq import ChatGroq
+
+# 1. Define your retriever
+class CustomerServiceRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        return [
+            Dataset(
+                session_id="cs-eval-001",
+                assistant_id="customer-service-bot",
+                language="english",
+                context="You are a helpful customer service assistant for an e-commerce store.",
+                conversation=[
+                    Batch(
+                        qa_id="q1",
+                        query="I want to return a product I bought last week.",
+                        assistant="I'd be happy to help with your return! You can return items within 30 days of purchase. Please visit our Returns Portal with your order number ready.",
+                        ground_truth_assistant="Items can be returned within 30 days. Use the Returns Portal.",
+                    ),
+                    Batch(
+                        qa_id="q2",
+                        query="What's your phone number for support?",
+                        assistant="You can reach our support team at 1-800-EXAMPLE. We're available Monday through Friday, 9 AM to 5 PM EST.",
+                        ground_truth_assistant="Support: 1-800-EXAMPLE, Mon-Fri 9-5 EST.",
+                    ),
+                ]
+            )
+        ]
+
+# 2. Initialize the judge model
+judge = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    api_key=os.getenv("GROQ_API_KEY"),
+    temperature=0.0,
+)
+
+# 3. Run Context metric
+print("=== Context Evaluation ===")
+context_results = Context.run(
+    CustomerServiceRetriever,
+    model=judge,
+    use_structured_output=True,
+    verbose=True,
+)
+
+avg_context = sum(m.context_awareness for m in context_results) / len(context_results)
+print(f"Average Context Awareness: {avg_context:.2f}")
+
+# 4. Run Conversational metric
+print("\n=== Conversational Evaluation ===")
+conv_results = Conversational.run(
+    CustomerServiceRetriever,
+    model=judge,
+    use_structured_output=True,
+    verbose=True,
+)
+
+for m in conv_results:
+    print(f"QA {m.qa_id}:")
+    print(f"  Quality: {m.conversational_quality_maxim}/10")
+    print(f"  Sensibleness: {m.conversational_sensibleness}/10")
+```
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="Metrics Overview" icon="chart-pie" href="/metrics/overview">
+    Learn about all available metrics
+  </Card>
+  <Card title="Generators" icon="wand-magic-sparkles" href="/generators/overview">
+    Generate synthetic test datasets
+  </Card>
+  <Card title="Runners" icon="play" href="/runners/overview">
+    Execute tests against AI systems
+  </Card>
+  <Card title="Examples" icon="code" href="/examples/overview">
+    See complete code examples
+  </Card>
+</CardGroup>

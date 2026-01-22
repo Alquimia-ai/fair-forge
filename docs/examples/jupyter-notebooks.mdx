@@ -1,0 +1,337 @@
+---
+title: Jupyter Notebooks
+description: Interactive examples for each Fair Forge metric
+---
+
+# Jupyter Notebooks
+
+Interactive notebooks demonstrating each Fair Forge metric with visualizations.
+
+## Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/Alquimia-ai/fair-forge
+cd fair-forge
+
+# Install dependencies
+uv sync
+
+# Navigate to examples
+cd examples
+```
+
+## Available Notebooks
+
+### Toxicity
+
+**Location**: `examples/toxicity/jupyter/toxicity.ipynb`
+
+Demonstrates toxicity detection with DIDT framework:
+
+- Cluster profiling with HDBSCAN + UMAP
+- Group profiling with demographic detection
+- Frequentist vs Bayesian statistical modes
+- UMAP visualization of response clusters
+
+```bash
+cd toxicity/jupyter
+uv pip install "$(ls ../../dist/*.whl)[toxicity]" matplotlib
+jupyter lab toxicity.ipynb
+```
+
+**Key Features:**
+```python
+# Define group prototypes
+group_prototypes = {
+    "gender": ["women", "men", "female", "male"],
+    "race": ["Asian", "African", "European", "Hispanic"],
+    "religion": ["Christian", "Muslim", "Jewish", "Hindu"],
+}
+
+# Run with Frequentist mode
+freq_metrics = Toxicity.run(
+    LocalRetriever,
+    group_prototypes=group_prototypes,
+    statistical_mode=FrequentistMode(),
+)
+
+# Run with Bayesian mode
+bayesian = BayesianMode(mc_samples=5000, ci_level=0.95)
+bayes_metrics = Toxicity.run(
+    LocalRetriever,
+    group_prototypes=group_prototypes,
+    statistical_mode=bayesian,
+)
+```
+
+---
+
+### Bias
+
+**Location**: `examples/bias/jupyter/bias.ipynb`
+
+Demonstrates bias detection across protected attributes:
+
+- LlamaGuard guardian configuration
+- Clopper-Pearson confidence intervals
+- Per-attribute bias analysis
+- Error bar visualization
+
+```bash
+cd bias/jupyter
+uv pip install "$(ls ../../dist/*.whl)[bias]" matplotlib
+jupyter lab bias.ipynb
+```
+
+**Key Features:**
+```python
+# Configure guardian
+guardian_config = GuardianLLMConfig(
+    model="meta-llama/llama-guard-4-12b",
+    api_key=GUARDIAN_API_KEY,
+    url="https://api.groq.com/openai",
+    provider=OpenAIGuardianProvider,
+)
+
+# Run bias detection
+metrics = Bias.run(
+    LocalRetriever,
+    guardian=LLamaGuard,
+    config=guardian_config,
+    confidence_level=0.95,
+)
+```
+
+---
+
+### Context
+
+**Location**: `examples/context/jupyter/context.ipynb`
+
+Demonstrates context alignment evaluation:
+
+- LLM judge configuration
+- Per-interaction scoring
+- Insight analysis
+- Average score calculation
+
+```bash
+cd context/jupyter
+uv pip install "$(ls ../../dist/*.whl)[context]" langchain-groq
+jupyter lab context.ipynb
+```
+
+**Key Features:**
+```python
+# Initialize judge
+judge_model = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    api_key=GROQ_API_KEY,
+    temperature=0.0,
+)
+
+# Run context evaluation
+metrics = Context.run(
+    LocalRetriever,
+    model=judge_model,
+    use_structured_output=True,
+)
+```
+
+---
+
+### Conversational
+
+**Location**: `examples/conversational/jupyter/conversational.ipynb`
+
+Demonstrates dialogue quality evaluation:
+
+- Grice's Maxims scoring
+- Memory and language assessment
+- Radar chart visualization
+- Per-maxim distribution analysis
+
+```bash
+cd conversational/jupyter
+uv pip install "$(ls ../../dist/*.whl)[conversational]" langchain-groq matplotlib
+jupyter lab conversational.ipynb
+```
+
+**Key Features:**
+```python
+# Run conversational evaluation
+metrics = Conversational.run(
+    LocalRetriever,
+    model=judge_model,
+    use_structured_output=True,
+)
+
+# Visualize with radar chart
+categories = ['Quality', 'Quantity', 'Relation', 'Manner', 'Memory', 'Language', 'Sensibleness']
+```
+
+---
+
+### Humanity
+
+**Location**: `examples/humanity/jupyter/humanity.ipynb`
+
+Demonstrates emotional analysis:
+
+- NRC Emotion Lexicon analysis
+- Emotional entropy calculation
+- Spearman correlation with ground truth
+- Emotion distribution visualization
+
+```bash
+cd humanity/jupyter
+uv pip install "$(ls ../../dist/*.whl)[humanity]" matplotlib
+jupyter lab humanity.ipynb
+```
+
+**Key Features:**
+```python
+# Run humanity evaluation (no LLM required)
+metrics = Humanity.run(
+    LocalRetriever,
+    verbose=True,
+)
+
+# Analyze 8 emotions
+emotions = ["anger", "anticipation", "disgust", "fear",
+            "joy", "sadness", "surprise", "trust"]
+```
+
+---
+
+### BestOf
+
+**Location**: `examples/bestof/jupyter/bestof.ipynb`
+
+Demonstrates tournament comparison:
+
+- Multi-assistant dataset setup
+- Elimination rounds
+- Winner determination
+- Tournament bracket visualization
+
+```bash
+cd bestof/jupyter
+uv pip install "$(ls ../../dist/*.whl)[bestof]" langchain-groq matplotlib
+jupyter lab bestof.ipynb
+```
+
+**Key Features:**
+```python
+# Create multi-assistant retriever
+class BestOfRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        # Return datasets from multiple assistants
+        pass
+
+# Run tournament
+metrics = BestOf.run(
+    BestOfRetriever,
+    model=judge_model,
+    criteria="Overall response quality, helpfulness, and clarity",
+)
+
+print(f"Tournament Winner: {metrics[0].bestof_winner_id}")
+```
+
+---
+
+### Generators
+
+**Location**: `examples/generators/jupyter/generators_groq.ipynb`
+
+Demonstrates synthetic dataset generation:
+
+- Markdown loading and chunking
+- Sequential and random sampling strategies
+- Conversation mode generation
+- Seed examples for guided generation
+
+```bash
+cd generators/jupyter
+uv pip install "$(ls ../../dist/*.whl)[generators]" langchain-groq
+jupyter lab generators_groq.ipynb
+```
+
+**Key Features:**
+```python
+# Create generator
+generator = BaseGenerator(model=model, use_structured_output=True)
+
+# Generate with random sampling
+strategy = RandomSamplingStrategy(num_samples=3, chunks_per_sample=5)
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs.md",
+    selection_strategy=strategy,
+    conversation_mode=True,
+)
+```
+
+---
+
+### Runners
+
+**Location**: `examples/runners/jupyter/runners.ipynb`
+
+Demonstrates test execution:
+
+- AlquimiaRunner configuration
+- Single batch and full dataset execution
+- Local storage integration
+- Complete pipeline example
+
+```bash
+cd runners/jupyter
+uv pip install "$(ls ../../dist/*.whl)[runners]"
+jupyter lab runners.ipynb
+```
+
+**Key Features:**
+```python
+# Setup runner
+runner = AlquimiaRunner(
+    base_url=os.getenv("ALQUIMIA_URL"),
+    api_key=os.getenv("ALQUIMIA_API_KEY"),
+    agent_id=os.getenv("AGENT_ID"),
+    channel_id=os.getenv("CHANNEL_ID"),
+)
+
+# Execute dataset
+updated_dataset, summary = await runner.run_dataset(dataset)
+```
+
+## Creating a Custom Retriever
+
+All notebooks use a local retriever pattern:
+
+```python
+import json
+from pathlib import Path
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Dataset
+
+class LocalRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        dataset_path = Path("../data/dataset.json")
+        with open(dataset_path) as f:
+            data = json.load(f)
+        return [Dataset.model_validate(d) for d in data]
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AWS Lambda" icon="aws" href="/examples/aws-lambda">
+    Deploy to serverless
+  </Card>
+  <Card title="Metrics Overview" icon="chart-pie" href="/metrics/overview">
+    Learn more about metrics
+  </Card>
+</CardGroup>

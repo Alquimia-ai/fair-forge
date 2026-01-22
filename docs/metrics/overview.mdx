@@ -1,0 +1,271 @@
+---
+title: Metrics Overview
+description: Overview of all available metrics in Fair Forge
+---
+
+# Metrics Overview
+
+Fair Forge provides six specialized metrics for comprehensive AI evaluation. Each metric focuses on a different aspect of AI behavior and quality.
+
+## Available Metrics
+
+<CardGroup cols={2}>
+  <Card title="Toxicity" icon="flask" href="/metrics/toxicity">
+    Measures toxic language with clustering and demographic group profiling using the DIDT framework.
+  </Card>
+  <Card title="Bias" icon="scale-balanced" href="/metrics/bias">
+    Detects bias across protected attributes (gender, race, religion, nationality, sexual orientation).
+  </Card>
+  <Card title="Context" icon="book" href="/metrics/context">
+    Evaluates how well responses align with provided context and instructions.
+  </Card>
+  <Card title="Conversational" icon="comments" href="/metrics/conversational">
+    Evaluates dialogue quality using Grice's Maxims (Quality, Quantity, Relation, Manner).
+  </Card>
+  <Card title="Humanity" icon="heart" href="/metrics/humanity">
+    Analyzes emotional depth and human-likeness using the NRC Emotion Lexicon.
+  </Card>
+  <Card title="BestOf" icon="trophy" href="/metrics/best-of">
+    Tournament-style evaluation to compare multiple assistants head-to-head.
+  </Card>
+</CardGroup>
+
+## Comparison Table
+
+| Metric | Purpose | Output Type | LLM Required |
+|--------|---------|-------------|--------------|
+| **Toxicity** | Detect toxic language patterns | Per-session metrics | No |
+| **Bias** | Identify biased responses | Per-session metrics | Yes (Guardian) |
+| **Context** | Measure context alignment | Per-interaction scores | Yes (Judge) |
+| **Conversational** | Evaluate dialogue quality | Per-interaction scores | Yes (Judge) |
+| **Humanity** | Analyze emotional expression | Per-interaction scores | No |
+| **BestOf** | Compare multiple assistants | Tournament results | Yes (Judge) |
+
+## Common Usage Pattern
+
+All metrics follow the same usage pattern:
+
+```python
+from fair_forge.metrics.<metric> import <Metric>
+from fair_forge.core.retriever import Retriever
+
+# 1. Define your retriever
+class MyRetriever(Retriever):
+    def load_dataset(self):
+        # Return list[Dataset]
+        pass
+
+# 2. Run the metric
+results = <Metric>.run(
+    MyRetriever,
+    **metric_specific_parameters,
+    verbose=True,
+)
+
+# 3. Analyze results
+for result in results:
+    # Process metric-specific output
+    pass
+```
+
+## Metric Categories
+
+### Lexicon-Based Metrics
+
+These metrics use predefined lexicons and don't require external LLMs:
+
+- **Toxicity**: Uses Hurtlex toxicity lexicon + HDBSCAN clustering
+- **Humanity**: Uses NRC Emotion Lexicon for emotion detection
+
+```python
+# No LLM required
+from fair_forge.metrics.toxicity import Toxicity
+
+results = Toxicity.run(
+    MyRetriever,
+    group_prototypes={...},
+)
+```
+
+### LLM-Judge Metrics
+
+These metrics use an LLM as a judge to evaluate responses:
+
+- **Context**: Evaluates context alignment
+- **Conversational**: Evaluates dialogue quality
+- **BestOf**: Compares assistants in tournaments
+
+```python
+# Requires LangChain-compatible model
+from fair_forge.metrics.context import Context
+from langchain_groq import ChatGroq
+
+judge = ChatGroq(model="llama-3.3-70b-versatile", api_key="...")
+
+results = Context.run(
+    MyRetriever,
+    model=judge,
+    use_structured_output=True,
+)
+```
+
+### Guardian-Based Metrics
+
+These metrics use specialized guardian models for detection:
+
+- **Bias**: Uses LlamaGuard or IBMGranite for bias detection
+
+```python
+from fair_forge.metrics.bias import Bias
+from fair_forge.guardians import LLamaGuard
+
+results = Bias.run(
+    MyRetriever,
+    guardian=LLamaGuard,
+    config=guardian_config,
+)
+```
+
+## Output Schemas
+
+Each metric returns a list of result objects. The schema depends on the metric:
+
+<Tabs>
+  <Tab title="Toxicity">
+    ```python
+    ToxicityMetric:
+      session_id: str
+      assistant_id: str
+      cluster_profiling: dict[float, float]  # cluster_id -> toxicity_score
+      group_profiling: GroupProfiling | None
+      assistant_space: AssistantSpace
+    ```
+  </Tab>
+  <Tab title="Bias">
+    ```python
+    BiasMetric:
+      session_id: str
+      assistant_id: str
+      confidence_intervals: list[ConfidenceInterval]
+      guardian_interactions: dict[str, list[GuardianInteraction]]
+    ```
+  </Tab>
+  <Tab title="Context">
+    ```python
+    ContextMetric:
+      session_id: str
+      assistant_id: str
+      qa_id: str
+      context_awareness: float  # 0-1
+      context_insight: str
+      context_thinkings: str
+    ```
+  </Tab>
+  <Tab title="Conversational">
+    ```python
+    ConversationalMetric:
+      session_id: str
+      assistant_id: str
+      qa_id: str
+      conversational_memory: float         # 0-10
+      conversational_language: float       # 0-10
+      conversational_quality_maxim: float  # 0-10
+      conversational_quantity_maxim: float # 0-10
+      conversational_relation_maxim: float # 0-10
+      conversational_manner_maxim: float   # 0-10
+      conversational_sensibleness: float   # 0-10
+      conversational_insight: str
+    ```
+  </Tab>
+  <Tab title="Humanity">
+    ```python
+    HumanityMetric:
+      session_id: str
+      assistant_id: str
+      qa_id: str
+      humanity_assistant_emotional_entropy: float
+      humanity_ground_truth_spearman: float
+      humanity_assistant_anger: float
+      humanity_assistant_anticipation: float
+      # ... other emotions
+    ```
+  </Tab>
+  <Tab title="BestOf">
+    ```python
+    BestOfMetric:
+      session_id: str
+      assistant_id: str
+      bestof_winner_id: str
+      bestof_contests: list[BestOfContest]
+    ```
+  </Tab>
+</Tabs>
+
+## Installation Requirements
+
+Each metric has specific dependencies:
+
+```bash
+# Toxicity (clustering + embeddings)
+uv pip install "alquimia-fair-forge[toxicity]"
+
+# Bias (guardian models)
+uv pip install "alquimia-fair-forge[bias]"
+
+# Context (LLM judge)
+uv pip install "alquimia-fair-forge[context]"
+
+# Conversational (LLM judge)
+uv pip install "alquimia-fair-forge[conversational]"
+
+# Humanity (included in core)
+uv pip install "alquimia-fair-forge[humanity]"
+
+# BestOf (LLM judge)
+uv pip install "alquimia-fair-forge[bestof]"
+
+# All metrics
+uv pip install "alquimia-fair-forge[all]"
+```
+
+## Choosing a Metric
+
+<AccordionGroup>
+  <Accordion title="I want to detect harmful language">
+    Use **Toxicity** for detecting toxic language patterns and demographic targeting.
+  </Accordion>
+
+  <Accordion title="I want to check for bias">
+    Use **Bias** for detecting discrimination across protected attributes.
+  </Accordion>
+
+  <Accordion title="I want to ensure responses follow instructions">
+    Use **Context** for measuring alignment with system context.
+  </Accordion>
+
+  <Accordion title="I want to evaluate conversation quality">
+    Use **Conversational** for assessing dialogue using Grice's Maxims.
+  </Accordion>
+
+  <Accordion title="I want to measure emotional expression">
+    Use **Humanity** for analyzing emotional depth and human-likeness.
+  </Accordion>
+
+  <Accordion title="I want to compare multiple assistants">
+    Use **BestOf** for tournament-style head-to-head comparisons.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Toxicity" icon="flask" href="/metrics/toxicity">
+    Learn about toxicity detection
+  </Card>
+  <Card title="Bias" icon="scale-balanced" href="/metrics/bias">
+    Learn about bias detection
+  </Card>
+  <Card title="Context" icon="book" href="/metrics/context">
+    Learn about context evaluation
+  </Card>
+</CardGroup>

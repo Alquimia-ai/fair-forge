@@ -1,0 +1,276 @@
+---
+title: Selection Strategies
+description: Control how chunks are selected for test generation
+---
+
+# Selection Strategies
+
+Strategies control how chunks are selected and grouped during test generation.
+
+## Available Strategies
+
+| Strategy | Description | Use Case |
+|----------|-------------|----------|
+| `SequentialStrategy` | Process all chunks in order | Complete coverage |
+| `RandomSamplingStrategy` | Sample random chunks multiple times | Diverse test sets |
+
+## SequentialStrategy
+
+The default strategy - processes all chunks sequentially into a single dataset.
+
+```python
+from fair_forge.generators import SequentialStrategy
+
+strategy = SequentialStrategy()
+
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=3,
+    selection_strategy=strategy,  # Default
+)
+
+# Returns: [single_dataset_with_all_chunks]
+```
+
+### When to Use
+
+- Complete test coverage needed
+- Testing all documentation sections
+- Regression testing
+
+## RandomSamplingStrategy
+
+Randomly samples chunks multiple times to create diverse test datasets.
+
+```python
+from fair_forge.generators import RandomSamplingStrategy
+
+strategy = RandomSamplingStrategy(
+    num_samples=3,       # Create 3 datasets
+    chunks_per_sample=5, # Each with 5 random chunks
+    seed=42,             # For reproducibility
+)
+
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=2,
+    selection_strategy=strategy,
+)
+
+# Returns: [dataset_1, dataset_2, dataset_3]
+```
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `num_samples` | `int` | Required | Number of datasets to generate |
+| `chunks_per_sample` | `int` | Required | Chunks per dataset |
+| `seed` | `int \| None` | `None` | Random seed for reproducibility |
+
+### When to Use
+
+- Cross-validation test sets
+- Diverse coverage sampling
+- Large documentation with limited budget
+- Randomized testing
+
+## Combining with Conversation Mode
+
+Strategies work with both independent queries and conversation mode:
+
+### Sequential + Conversations
+
+```python
+strategy = SequentialStrategy()
+
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=3,  # 3-turn conversations
+    selection_strategy=strategy,
+    conversation_mode=True,
+)
+```
+
+### Random + Conversations
+
+```python
+strategy = RandomSamplingStrategy(
+    num_samples=2,
+    chunks_per_sample=3,
+    seed=42,
+)
+
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=2,  # 2-turn conversations
+    selection_strategy=strategy,
+    conversation_mode=True,
+)
+
+# Result: 2 datasets, each with 2-turn conversations from 3 chunks
+```
+
+## Examples
+
+### Full Coverage
+
+Generate tests for entire documentation:
+
+```python
+# Process everything
+strategy = SequentialStrategy()
+
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=5,
+    selection_strategy=strategy,
+)
+
+print(f"Total queries: {len(datasets[0].conversation)}")
+```
+
+### Cross-Validation Sets
+
+Create multiple test sets for evaluation:
+
+```python
+# 5 diverse test sets
+strategy = RandomSamplingStrategy(
+    num_samples=5,
+    chunks_per_sample=10,
+    seed=42,
+)
+
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=3,
+    selection_strategy=strategy,
+)
+
+for i, ds in enumerate(datasets):
+    print(f"Test set {i+1}: {len(ds.conversation)} queries")
+    # Use different sets for different evaluation runs
+```
+
+### Budget-Constrained Generation
+
+When you can't test everything:
+
+```python
+# Sample 20% of content, 3 times
+chunks = loader.load("./docs")
+total_chunks = len(chunks)
+sample_size = int(total_chunks * 0.2)
+
+strategy = RandomSamplingStrategy(
+    num_samples=3,
+    chunks_per_sample=sample_size,
+    seed=42,
+)
+
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=2,
+    selection_strategy=strategy,
+)
+```
+
+## Comparing Strategies
+
+```python
+from fair_forge.generators import SequentialStrategy, RandomSamplingStrategy
+
+# Load chunks first to understand the data
+chunks = loader.load("./docs")
+print(f"Total chunks: {len(chunks)}")
+
+# Sequential: Complete coverage
+seq_strategy = SequentialStrategy()
+seq_datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=2,
+    selection_strategy=seq_strategy,
+)
+print(f"Sequential: 1 dataset with {len(seq_datasets[0].conversation)} queries")
+
+# Random: Sampled coverage
+rand_strategy = RandomSamplingStrategy(
+    num_samples=3,
+    chunks_per_sample=5,
+    seed=42,
+)
+rand_datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=2,
+    selection_strategy=rand_strategy,
+)
+print(f"Random: {len(rand_datasets)} datasets with {sum(len(d.conversation) for d in rand_datasets)} total queries")
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Sequential for Regression Testing">
+    Complete coverage ensures no section is missed:
+    ```python
+    strategy = SequentialStrategy()
+    ```
+  </Accordion>
+
+  <Accordion title="Use Random for Large Documentation">
+    Sample strategically when full coverage isn't practical:
+    ```python
+    strategy = RandomSamplingStrategy(
+        num_samples=5,
+        chunks_per_sample=20,
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Set Seed for Reproducibility">
+    Always set a seed for consistent results:
+    ```python
+    strategy = RandomSamplingStrategy(
+        num_samples=3,
+        chunks_per_sample=10,
+        seed=42,  # Same seed = same samples
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Match Strategy to Use Case">
+    - **CI/CD**: Sequential for full coverage
+    - **Development**: Random for quick feedback
+    - **Evaluation**: Multiple random sets for statistical validity
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="BaseGenerator" icon="gear" href="/generators/base-generator">
+    Learn about the generator class
+  </Card>
+  <Card title="Runners" icon="play" href="/runners/overview">
+    Execute generated tests
+  </Card>
+</CardGroup>

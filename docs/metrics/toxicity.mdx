@@ -1,0 +1,398 @@
+---
+title: Toxicity
+description: Measure toxic language with clustering and demographic group profiling
+---
+
+# Toxicity Metric
+
+The Toxicity metric measures toxic language in AI responses using clustering and the DIDT (Directed Toxicity, Demographic Representation, Associated Sentiment Bias) framework.
+
+## Overview
+
+The metric provides:
+
+- **Cluster profiling**: Groups similar responses using HDBSCAN+UMAP and measures toxicity per cluster
+- **DIDT framework** with three components:
+  - **DR (Demographic Representation)**: Distribution divergence of group mention rates
+  - **DTO (Directed Toxicity per Group)**: Toxicity rate dispersion across demographic groups
+  - **ASB (Associated Sentiment Bias)**: Sentiment deviation across groups
+
+## Installation
+
+```bash
+uv pip install "alquimia-fair-forge[toxicity]"
+```
+
+## Basic Usage
+
+```python
+from fair_forge.metrics.toxicity import Toxicity
+from fair_forge.statistical import FrequentistMode
+from your_retriever import MyRetriever
+
+# Define group prototypes for demographic detection
+group_prototypes = {
+    "gender": ["women", "men", "female", "male", "woman", "man"],
+    "race": ["Asian", "African", "European", "Hispanic", "Black", "White"],
+    "religion": ["Christian", "Muslim", "Jewish", "Hindu", "Buddhist"],
+    "sexuality": ["LGBTQ+", "gay", "lesbian", "bisexual", "heterosexual"],
+}
+
+# Run the metric
+metrics = Toxicity.run(
+    MyRetriever,
+    group_prototypes=group_prototypes,
+    group_default_threshold=0.40,
+    statistical_mode=FrequentistMode(),
+    verbose=True,
+)
+
+# Analyze results
+for metric in metrics:
+    print(f"Session: {metric.session_id}")
+
+    # Cluster profiling
+    print("Cluster Profiling:")
+    for cluster_id, toxicity in metric.cluster_profiling.items():
+        print(f"  Cluster {cluster_id}: {toxicity:.4f}")
+
+    # Group profiling
+    if metric.group_profiling:
+        gp = metric.group_profiling.frequentist
+        print(f"DIDT: {gp.DIDT:.4f}")
+        print(f"  DR: {gp.DR:.4f}")
+        print(f"  ASB: {gp.ASB:.4f}")
+        print(f"  DTO: {gp.DTO:.4f}")
+```
+
+## Parameters
+
+### Required Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `retriever` | `Type[Retriever]` | Data source class |
+
+### Group Detection Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `group_prototypes` | `dict[str, list[str]]` | `None` | Prototype phrases for each demographic group |
+| `group_thresholds` | `dict[str, float]` | `None` | Per-group similarity thresholds |
+| `group_default_threshold` | `float` | `0.50` | Default threshold for group detection |
+| `group_toxicity_threshold` | `float` | `0.5` | Threshold for toxic classification |
+| `group_extractor` | `BaseGroupExtractor` | Auto | Custom group extractor (overrides prototypes) |
+
+### Embedding Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `embedding_model` | `str` | `"all-MiniLM-L6-v2"` | SentenceTransformer model name |
+
+### Clustering Parameters (HDBSCAN)
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `toxicity_min_cluster_size` | `int` | `5` | Minimum cluster size |
+| `toxicity_cluster_selection_epsilon` | `float` | `0.0` | Cluster selection epsilon |
+| `toxicity_cluster_selection_method` | `str` | `"eom"` | Selection method ("eom" or "leaf") |
+| `toxicity_cluster_use_latent_space` | `bool` | `True` | Use UMAP latent space for clustering |
+
+### UMAP Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `umap_n_components` | `int` | `2` | Number of UMAP dimensions |
+| `umap_n_neighbors` | `int` | `15` | Number of neighbors |
+| `umap_min_dist` | `float` | `0.1` | Minimum distance |
+| `umap_random_state` | `int` | `42` | Random seed |
+| `umap_metric` | `str` | `"cosine"` | Distance metric |
+
+### DIDT Weight Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `w_DR` | `float` | `1/3` | Weight for DR component |
+| `w_ASB` | `float` | `1/3` | Weight for ASB component |
+| `w_DTO` | `float` | `1/3` | Weight for DTO component |
+
+### Other Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `statistical_mode` | `StatisticalMode` | `FrequentistMode()` | Statistical analysis mode |
+| `toxicity_loader` | `Type[ToxicityLoader]` | `HurtlexLoader` | Toxicity lexicon loader |
+| `sentiment_analyzer` | `SentimentAnalyzer` | `None` | Optional sentiment analyzer for ASB |
+| `verbose` | `bool` | `False` | Enable verbose logging |
+
+## Output Schema
+
+### ToxicityMetric
+
+```python
+class ToxicityMetric(BaseMetric):
+    session_id: str
+    assistant_id: str
+    cluster_profiling: dict[float, float]  # cluster_id -> toxicity_score
+    group_profiling: GroupProfiling | None
+    assistant_space: AssistantSpace
+```
+
+### GroupProfiling
+
+```python
+class GroupProfiling(BaseModel):
+    mode: Literal["frequentist", "bayesian"]
+    groups: list[str]           # Detected groups
+    N_i: dict[str, int]         # Mention counts per group
+    K_i: dict[str, int]         # Toxic mention counts per group
+    frequentist: FrequentistGroupProfiling | None
+    bayesian: BayesianGroupProfiling | None
+```
+
+### FrequentistGroupProfiling
+
+```python
+class FrequentistGroupProfiling(BaseModel):
+    DR: float   # Demographic Representation (0-1)
+    ASB: float  # Associated Sentiment Bias (0-1)
+    DTO: float  # Directed Toxicity per Group (0-1)
+    DIDT: float # Aggregate score (0-1)
+```
+
+## Statistical Modes
+
+### Frequentist Mode
+
+```python
+from fair_forge.statistical import FrequentistMode
+
+metrics = Toxicity.run(
+    MyRetriever,
+    group_prototypes=group_prototypes,
+    statistical_mode=FrequentistMode(),
+)
+
+# Returns point estimates
+gp = metrics[0].group_profiling.frequentist
+print(f"DIDT: {gp.DIDT}")  # Single float value
+```
+
+### Bayesian Mode
+
+```python
+from fair_forge.statistical import BayesianMode
+
+bayesian = BayesianMode(
+    mc_samples=5000,
+    ci_level=0.95,
+    dirichlet_prior=1.0,
+    beta_prior_a=1.0,
+    beta_prior_b=1.0,
+    rng_seed=42,
+)
+
+metrics = Toxicity.run(
+    MyRetriever,
+    group_prototypes=group_prototypes,
+    statistical_mode=bayesian,
+)
+
+# Returns distributions with credible intervals
+summary = metrics[0].group_profiling.bayesian.summary
+print(f"DIDT: {summary['DIDT'].mean:.4f} [{summary['DIDT'].ci_low:.4f}, {summary['DIDT'].ci_high:.4f}]")
+```
+
+## Understanding DIDT Components
+
+### DR (Demographic Representation)
+
+Measures how evenly different demographic groups are mentioned in responses.
+
+- **0**: Perfect balance - all groups mentioned equally
+- **1**: Complete imbalance - only one group mentioned
+
+### ASB (Associated Sentiment Bias)
+
+Measures sentiment differences when discussing different groups.
+
+- **0**: Consistent sentiment across all groups
+- **1**: Extreme sentiment variation between groups
+
+<Note>
+ASB requires a `sentiment_analyzer` to be provided. Without it, ASB defaults to 0.
+</Note>
+
+### DTO (Directed Toxicity per Group)
+
+Measures toxicity rate variation across groups.
+
+- **0**: Equal toxicity rates across all groups
+- **1**: Toxicity concentrated in specific groups
+
+### DIDT (Aggregate Score)
+
+Weighted combination of DR, ASB, and DTO:
+
+```
+DIDT = w_DR * DR + w_ASB * ASB + w_DTO * DTO
+```
+
+Default weights are equal (1/3 each).
+
+## Customization
+
+### Custom Group Prototypes
+
+```python
+# Define prototypes relevant to your domain
+group_prototypes = {
+    "age": ["young", "old", "elderly", "teenager", "millennial", "boomer"],
+    "occupation": ["doctor", "lawyer", "teacher", "engineer", "artist"],
+    "socioeconomic": ["wealthy", "poor", "middle-class", "homeless"],
+}
+
+metrics = Toxicity.run(
+    MyRetriever,
+    group_prototypes=group_prototypes,
+)
+```
+
+### Custom Group Extractor
+
+```python
+from fair_forge.extractors.embedding import EmbeddingGroupExtractor
+from sentence_transformers import SentenceTransformer
+
+# Create custom extractor with specific model
+embedder = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+extractor = EmbeddingGroupExtractor(
+    embedder=embedder,
+    group_prototypes=group_prototypes,
+    thresholds={"gender": 0.35, "race": 0.40},
+    default_threshold=0.45,
+)
+
+metrics = Toxicity.run(
+    MyRetriever,
+    group_extractor=extractor,
+)
+```
+
+### Custom Clustering
+
+```python
+# Fine-tune clustering for your data
+metrics = Toxicity.run(
+    MyRetriever,
+    group_prototypes=group_prototypes,
+    toxicity_min_cluster_size=10,         # Larger clusters
+    toxicity_cluster_selection_method="leaf",  # Finer clusters
+    umap_n_neighbors=30,                   # More neighbors for UMAP
+    umap_min_dist=0.05,                    # Tighter clusters
+)
+```
+
+## Visualization
+
+### Cluster Visualization
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+
+metric = metrics[0]
+latent_space = np.array(metric.assistant_space.latent_space)
+labels = np.array(metric.assistant_space.cluster_labels)
+
+plt.figure(figsize=(10, 8))
+scatter = plt.scatter(
+    latent_space[:, 0],
+    latent_space[:, 1],
+    c=labels,
+    cmap='tab10',
+    alpha=0.7
+)
+plt.colorbar(scatter, label='Cluster')
+plt.xlabel('UMAP Dimension 1')
+plt.ylabel('UMAP Dimension 2')
+plt.title('Response Clusters (Toxicity Analysis)')
+plt.show()
+```
+
+## Complete Example
+
+```python
+from fair_forge.metrics.toxicity import Toxicity
+from fair_forge.statistical import FrequentistMode, BayesianMode
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Dataset, Batch
+
+class MyRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        return [
+            Dataset(
+                session_id="eval-001",
+                assistant_id="my-assistant",
+                language="english",
+                context="",
+                conversation=[
+                    Batch(qa_id="q1", query="...", assistant="Response 1..."),
+                    Batch(qa_id="q2", query="...", assistant="Response 2..."),
+                ]
+            )
+        ]
+
+# Define groups
+group_prototypes = {
+    "gender": ["women", "men", "female", "male"],
+    "race": ["Asian", "African", "European", "Hispanic"],
+    "religion": ["Christian", "Muslim", "Jewish", "Hindu"],
+}
+
+# Run with Frequentist mode
+freq_metrics = Toxicity.run(
+    MyRetriever,
+    group_prototypes=group_prototypes,
+    group_default_threshold=0.40,
+    statistical_mode=FrequentistMode(),
+    toxicity_min_cluster_size=2,
+    verbose=True,
+)
+
+# Run with Bayesian mode
+bayes_metrics = Toxicity.run(
+    MyRetriever,
+    group_prototypes=group_prototypes,
+    group_default_threshold=0.40,
+    statistical_mode=BayesianMode(mc_samples=5000, ci_level=0.95),
+    toxicity_min_cluster_size=2,
+    verbose=True,
+)
+
+# Compare results
+print("Frequentist vs Bayesian Comparison")
+print("=" * 50)
+
+freq_gp = freq_metrics[0].group_profiling
+bayes_gp = bayes_metrics[0].group_profiling
+
+for component in ['DR', 'ASB', 'DTO', 'DIDT']:
+    freq_val = getattr(freq_gp.frequentist, component)
+    bayes_summary = bayes_gp.bayesian.summary[component]
+
+    print(f"{component}:")
+    print(f"  Frequentist: {freq_val:.4f}")
+    print(f"  Bayesian: {bayes_summary.mean:.4f} [{bayes_summary.ci_low:.4f}, {bayes_summary.ci_high:.4f}]")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Bias Metric" icon="scale-balanced" href="/metrics/bias">
+    Learn about bias detection
+  </Card>
+  <Card title="Statistical Modes" icon="calculator" href="/core-concepts/statistical-modes">
+    Understand Frequentist vs Bayesian
+  </Card>
+</CardGroup>

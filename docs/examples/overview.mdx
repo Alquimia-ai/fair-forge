@@ -1,0 +1,86 @@
+---
+title: Examples Overview
+description: Complete examples for Fair Forge usage
+---
+
+# Examples Overview
+
+Fair Forge provides comprehensive examples for different deployment scenarios.
+
+## Available Examples
+
+<CardGroup cols={2}>
+  <Card title="Jupyter Notebooks" icon="book" href="/examples/jupyter-notebooks">
+    Interactive notebooks for each metric with visualizations
+  </Card>
+  <Card title="AWS Lambda" icon="aws" href="/examples/aws-lambda">
+    Serverless deployment for generators and runners
+  </Card>
+</CardGroup>
+
+## Example Categories
+
+### Metrics Examples
+
+Interactive Jupyter notebooks demonstrating each metric:
+
+| Metric | Notebook | Description |
+|--------|----------|-------------|
+| Toxicity | `toxicity.ipynb` | DIDT framework with Frequentist and Bayesian modes |
+| Bias | `bias.ipynb` | Guardian-based bias detection with visualization |
+| Context | `context.ipynb` | LLM judge for context alignment |
+| Conversational | `conversational.ipynb` | Grice's Maxims evaluation with radar charts |
+| Humanity | `humanity.ipynb` | NRC emotion analysis with entropy |
+| BestOf | `bestof.ipynb` | Tournament comparison between assistants |
+
+### Deployment Examples
+
+Serverless functions for production use:
+
+| Module | Lambda | Description |
+|--------|--------|-------------|
+| Generators | `generators/aws-lambda` | Generate test datasets from context |
+| Runners | `runners/aws-lambda` | Execute tests against AI systems |
+
+## Quick Links
+
+### Jupyter Notebooks
+
+```bash
+# Clone and run notebooks
+git clone https://github.com/Alquimia-ai/fair-forge
+cd fair-forge/examples
+
+# Toxicity example
+cd toxicity/jupyter
+jupyter lab toxicity.ipynb
+```
+
+### AWS Lambda
+
+```bash
+# Deploy generators Lambda
+cd examples/generators/aws-lambda
+./scripts/deploy.sh generators us-east-2
+
+# Deploy runners Lambda
+cd examples/runners/aws-lambda
+./scripts/deploy.sh runners us-east-2
+```
+
+## Getting Started
+
+1. **Choose your metric** - Pick the metric that matches your evaluation needs
+2. **Try the notebook** - Run the interactive example to understand the API
+3. **Deploy to production** - Use Lambda for serverless execution
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Jupyter Notebooks" icon="book" href="/examples/jupyter-notebooks">
+    Run interactive examples
+  </Card>
+  <Card title="AWS Lambda" icon="aws" href="/examples/aws-lambda">
+    Deploy serverless functions
+  </Card>
+</CardGroup>

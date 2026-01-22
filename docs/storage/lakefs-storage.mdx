@@ -1,0 +1,205 @@
+---
+title: LakeFS Storage
+description: Cloud-based versioned storage using LakeFS
+---
+
+# LakeFS Storage
+
+Store test datasets and results in LakeFS for versioned, cloud-based storage.
+
+## What is LakeFS?
+
+LakeFS provides Git-like version control for data lakes. Benefits:
+
+- **Versioning**: Track changes to test datasets
+- **Branching**: Experiment with test variations
+- **Rollback**: Revert to previous dataset versions
+- **Collaboration**: Share test datasets across teams
+
+## Installation
+
+```bash
+uv pip install "alquimia-fair-forge[cloud]"
+```
+
+## Setup
+
+```python
+from fair_forge.storage import create_lakefs_storage
+
+storage = create_lakefs_storage(
+    host="http://lakefs.example.com:8000",
+    username="admin",
+    password="your-password",
+    repo_id="fair-forge-tests",
+    tests_prefix="tests/",
+    results_prefix="results/",
+    branch_name="main",
+)
+```
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `host` | `str` | Required | LakeFS server URL |
+| `username` | `str` | Required | LakeFS username |
+| `password` | `str` | Required | LakeFS password |
+| `repo_id` | `str` | Required | LakeFS repository ID |
+| `tests_prefix` | `str` | `"tests/"` | Path prefix for test datasets |
+| `results_prefix` | `str` | `"results/"` | Path prefix for results |
+| `branch_name` | `str` | `"main"` | LakeFS branch to use |
+| `enabled_suites` | `list[str] \| None` | `None` | Filter to specific suites |
+
+## Repository Structure
+
+```
+fair-forge-tests/
+├── tests/
+│   ├── regression/
+│   │   ├── api_tests.json
+│   │   └── ui_tests.json
+│   └── smoke/
+│       └── basic_tests.json
+└── results/
+    ├── test_run_20240115_143022_abc123.json
+    └── test_run_20240116_091530_def456.json
+```
+
+## Methods
+
+### load_datasets
+
+Load test datasets from LakeFS:
+
+```python
+datasets = storage.load_datasets()
+
+for ds in datasets:
+    print(f"{ds.session_id}: {len(ds.conversation)} batches")
+```
+
+### save_results
+
+Save execution results to LakeFS:
+
+```python
+from datetime import datetime
+import uuid
+
+result_path = storage.save_results(
+    datasets=executed_datasets,
+    run_id=str(uuid.uuid4()),
+    timestamp=datetime.now(),
+)
+
+print(f"Saved to LakeFS: {result_path}")
+```
+
+## Working with Branches
+
+### Use Different Branches
+
+```python
+# Main branch for production tests
+prod_storage = create_lakefs_storage(
+    host="...",
+    repo_id="fair-forge-tests",
+    branch_name="main",
+)
+
+# Development branch for experimental tests
+dev_storage = create_lakefs_storage(
+    host="...",
+    repo_id="fair-forge-tests",
+    branch_name="develop",
+)
+```
+
+## Complete Example
+
+```python
+import asyncio
+from datetime import datetime
+import uuid
+import os
+from fair_forge.storage import create_lakefs_storage
+from fair_forge.runners import AlquimiaRunner
+
+async def main():
+    # Setup LakeFS storage
+    storage = create_lakefs_storage(
+        host=os.getenv("LAKEFS_HOST"),
+        username=os.getenv("LAKEFS_USERNAME"),
+        password=os.getenv("LAKEFS_PASSWORD"),
+        repo_id="fair-forge-tests",
+        branch_name="main",
+    )
+
+    # Setup runner
+    runner = AlquimiaRunner(
+        base_url=os.getenv("ALQUIMIA_URL"),
+        api_key=os.getenv("ALQUIMIA_API_KEY"),
+        agent_id=os.getenv("AGENT_ID"),
+        channel_id=os.getenv("CHANNEL_ID"),
+    )
+
+    # Load datasets from LakeFS
+    print("Loading datasets from LakeFS...")
+    datasets = storage.load_datasets()
+    print(f"Loaded {len(datasets)} dataset(s)")
+
+    # Execute tests
+    executed = []
+    for dataset in datasets:
+        print(f"Running: {dataset.session_id}")
+        updated, summary = await runner.run_dataset(dataset)
+        executed.append(updated)
+        print(f"  {summary['successes']}/{summary['total_batches']} passed")
+
+    # Save results to LakeFS
+    result_path = storage.save_results(
+        datasets=executed,
+        run_id=str(uuid.uuid4()),
+        timestamp=datetime.now(),
+    )
+    print(f"\nResults saved to LakeFS: {result_path}")
+
+asyncio.run(main())
+```
+
+## Environment Variables
+
+```env
+LAKEFS_HOST=http://lakefs.example.com:8000
+LAKEFS_USERNAME=admin
+LAKEFS_PASSWORD=your-password
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="CI/CD Integration" icon="gear">
+    Version test datasets alongside code
+  </Card>
+  <Card title="A/B Testing" icon="code-compare">
+    Branch datasets for different test scenarios
+  </Card>
+  <Card title="Audit Trail" icon="clock-rotate-left">
+    Track all changes to test datasets
+  </Card>
+  <Card title="Team Collaboration" icon="users">
+    Share datasets across distributed teams
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Runners" icon="play" href="/runners/overview">
+    Execute test datasets
+  </Card>
+  <Card title="Examples" icon="code" href="/examples/overview">
+    See complete examples
+  </Card>
+</CardGroup>

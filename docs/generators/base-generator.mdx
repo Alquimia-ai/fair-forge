@@ -1,0 +1,323 @@
+---
+title: BaseGenerator
+description: The main class for generating synthetic test datasets
+---
+
+# BaseGenerator
+
+The `BaseGenerator` class is the core component for generating synthetic test datasets from your documentation.
+
+## Overview
+
+```python
+from fair_forge.generators import BaseGenerator
+from langchain_groq import ChatGroq
+
+# Create model
+model = ChatGroq(model="llama-3.1-8b-instant", temperature=0.4)
+
+# Create generator
+generator = BaseGenerator(
+    model=model,
+    use_structured_output=True,
+)
+
+# Generate datasets
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./documentation.md",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=3,
+)
+```
+
+## Constructor Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `model` | `BaseChatModel` | Required | LangChain-compatible chat model |
+| `use_structured_output` | `bool` | `False` | Use structured output parsing |
+
+## generate_dataset Method
+
+### Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `context_loader` | `ContextLoader` | Required | Loader for documentation |
+| `source` | `str` | Required | Path to documentation |
+| `assistant_id` | `str` | Required | ID for the generated dataset |
+| `num_queries_per_chunk` | `int` | `3` | Questions per chunk |
+| `language` | `str` | `"english"` | Language for generation |
+| `conversation_mode` | `bool` | `False` | Generate conversations |
+| `selection_strategy` | `Strategy` | `SequentialStrategy()` | Chunk selection strategy |
+| `seed_examples` | `list[str]` | `None` | Example questions to guide style |
+
+### Return Value
+
+```python
+list[Dataset]  # One or more datasets depending on strategy
+```
+
+## Basic Example
+
+```python
+from fair_forge.generators import BaseGenerator, create_markdown_loader
+from langchain_groq import ChatGroq
+
+# Setup
+model = ChatGroq(model="llama-3.1-8b-instant", temperature=0.4)
+loader = create_markdown_loader(max_chunk_size=2000)
+generator = BaseGenerator(model=model, use_structured_output=True)
+
+# Generate
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs/product.md",
+    assistant_id="product-assistant",
+    num_queries_per_chunk=3,
+    language="english",
+)
+
+# Results
+dataset = datasets[0]
+print(f"Generated {len(dataset.conversation)} queries")
+
+for batch in dataset.conversation:
+    print(f"[{batch.qa_id}] {batch.query}")
+```
+
+## With Seed Examples
+
+Guide the style of generated questions:
+
+```python
+seed_examples = [
+    "What is the difference between supervised and unsupervised learning?",
+    "How do you prevent overfitting in a machine learning model?",
+    "When should you use precision vs recall as your primary metric?",
+]
+
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./ml_docs.md",
+    assistant_id="ml-assistant",
+    num_queries_per_chunk=3,
+    seed_examples=seed_examples,
+)
+```
+
+## Conversation Mode
+
+Generate coherent multi-turn conversations:
+
+```python
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=3,  # 3-turn conversations
+    conversation_mode=True,
+)
+
+# Each batch includes turn metadata
+for batch in datasets[0].conversation:
+    turn = batch.agentic.get('turn_number', 0)
+    builds_on = batch.agentic.get('builds_on', None)
+    print(f"Turn {turn}: {batch.query}")
+    if builds_on:
+        print(f"  (follows up on: {builds_on})")
+```
+
+## With Selection Strategy
+
+### Random Sampling
+
+Generate multiple diverse datasets:
+
+```python
+from fair_forge.generators import RandomSamplingStrategy
+
+strategy = RandomSamplingStrategy(
+    num_samples=3,       # Create 3 datasets
+    chunks_per_sample=5, # Each with 5 random chunks
+    seed=42,             # For reproducibility
+)
+
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./docs",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=2,
+    selection_strategy=strategy,
+)
+
+print(f"Generated {len(datasets)} datasets")
+```
+
+## Generated Query Metadata
+
+Each generated batch includes metadata in the `agentic` field:
+
+```python
+batch.agentic = {
+    "difficulty": "medium",     # easy, medium, hard
+    "query_type": "factual",    # factual, inferential, comparative, application
+    "chunk_id": "doc_section_1",
+    "turn_number": 1,           # In conversation mode
+    "builds_on": "prev_query",  # In conversation mode
+}
+```
+
+## Complete Example
+
+```python
+import asyncio
+import json
+from pathlib import Path
+from fair_forge.generators import (
+    BaseGenerator,
+    create_markdown_loader,
+    RandomSamplingStrategy,
+)
+from langchain_groq import ChatGroq
+
+async def main():
+    # Create sample documentation
+    content = """# Product Documentation
+
+    Our product helps users manage their tasks efficiently.
+
+    ## Features
+
+    - Task creation and management
+    - Due date reminders
+    - Team collaboration
+
+    ## Getting Started
+
+    1. Create an account
+    2. Set up your first project
+    3. Invite team members
+    """
+
+    # Save to file
+    doc_path = Path("./sample_docs.md")
+    doc_path.write_text(content)
+
+    # Setup components
+    model = ChatGroq(
+        model="llama-3.1-8b-instant",
+        temperature=0.4,
+        max_tokens=2048,
+    )
+
+    loader = create_markdown_loader(
+        max_chunk_size=2000,
+        header_levels=[1, 2, 3],
+    )
+
+    generator = BaseGenerator(
+        model=model,
+        use_structured_output=True,
+    )
+
+    # Generate with random sampling
+    strategy = RandomSamplingStrategy(
+        num_samples=2,
+        chunks_per_sample=2,
+        seed=42,
+    )
+
+    datasets = await generator.generate_dataset(
+        context_loader=loader,
+        source=str(doc_path),
+        assistant_id="docs-assistant",
+        num_queries_per_chunk=3,
+        language="english",
+        selection_strategy=strategy,
+        conversation_mode=False,
+    )
+
+    # Output results
+    print(f"Generated {len(datasets)} dataset(s)\n")
+
+    for i, dataset in enumerate(datasets):
+        print(f"Dataset {i+1}: {len(dataset.conversation)} queries")
+        for batch in dataset.conversation:
+            difficulty = batch.agentic.get('difficulty', 'N/A')
+            print(f"  [{difficulty}] {batch.query}")
+
+    # Save to JSON
+    for i, dataset in enumerate(datasets):
+        output = Path(f"./test_dataset_{i+1}.json")
+        output.write_text(json.dumps(dataset.model_dump(), indent=2))
+        print(f"\nSaved: {output}")
+
+    # Cleanup
+    doc_path.unlink()
+
+asyncio.run(main())
+```
+
+## Error Handling
+
+```python
+try:
+    datasets = await generator.generate_dataset(
+        context_loader=loader,
+        source="./docs",
+        assistant_id="my-assistant",
+        num_queries_per_chunk=3,
+    )
+except ValueError as e:
+    print(f"Configuration error: {e}")
+except Exception as e:
+    print(f"Generation error: {e}")
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Choose Appropriate Chunk Size">
+    Match chunk size to your content:
+    - **500-1000**: Short, focused sections
+    - **1000-2000**: Standard documentation
+    - **2000-4000**: Long-form content
+  </Accordion>
+
+  <Accordion title="Use Seed Examples">
+    Provide seed examples to guide question style:
+    ```python
+    seed_examples = [
+        "What is...",
+        "How do I...",
+        "When should I...",
+    ]
+    ```
+  </Accordion>
+
+  <Accordion title="Adjust Temperature">
+    - **Low (0.0-0.3)**: More deterministic, focused questions
+    - **Medium (0.4-0.7)**: Balanced creativity
+    - **High (0.8-1.0)**: More varied, creative questions
+  </Accordion>
+
+  <Accordion title="Use Conversation Mode for Context Testing">
+    Enable conversation mode when testing context retention:
+    ```python
+    conversation_mode=True
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Context Loaders" icon="file-import" href="/generators/context-loaders">
+    Learn about loading documentation
+  </Card>
+  <Card title="Strategies" icon="sitemap" href="/generators/strategies">
+    Learn about chunk selection
+  </Card>
+</CardGroup>

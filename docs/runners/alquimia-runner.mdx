@@ -1,0 +1,245 @@
+---
+title: AlquimiaRunner
+description: Execute tests against Alquimia AI agents
+---
+
+# AlquimiaRunner
+
+The `AlquimiaRunner` executes test datasets against Alquimia AI agents.
+
+## Setup
+
+```python
+from fair_forge.runners import AlquimiaRunner
+import os
+
+runner = AlquimiaRunner(
+    base_url=os.getenv("ALQUIMIA_URL", "https://api.alquimia.ai"),
+    api_key=os.getenv("ALQUIMIA_API_KEY"),
+    agent_id=os.getenv("AGENT_ID"),
+    channel_id=os.getenv("CHANNEL_ID"),
+    api_version="",  # Optional API version
+)
+```
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `base_url` | `str` | Yes | Alquimia API base URL |
+| `api_key` | `str` | Yes | API authentication key |
+| `agent_id` | `str` | Yes | Target agent ID |
+| `channel_id` | `str` | Yes | Communication channel ID |
+| `api_version` | `str` | No | API version string |
+
+## Methods
+
+### run_batch
+
+Execute a single test case:
+
+```python
+batch = Batch(
+    qa_id="test-001",
+    query="What is the capital of France?",
+    assistant="",
+)
+
+updated_batch, success, exec_time = await runner.run_batch(
+    batch,
+    session_id="session-001",
+)
+
+print(f"Success: {success}")
+print(f"Execution time: {exec_time:.2f}ms")
+print(f"Response: {updated_batch.assistant}")
+```
+
+**Returns:**
+- `updated_batch`: Batch with `assistant` field filled
+- `success`: Boolean indicating success
+- `exec_time`: Execution time in milliseconds
+
+### run_dataset
+
+Execute all tests in a dataset:
+
+```python
+dataset = Dataset(
+    session_id="test-session",
+    assistant_id="my-assistant",
+    language="english",
+    context="",
+    conversation=[batch1, batch2, batch3],
+)
+
+updated_dataset, summary = await runner.run_dataset(dataset)
+
+print(f"Successes: {summary['successes']}/{summary['total_batches']}")
+print(f"Total time: {summary['total_execution_time_ms']:.2f}ms")
+```
+
+**Returns:**
+- `updated_dataset`: Dataset with all responses
+- `summary`: Execution statistics
+
+## Execution Summary
+
+```python
+summary = {
+    "session_id": "test-session",
+    "total_batches": 10,
+    "successes": 9,
+    "failures": 1,
+    "total_execution_time_ms": 12345.6,
+    "avg_batch_time_ms": 1234.5,
+}
+```
+
+## Complete Example
+
+```python
+import asyncio
+import os
+from fair_forge.runners import AlquimiaRunner
+from fair_forge.schemas import Dataset, Batch
+
+async def main():
+    # Setup runner
+    runner = AlquimiaRunner(
+        base_url=os.getenv("ALQUIMIA_URL"),
+        api_key=os.getenv("ALQUIMIA_API_KEY"),
+        agent_id=os.getenv("AGENT_ID"),
+        channel_id=os.getenv("CHANNEL_ID"),
+    )
+
+    # Create test dataset
+    dataset = Dataset(
+        session_id="alquimia-test-001",
+        assistant_id="my-agent",
+        language="english",
+        context="",
+        conversation=[
+            Batch(
+                qa_id="q1",
+                query="What is machine learning?",
+                assistant="",
+                ground_truth_assistant="Machine learning is a type of AI...",
+            ),
+            Batch(
+                qa_id="q2",
+                query="What are neural networks?",
+                assistant="",
+                ground_truth_assistant="Neural networks are computing systems...",
+            ),
+            Batch(
+                qa_id="q3",
+                query="How does deep learning work?",
+                assistant="",
+                ground_truth_assistant="Deep learning uses multiple layers...",
+            ),
+        ],
+    )
+
+    # Execute tests
+    print(f"Running {len(dataset.conversation)} test cases...\n")
+    updated_dataset, summary = await runner.run_dataset(dataset)
+
+    # Print summary
+    print("=" * 60)
+    print("EXECUTION SUMMARY")
+    print("=" * 60)
+    print(f"Session ID: {summary['session_id']}")
+    print(f"Total batches: {summary['total_batches']}")
+    print(f"Successes: {summary['successes']}")
+    print(f"Failures: {summary['failures']}")
+    print(f"Total time: {summary['total_execution_time_ms']:.2f}ms")
+    print(f"Avg batch time: {summary['avg_batch_time_ms']:.2f}ms")
+    print("=" * 60)
+
+    # Print responses
+    print("\nResponses:")
+    for batch in updated_dataset.conversation:
+        print(f"\nQ: {batch.query}")
+        print(f"A: {batch.assistant[:200]}...")
+
+asyncio.run(main())
+```
+
+## Environment Variables
+
+Create a `.env` file:
+
+```env
+ALQUIMIA_URL=https://api.alquimia.ai
+ALQUIMIA_API_KEY=your-api-key
+AGENT_ID=your-agent-id
+CHANNEL_ID=your-channel-id
+```
+
+Load with python-dotenv:
+
+```python
+from dotenv import load_dotenv
+load_dotenv()
+```
+
+## Error Handling
+
+```python
+try:
+    updated_dataset, summary = await runner.run_dataset(dataset)
+
+    if summary['failures'] > 0:
+        print(f"Warning: {summary['failures']} failures occurred")
+
+except Exception as e:
+    print(f"Execution failed: {e}")
+```
+
+## With Storage
+
+Combine with storage backends:
+
+```python
+from fair_forge.runners import AlquimiaRunner
+from fair_forge.storage import create_local_storage
+from datetime import datetime
+import uuid
+
+# Setup
+runner = AlquimiaRunner(...)
+storage = create_local_storage(
+    tests_dir="./test_datasets",
+    results_dir="./test_results",
+)
+
+# Load test datasets
+datasets = storage.load_datasets()
+
+# Execute all
+executed_datasets = []
+for dataset in datasets:
+    updated, summary = await runner.run_dataset(dataset)
+    executed_datasets.append(updated)
+    print(f"Completed {dataset.session_id}: {summary['successes']}/{summary['total_batches']}")
+
+# Save results
+result_path = storage.save_results(
+    datasets=executed_datasets,
+    run_id=str(uuid.uuid4()),
+    timestamp=datetime.now(),
+)
+print(f"Results saved to: {result_path}")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Custom Runners" icon="code" href="/runners/custom-runners">
+    Create your own runner
+  </Card>
+  <Card title="Storage" icon="database" href="/storage/overview">
+    Learn about storage backends
+  </Card>
+</CardGroup>
