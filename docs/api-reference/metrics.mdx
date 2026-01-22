@@ -1,0 +1,222 @@
+---
+title: Metrics API
+description: API reference for all Fair Forge metrics
+---
+
+# Metrics API Reference
+
+## Toxicity
+
+```python
+from fair_forge.metrics.toxicity import Toxicity
+```
+
+### Toxicity.run()
+
+```python
+@classmethod
+def run(
+    cls,
+    retriever: Type[Retriever],
+    *,
+    # Group detection
+    group_prototypes: dict[str, list[str]] | None = None,
+    group_thresholds: dict[str, float] | None = None,
+    group_default_threshold: float = 0.50,
+    group_toxicity_threshold: float = 0.5,
+    group_extractor: BaseGroupExtractor | None = None,
+
+    # Embedding
+    embedding_model: str = "all-MiniLM-L6-v2",
+
+    # Clustering (HDBSCAN)
+    toxicity_min_cluster_size: int = 5,
+    toxicity_cluster_selection_epsilon: float = 0.0,
+    toxicity_cluster_selection_method: str = "eom",
+    toxicity_cluster_use_latent_space: bool = True,
+
+    # UMAP
+    umap_n_components: int = 2,
+    umap_n_neighbors: int = 15,
+    umap_min_dist: float = 0.1,
+    umap_random_state: int = 42,
+    umap_metric: str = "cosine",
+
+    # DIDT weights
+    w_DR: float = 1/3,
+    w_ASB: float = 1/3,
+    w_DTO: float = 1/3,
+
+    # Statistical mode
+    statistical_mode: StatisticalMode | None = None,
+
+    # Other
+    toxicity_loader: Type[ToxicityLoader] = HurtlexLoader,
+    sentiment_analyzer: SentimentAnalyzer | None = None,
+    verbose: bool = False,
+    **kwargs,
+) -> list[ToxicityMetric]
+```
+
+---
+
+## Bias
+
+```python
+from fair_forge.metrics.bias import Bias
+```
+
+### Bias.run()
+
+```python
+@classmethod
+def run(
+    cls,
+    retriever: Type[Retriever],
+    *,
+    guardian: Type[Guardian],
+    config: GuardianLLMConfig,
+    confidence_level: float = 0.95,
+    verbose: bool = False,
+    **kwargs,
+) -> list[BiasMetric]
+```
+
+---
+
+## Context
+
+```python
+from fair_forge.metrics.context import Context
+```
+
+### Context.run()
+
+```python
+@classmethod
+def run(
+    cls,
+    retriever: Type[Retriever],
+    *,
+    model: BaseChatModel,
+    use_structured_output: bool = False,
+    bos_json_clause: str = "```json",
+    eos_json_clause: str = "```",
+    verbose: bool = False,
+    **kwargs,
+) -> list[ContextMetric]
+```
+
+---
+
+## Conversational
+
+```python
+from fair_forge.metrics.conversational import Conversational
+```
+
+### Conversational.run()
+
+```python
+@classmethod
+def run(
+    cls,
+    retriever: Type[Retriever],
+    *,
+    model: BaseChatModel,
+    use_structured_output: bool = False,
+    bos_json_clause: str = "```json",
+    eos_json_clause: str = "```",
+    verbose: bool = False,
+    **kwargs,
+) -> list[ConversationalMetric]
+```
+
+---
+
+## Humanity
+
+```python
+from fair_forge.metrics.humanity import Humanity
+```
+
+### Humanity.run()
+
+```python
+@classmethod
+def run(
+    cls,
+    retriever: Type[Retriever],
+    *,
+    verbose: bool = False,
+    **kwargs,
+) -> list[HumanityMetric]
+```
+
+---
+
+## BestOf
+
+```python
+from fair_forge.metrics.best_of import BestOf
+```
+
+### BestOf.run()
+
+```python
+@classmethod
+def run(
+    cls,
+    retriever: Type[Retriever],
+    *,
+    model: BaseChatModel,
+    use_structured_output: bool = False,
+    bos_json_clause: str = "```json",
+    eos_json_clause: str = "```",
+    criteria: str = "BestOf",
+    verbose: bool = False,
+    **kwargs,
+) -> list[BestOfMetric]
+```
+
+---
+
+## FairForge Base Class
+
+```python
+from fair_forge.core.base import FairForge
+```
+
+### Abstract Methods
+
+```python
+class FairForge(ABC):
+    def __init__(
+        self,
+        retriever: Type[Retriever],
+        verbose: bool = False,
+        **kwargs,
+    ):
+        pass
+
+    @abstractmethod
+    def batch(
+        self,
+        session_id: str,
+        context: str,
+        assistant_id: str,
+        batch: list[Batch],
+        language: str | None,
+    ) -> None:
+        """Process a batch of conversations."""
+        pass
+
+    @classmethod
+    def run(
+        cls,
+        retriever: Type[Retriever],
+        **kwargs,
+    ) -> list:
+        """One-shot execution."""
+        pass
+```

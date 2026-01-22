@@ -1,0 +1,121 @@
+---
+title: {MODULE_NAME}
+description: {MODULE_DESCRIPTION}
+---
+
+# {MODULE_NAME}
+
+{MODULE_LONG_DESCRIPTION}
+
+## Installation
+
+```bash
+uv pip install "fair-forge[{EXTRA_NAME}]"
+```
+
+## Setup
+
+```python
+from {IMPORT_PATH} import {FACTORY_FUNCTION}
+
+storage = {FACTORY_FUNCTION}(
+{CONSTRUCTOR_PARAMS}
+)
+```
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+{PARAMS_TABLE}
+
+## Methods
+
+### load_datasets
+
+Load test datasets from storage:
+
+```python
+datasets = storage.load_datasets()
+
+print(f"Loaded {len(datasets)} dataset(s)")
+for ds in datasets:
+    print(f"  - {ds.session_id}: {len(ds.conversation)} batches")
+```
+
+### save_results
+
+Save execution results:
+
+```python
+from datetime import datetime
+import uuid
+
+result_path = storage.save_results(
+    datasets=executed_datasets,
+    run_id=str(uuid.uuid4()),
+    timestamp=datetime.now(),
+)
+
+print(f"Saved to: {result_path}")
+```
+
+## Data Format
+
+### Test Dataset
+
+```json
+{
+  "session_id": "test-001",
+  "assistant_id": "my-assistant",
+  "language": "english",
+  "context": "You are a helpful assistant.",
+  "conversation": [
+    {
+      "qa_id": "q1",
+      "query": "What is the capital of France?",
+      "assistant": "",
+      "ground_truth_assistant": "Paris"
+    }
+  ]
+}
+```
+
+### Results File
+
+```json
+{
+  "run_id": "abc123",
+  "timestamp": "2024-01-15T14:30:22",
+  "datasets": [...]
+}
+```
+
+## Complete Example
+
+```python
+{COMPLETE_EXAMPLE_CODE}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="{BEST_PRACTICE_1_TITLE}">
+    {BEST_PRACTICE_1_CONTENT}
+  </Accordion>
+
+  <Accordion title="{BEST_PRACTICE_2_TITLE}">
+    {BEST_PRACTICE_2_CONTENT}
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Runners" icon="play" href="/runners/overview">
+    Execute test datasets
+  </Card>
+  <Card title="Metrics" icon="chart-pie" href="/metrics/overview">
+    Evaluate results
+  </Card>
+</CardGroup>

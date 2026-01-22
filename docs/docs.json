@@ -1,0 +1,119 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Fair Forge",
+  "theme": "mint",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#884393",
+    "light": "#54c2e9",
+    "dark": "#6a3473"
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/Alquimia-ai/fair-forge"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Started",
+    "url": "/quickstart"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core-concepts/architecture",
+              "core-concepts/retriever",
+              "core-concepts/dataset-batch",
+              "core-concepts/statistical-modes"
+            ]
+          },
+          {
+            "group": "Metrics",
+            "pages": [
+              "metrics/overview",
+              "metrics/toxicity",
+              "metrics/bias",
+              "metrics/context",
+              "metrics/conversational",
+              "metrics/humanity",
+              "metrics/best-of"
+            ]
+          },
+          {
+            "group": "Generators",
+            "pages": [
+              "generators/overview",
+              "generators/base-generator",
+              "generators/context-loaders",
+              "generators/strategies"
+            ]
+          },
+          {
+            "group": "Runners",
+            "pages": [
+              "runners/overview",
+              "runners/alquimia-runner",
+              "runners/custom-runners"
+            ]
+          },
+          {
+            "group": "Storage",
+            "pages": [
+              "storage/overview",
+              "storage/local-storage",
+              "storage/lakefs-storage"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "API Reference",
+            "pages": [
+              "api-reference/overview",
+              "api-reference/metrics",
+              "api-reference/generators",
+              "api-reference/runners",
+              "api-reference/schemas"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Examples",
+        "groups": [
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/overview",
+              "examples/jupyter-notebooks",
+              "examples/aws-lambda"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footerSocials": {
+    "github": "https://github.com/Alquimia-ai/fair-forge"
+  }
+}

@@ -1,0 +1,327 @@
+---
+title: Context
+description: Evaluate how well AI responses align with provided context
+---
+
+# Context Metric
+
+The Context metric evaluates how well an AI assistant's responses align with the provided system context and instructions.
+
+## Overview
+
+This metric uses an LLM as a judge to assess:
+
+- **Context Awareness**: How well the response follows the given context (0-1 scale)
+- **Context Insight**: Explanation of the alignment assessment
+- **Context Thinkings**: The judge's reasoning process
+
+## Installation
+
+```bash
+uv pip install "fair-forge[context]"
+uv pip install langchain-groq  # Or your preferred LLM provider
+```
+
+## Basic Usage
+
+```python
+from fair_forge.metrics.context import Context
+from langchain_groq import ChatGroq
+from your_retriever import MyRetriever
+
+# Initialize the judge model
+judge_model = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    api_key="your-api-key",
+    temperature=0.0,
+)
+
+# Run the metric
+metrics = Context.run(
+    MyRetriever,
+    model=judge_model,
+    use_structured_output=True,
+    verbose=True,
+)
+
+# Analyze results
+for metric in metrics:
+    print(f"QA ID: {metric.qa_id}")
+    print(f"Context Awareness: {metric.context_awareness}")
+    print(f"Insight: {metric.context_insight}")
+```
+
+## Parameters
+
+### Required Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `retriever` | `Type[Retriever]` | Data source class |
+| `model` | `BaseChatModel` | LangChain-compatible judge model |
+
+### Optional Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `use_structured_output` | `bool` | `False` | Use LangChain structured output |
+| `bos_json_clause` | `str` | `"```json"` | JSON block start marker |
+| `eos_json_clause` | `str` | `"```"` | JSON block end marker |
+| `verbose` | `bool` | `False` | Enable verbose logging |
+
+## Output Schema
+
+### ContextMetric
+
+```python
+class ContextMetric(BaseMetric):
+    session_id: str
+    assistant_id: str
+    qa_id: str                    # ID of the evaluated interaction
+    context_awareness: float      # Alignment score (0-1)
+    context_insight: str          # Explanation of the assessment
+    context_thinkings: str        # Judge's reasoning (if available)
+```
+
+## Interpretation
+
+### Context Awareness Score
+
+| Score Range | Interpretation |
+|-------------|----------------|
+| 0.8 - 1.0 | Excellent alignment - response fully follows context |
+| 0.6 - 0.8 | Good alignment - mostly follows context with minor deviations |
+| 0.4 - 0.6 | Moderate alignment - partially follows context |
+| 0.2 - 0.4 | Poor alignment - significant deviations from context |
+| 0.0 - 0.2 | Very poor - response ignores or contradicts context |
+
+### Example Insights
+
+```
+Score: 1.0
+Insight: "The assistant's response directly answers the user's query about
+the CEO of Alquimia, matching the ground truth provided in the context.
+No extraneous information is included."
+
+Score: 0.2
+Insight: "The assistant's response repeats a generic statement that
+doesn't reflect the detailed information in the context. It fails to
+mention the key attributes."
+
+Score: 0.0
+Insight: "The assistant provided no response to the user's queries,
+failing to address the context."
+```
+
+## Complete Example
+
+```python
+import os
+from fair_forge.metrics.context import Context
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Dataset, Batch
+from langchain_groq import ChatGroq
+
+# Define retriever with context
+class ContextTestRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        context = """You are a helpful customer service assistant for TechStore.
+        Key policies:
+        - Returns accepted within 30 days with receipt
+        - Free shipping on orders over $50
+        - Support hours: Mon-Fri 9am-5pm EST
+        Always be polite and offer to help further."""
+
+        return [
+            Dataset(
+                session_id="context-eval-001",
+                assistant_id="techstore-bot",
+                language="english",
+                context=context,
+                conversation=[
+                    Batch(
+                        qa_id="q1",
+                        query="What's your return policy?",
+                        assistant="Our return policy allows returns within 30 days with a receipt. Is there anything else I can help with?",
+                        ground_truth_assistant="Returns within 30 days with receipt.",
+                    ),
+                    Batch(
+                        qa_id="q2",
+                        query="Do you offer free shipping?",
+                        assistant="Yes, we offer free shipping on orders over $50. Would you like help with anything else?",
+                        ground_truth_assistant="Free shipping on orders over $50.",
+                    ),
+                    Batch(
+                        qa_id="q3",
+                        query="What are your hours?",
+                        assistant="We're open 24/7!",  # Wrong - context says Mon-Fri 9-5
+                        ground_truth_assistant="Mon-Fri 9am-5pm EST.",
+                    ),
+                ]
+            )
+        ]
+
+# Initialize judge
+judge = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    api_key=os.getenv("GROQ_API_KEY"),
+    temperature=0.0,
+)
+
+# Run context evaluation
+metrics = Context.run(
+    ContextTestRetriever,
+    model=judge,
+    use_structured_output=True,
+    verbose=True,
+)
+
+# Analyze results
+print("Context Evaluation Results")
+print("=" * 60)
+
+for metric in metrics:
+    status = "PASS" if metric.context_awareness >= 0.8 else "FAIL"
+    print(f"\n[{status}] QA ID: {metric.qa_id}")
+    print(f"Score: {metric.context_awareness:.2f}")
+    print(f"Insight: {metric.context_insight}")
+
+# Calculate average
+avg_score = sum(m.context_awareness for m in metrics) / len(metrics)
+print(f"\nAverage Context Awareness: {avg_score:.2f}")
+```
+
+## LLM Provider Options
+
+### Groq
+
+```python
+from langchain_groq import ChatGroq
+
+judge = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    api_key="your-api-key",
+    temperature=0.0,
+)
+```
+
+### OpenAI
+
+```python
+from langchain_openai import ChatOpenAI
+
+judge = ChatOpenAI(
+    model="gpt-4o",
+    api_key="your-api-key",
+    temperature=0.0,
+)
+```
+
+### Anthropic
+
+```python
+from langchain_anthropic import ChatAnthropic
+
+judge = ChatAnthropic(
+    model="claude-3-sonnet-20240229",
+    api_key="your-api-key",
+    temperature=0.0,
+)
+```
+
+### Ollama (Local)
+
+```python
+from langchain_ollama import ChatOllama
+
+judge = ChatOllama(
+    model="llama3.1:8b",
+    temperature=0.0,
+)
+```
+
+## Structured vs Non-Structured Output
+
+### Structured Output
+
+Uses LangChain's structured output feature (recommended):
+
+```python
+metrics = Context.run(
+    MyRetriever,
+    model=judge,
+    use_structured_output=True,  # Uses .with_structured_output()
+)
+```
+
+**Pros**: More reliable parsing, better type safety
+**Cons**: Requires model support for structured output
+
+### Non-Structured Output
+
+Uses regex extraction from JSON blocks:
+
+```python
+metrics = Context.run(
+    MyRetriever,
+    model=judge,
+    use_structured_output=False,
+    bos_json_clause="```json",
+    eos_json_clause="```",
+)
+```
+
+**Pros**: Works with any model
+**Cons**: May have parsing failures
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Provide Clear Context">
+    Include specific, actionable instructions in your context:
+    ```python
+    context = """You are a support assistant for Acme Corp.
+    Rules:
+    1. Always greet customers by name if available
+    2. Never discuss competitors
+    3. Escalate billing issues to human support
+    4. Response time SLA: 24 hours"""
+    ```
+  </Accordion>
+
+  <Accordion title="Include Ground Truth">
+    Provide `ground_truth_assistant` for better evaluation:
+    ```python
+    Batch(
+        qa_id="q1",
+        query="What's your refund policy?",
+        assistant="Refunds take 5-7 business days...",
+        ground_truth_assistant="Refunds processed within 5-7 business days to original payment method.",
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Use Temperature 0">
+    Set `temperature=0` for consistent, deterministic judgments:
+    ```python
+    judge = ChatGroq(model="...", temperature=0.0)
+    ```
+  </Accordion>
+
+  <Accordion title="Choose Appropriate Model">
+    Larger models provide better judgment quality:
+    - **Production**: GPT-4, Claude-3, Llama-3-70B
+    - **Testing**: Llama-3-8B, GPT-3.5
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Conversational Metric" icon="comments" href="/metrics/conversational">
+    Learn about dialogue quality evaluation
+  </Card>
+  <Card title="Humanity Metric" icon="heart" href="/metrics/humanity">
+    Learn about emotional analysis
+  </Card>
+</CardGroup>

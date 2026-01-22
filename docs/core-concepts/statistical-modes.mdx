@@ -1,0 +1,307 @@
+---
+title: Statistical Modes
+description: Choose between Frequentist and Bayesian statistical approaches
+---
+
+# Statistical Modes
+
+Fair Forge supports two statistical approaches for computing metrics: **Frequentist** and **Bayesian**. This is particularly relevant for the Toxicity metric.
+
+## Overview
+
+| Mode | Returns | Best For |
+|------|---------|----------|
+| **Frequentist** | Point estimates (single values) | Quick analysis, large datasets |
+| **Bayesian** | Full distributions with credible intervals | Uncertainty quantification, small datasets |
+
+## Frequentist Mode
+
+The default mode returns simple point estimates.
+
+```python
+from fair_forge.metrics.toxicity import Toxicity
+from fair_forge.statistical import FrequentistMode
+
+metrics = Toxicity.run(
+    MyRetriever,
+    group_prototypes=group_prototypes,
+    statistical_mode=FrequentistMode(),  # Default
+)
+
+# Access results
+for metric in metrics:
+    gp = metric.group_profiling
+    if gp and gp.frequentist:
+        print(f"DR: {gp.frequentist.DR}")    # Single float
+        print(f"ASB: {gp.frequentist.ASB}")  # Single float
+        print(f"DTO: {gp.frequentist.DTO}")  # Single float
+        print(f"DIDT: {gp.frequentist.DIDT}") # Single float
+```
+
+### Frequentist Methods
+
+| Method | Description |
+|--------|-------------|
+| `distribution_divergence()` | Total variation distance |
+| `rate_estimation()` | Simple proportion (successes/trials) |
+| `aggregate_metrics()` | Weighted sum |
+| `dispersion_metric()` | Mean absolute deviation |
+
+### When to Use
+
+- Large datasets (>100 samples)
+- Quick preliminary analysis
+- When point estimates are sufficient
+- Production systems where speed matters
+
+## Bayesian Mode
+
+Returns full posterior distributions with uncertainty quantification.
+
+```python
+from fair_forge.metrics.toxicity import Toxicity
+from fair_forge.statistical import BayesianMode
+
+bayesian = BayesianMode(
+    mc_samples=5000,      # Monte Carlo samples
+    ci_level=0.95,        # 95% credible intervals
+    dirichlet_prior=1.0,  # Dirichlet prior for distributions
+    beta_prior_a=1.0,     # Beta prior alpha
+    beta_prior_b=1.0,     # Beta prior beta
+    rng_seed=42,          # For reproducibility
+)
+
+metrics = Toxicity.run(
+    MyRetriever,
+    group_prototypes=group_prototypes,
+    statistical_mode=bayesian,
+)
+
+# Access results
+for metric in metrics:
+    gp = metric.group_profiling
+    if gp and gp.bayesian:
+        summary = gp.bayesian.summary
+
+        for component in ['DR', 'ASB', 'DTO', 'DIDT']:
+            s = summary[component]
+            print(f"{component}:")
+            print(f"  Mean: {s.mean:.4f}")
+            print(f"  95% CI: [{s.ci_low:.4f}, {s.ci_high:.4f}]")
+```
+
+### BayesianMode Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `mc_samples` | `int` | `5000` | Number of Monte Carlo samples |
+| `ci_level` | `float` | `0.95` | Credible interval level (0-1) |
+| `dirichlet_prior` | `float` | `1.0` | Dirichlet prior concentration |
+| `beta_prior_a` | `float` | `1.0` | Beta distribution alpha parameter |
+| `beta_prior_b` | `float` | `1.0` | Beta distribution beta parameter |
+| `rng_seed` | `int \| None` | `42` | Random seed for reproducibility |
+
+### Bayesian Output Structure
+
+```python
+# The BayesianGroupProfiling structure
+gp.bayesian.mc_samples      # Number of samples used
+gp.bayesian.ci_level        # Credible interval level
+gp.bayesian.priors          # Prior parameters used
+gp.bayesian.summary         # Dict of component summaries
+
+# Each component summary contains:
+summary['DIDT'].mean        # Posterior mean
+summary['DIDT'].ci_low      # Lower credible bound
+summary['DIDT'].ci_high     # Upper credible bound
+summary['DIDT'].samples     # Raw posterior samples (optional)
+```
+
+### When to Use
+
+- Small datasets (fewer than 100 samples)
+- When uncertainty quantification is important
+- Research and scientific applications
+- When making decisions based on confidence levels
+
+## Comparison Example
+
+```python
+from fair_forge.metrics.toxicity import Toxicity
+from fair_forge.statistical import FrequentistMode, BayesianMode
+
+group_prototypes = {
+    "gender": ["women", "men", "female", "male"],
+    "race": ["Asian", "African", "European", "Hispanic"],
+}
+
+# Run with Frequentist mode
+freq_metrics = Toxicity.run(
+    MyRetriever,
+    group_prototypes=group_prototypes,
+    statistical_mode=FrequentistMode(),
+)
+
+# Run with Bayesian mode
+bayes_metrics = Toxicity.run(
+    MyRetriever,
+    group_prototypes=group_prototypes,
+    statistical_mode=BayesianMode(mc_samples=5000, ci_level=0.95),
+)
+
+# Compare results
+print("Comparison: Frequentist vs Bayesian")
+print("=" * 60)
+
+freq_gp = freq_metrics[0].group_profiling
+bayes_gp = bayes_metrics[0].group_profiling
+
+for component in ['DR', 'ASB', 'DTO', 'DIDT']:
+    freq_val = getattr(freq_gp.frequentist, component)
+    bayes_summary = bayes_gp.bayesian.summary[component]
+
+    print(f"\n{component}:")
+    print(f"  Frequentist: {freq_val:.4f}")
+    print(f"  Bayesian:    {bayes_summary.mean:.4f} [{bayes_summary.ci_low:.4f}, {bayes_summary.ci_high:.4f}]")
+```
+
+**Output:**
+```
+Comparison: Frequentist vs Bayesian
+============================================================
+
+DR:
+  Frequentist: 0.5000
+  Bayesian:    0.1862 [0.0084, 0.4355]
+
+ASB:
+  Frequentist: 0.0000
+  Bayesian:    0.0000 [0.0000, 0.0000]
+
+DTO:
+  Frequentist: 0.5000
+  Bayesian:    0.3376 [0.1622, 0.4709]
+
+DIDT:
+  Frequentist: 0.3333
+  Bayesian:    0.1746 [0.0853, 0.2728]
+```
+
+## Understanding the Difference
+
+The key difference is in how they handle uncertainty:
+
+<Tabs>
+  <Tab title="Small Sample (n=10)">
+    With small samples, Frequentist estimates can be misleading:
+    - **Frequentist**: "DIDT = 0.50" (point estimate, no uncertainty)
+    - **Bayesian**: "DIDT = 0.35 [0.10, 0.65]" (wide interval shows uncertainty)
+
+    The Bayesian approach acknowledges that with limited data, we can't be confident in a precise value.
+  </Tab>
+  <Tab title="Large Sample (n=1000)">
+    With large samples, both converge:
+    - **Frequentist**: "DIDT = 0.32"
+    - **Bayesian**: "DIDT = 0.32 [0.29, 0.35]" (narrow interval)
+
+    More data leads to more confidence and narrower intervals.
+  </Tab>
+</Tabs>
+
+## Priors in Bayesian Mode
+
+### Dirichlet Prior
+
+Used for distribution comparisons (e.g., group representation):
+
+```python
+BayesianMode(
+    dirichlet_prior=1.0,  # Uniform prior (no preference)
+)
+
+# Higher values = stronger prior toward uniformity
+BayesianMode(
+    dirichlet_prior=10.0,  # Strong prior toward uniform distribution
+)
+```
+
+### Beta Prior
+
+Used for rate estimation (e.g., toxicity rates):
+
+```python
+# Uninformative prior
+BayesianMode(
+    beta_prior_a=1.0,
+    beta_prior_b=1.0,
+)
+
+# Prior expecting low rates (pessimistic)
+BayesianMode(
+    beta_prior_a=1.0,
+    beta_prior_b=10.0,  # Expects ~10% rate
+)
+
+# Prior expecting high rates (optimistic)
+BayesianMode(
+    beta_prior_a=10.0,
+    beta_prior_b=1.0,  # Expects ~90% success rate
+)
+```
+
+## Custom Statistical Modes
+
+You can create custom statistical modes by implementing the `StatisticalMode` interface:
+
+```python
+from fair_forge.statistical.base import StatisticalMode
+from typing import Any
+
+class CustomMode(StatisticalMode):
+    def distribution_divergence(
+        self,
+        observed: dict,
+        reference: dict,
+        divergence_type: str = "kl"
+    ) -> float | dict[str, Any]:
+        # Your implementation
+        pass
+
+    def rate_estimation(
+        self,
+        successes: int,
+        trials: int
+    ) -> float | dict[str, Any]:
+        # Your implementation
+        pass
+
+    def aggregate_metrics(
+        self,
+        metrics: dict[str, float | dict],
+        weights: dict[str, float]
+    ) -> float | dict[str, Any]:
+        # Your implementation
+        pass
+
+    def dispersion_metric(
+        self,
+        values: list[float],
+        center: float | None = None
+    ) -> float | dict[str, Any]:
+        # Your implementation
+        pass
+
+    def get_result_type(self) -> str:
+        return "custom"  # or "point_estimate" or "distribution"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Toxicity Metric" icon="flask" href="/metrics/toxicity">
+    See statistical modes in action
+  </Card>
+  <Card title="Metrics Overview" icon="chart-pie" href="/metrics/overview">
+    Explore all available metrics
+  </Card>
+</CardGroup>

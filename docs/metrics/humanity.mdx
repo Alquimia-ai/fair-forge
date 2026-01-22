@@ -1,0 +1,303 @@
+---
+title: Humanity
+description: Analyze emotional depth and human-likeness of AI responses
+---
+
+# Humanity Metric
+
+The Humanity metric evaluates the emotional depth and human-likeness of AI responses using the **NRC Emotion Lexicon**.
+
+## Overview
+
+The metric analyzes eight emotion categories:
+
+| Emotion | Description |
+|---------|-------------|
+| **Anger** | Expressions of frustration, annoyance, hostility |
+| **Anticipation** | Forward-looking, expectant expressions |
+| **Disgust** | Expressions of distaste or aversion |
+| **Fear** | Expressions of worry, anxiety, concern |
+| **Joy** | Expressions of happiness, satisfaction, pleasure |
+| **Sadness** | Expressions of sorrow, disappointment |
+| **Surprise** | Expressions of unexpectedness |
+| **Trust** | Expressions of confidence, reliability |
+
+Key metrics:
+- **Emotional Entropy**: Shannon entropy measuring emotional diversity
+- **Spearman Correlation**: Correlation with ground truth emotional distribution
+
+## Installation
+
+```bash
+uv pip install "fair-forge[humanity]"
+```
+
+## Basic Usage
+
+```python
+from fair_forge.metrics.humanity import Humanity
+from your_retriever import MyRetriever
+
+# Run the metric (no LLM required)
+metrics = Humanity.run(
+    MyRetriever,
+    verbose=True,
+)
+
+# Analyze results
+for metric in metrics:
+    print(f"QA ID: {metric.qa_id}")
+    print(f"Emotional Entropy: {metric.humanity_assistant_emotional_entropy:.4f}")
+    print(f"Spearman Correlation: {metric.humanity_ground_truth_spearman:.4f}")
+```
+
+## Parameters
+
+### Required Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `retriever` | `Type[Retriever]` | Data source class |
+
+### Optional Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `verbose` | `bool` | `False` | Enable verbose logging |
+
+## Output Schema
+
+### HumanityMetric
+
+```python
+class HumanityMetric(BaseMetric):
+    session_id: str
+    assistant_id: str
+    qa_id: str
+    humanity_assistant_emotional_entropy: float    # Shannon entropy
+    humanity_ground_truth_spearman: float         # Correlation with ground truth
+
+    # Per-emotion proportions (0-1)
+    humanity_assistant_anger: float
+    humanity_assistant_anticipation: float
+    humanity_assistant_disgust: float
+    humanity_assistant_fear: float
+    humanity_assistant_joy: float
+    humanity_assistant_sadness: float
+    humanity_assistant_surprise: float
+    humanity_assistant_trust: float
+```
+
+## Understanding the Metrics
+
+### Emotional Entropy
+
+Measures the diversity of emotions in a response using Shannon entropy:
+
+```
+H = -Σ p(emotion) * log2(p(emotion))
+```
+
+| Entropy | Interpretation |
+|---------|----------------|
+| > 2.5 | High diversity - uses many emotions naturally |
+| 1.5 - 2.5 | Moderate diversity - balanced emotional expression |
+| < 1.5 | Low diversity - dominated by few emotions |
+| 0 | Only one emotion or no emotional content |
+
+### Spearman Correlation
+
+Measures how well the assistant's emotional distribution matches the ground truth:
+
+| Correlation | Interpretation |
+|-------------|----------------|
+| > 0.5 | Strong positive - emotions align well with expected |
+| 0.0 - 0.5 | Weak positive - some alignment |
+| ≈ 0.0 | No correlation - emotions are unrelated |
+| < 0.0 | Negative - emotions diverge from expected |
+
+## Complete Example
+
+```python
+from fair_forge.metrics.humanity import Humanity
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Dataset, Batch
+import numpy as np
+
+class HumanityRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        return [
+            Dataset(
+                session_id="humanity-eval-001",
+                assistant_id="empathetic-bot",
+                language="english",
+                context="You are a supportive, empathetic assistant.",
+                conversation=[
+                    Batch(
+                        qa_id="q1",
+                        query="I just got promoted at work!",
+                        assistant="That's wonderful news! Congratulations on your well-deserved promotion. Your hard work has clearly paid off, and I'm thrilled for your success!",
+                        ground_truth_assistant="Express joy and congratulations enthusiastically.",
+                    ),
+                    Batch(
+                        qa_id="q2",
+                        query="I'm worried about my exam tomorrow.",
+                        assistant="I understand your anxiety about the exam. It's natural to feel nervous. Remember to take deep breaths and trust in your preparation. You've got this!",
+                        ground_truth_assistant="Acknowledge worry, provide reassurance and support.",
+                    ),
+                    Batch(
+                        qa_id="q3",
+                        query="Tell me about machine learning algorithms.",
+                        assistant="Machine learning algorithms are mathematical methods that learn patterns from data.",
+                        ground_truth_assistant="Provide factual, educational content.",
+                    ),
+                ]
+            )
+        ]
+
+# Run evaluation
+metrics = Humanity.run(
+    HumanityRetriever,
+    verbose=True,
+)
+
+# Analyze results
+print("Humanity Evaluation Results")
+print("=" * 60)
+
+emotions = ["anger", "anticipation", "disgust", "fear", "joy", "sadness", "surprise", "trust"]
+
+for metric in metrics:
+    print(f"\nQA ID: {metric.qa_id}")
+    print(f"Emotional Entropy: {metric.humanity_assistant_emotional_entropy:.4f}")
+    print(f"Ground Truth Spearman: {metric.humanity_ground_truth_spearman:.4f}")
+    print("Emotion Distribution:")
+    for emotion in emotions:
+        value = getattr(metric, f"humanity_assistant_{emotion}")
+        if value > 0:
+            bar = "█" * int(value * 20)
+            print(f"  {emotion.capitalize():12}: {value:.3f} {bar}")
+
+# Summary
+print("\n" + "=" * 60)
+print("Summary")
+print("=" * 60)
+avg_entropy = np.mean([m.humanity_assistant_emotional_entropy for m in metrics])
+avg_spearman = np.mean([m.humanity_ground_truth_spearman for m in metrics])
+print(f"Average Emotional Entropy: {avg_entropy:.4f}")
+print(f"Average Spearman Correlation: {avg_spearman:.4f}")
+```
+
+## Visualization
+
+### Emotion Distribution Bar Chart
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+
+emotions = ["anger", "anticipation", "disgust", "fear", "joy", "sadness", "surprise", "trust"]
+
+# Calculate average emotion distributions
+avg_emotions = {e: 0 for e in emotions}
+for metric in metrics:
+    for emotion in emotions:
+        avg_emotions[emotion] += getattr(metric, f"humanity_assistant_{emotion}")
+
+for emotion in emotions:
+    avg_emotions[emotion] /= len(metrics)
+
+# Plot
+fig, ax = plt.subplots(figsize=(10, 6))
+bars = ax.bar(emotions, [avg_emotions[e] for e in emotions], color='steelblue')
+ax.set_xlabel('Emotion')
+ax.set_ylabel('Average Distribution')
+ax.set_title('Average Emotion Distribution Across Responses')
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+```
+
+### Entropy Distribution
+
+```python
+import matplotlib.pyplot as plt
+
+entropies = [m.humanity_assistant_emotional_entropy for m in metrics]
+qa_ids = [m.qa_id for m in metrics]
+
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.bar(qa_ids, entropies, color='coral')
+ax.set_xlabel('QA ID')
+ax.set_ylabel('Emotional Entropy')
+ax.set_title('Emotional Entropy per Response')
+ax.axhline(y=np.mean(entropies), color='red', linestyle='--', label=f'Mean: {np.mean(entropies):.2f}')
+ax.legend()
+plt.tight_layout()
+plt.show()
+```
+
+## Use Cases
+
+<AccordionGroup>
+  <Accordion title="Customer Service">
+    Responses should show trust, anticipation, and appropriate empathy:
+    - High trust for reliability
+    - Joy for positive interactions
+    - Some sadness/understanding for complaints
+  </Accordion>
+
+  <Accordion title="Mental Health Support">
+    Should match user's emotional tone appropriately:
+    - High Spearman correlation with ground truth
+    - Balanced emotional diversity
+    - Appropriate expressions of care and support
+  </Accordion>
+
+  <Accordion title="Technical Documentation">
+    May have lower emotional content (which is appropriate):
+    - Low entropy is acceptable
+    - Trust should still be present
+    - Neutral emotional tone
+  </Accordion>
+
+  <Accordion title="Creative Writing">
+    Should show high emotional diversity:
+    - High entropy (>2.0)
+    - Varied emotions across interactions
+    - Natural emotional range
+  </Accordion>
+</AccordionGroup>
+
+## Interpretation Guidelines
+
+### High Emotional Entropy (>2.0)
+
+The response expresses a diverse range of emotions, appearing more natural and human-like. Good for:
+- Creative writing
+- Emotional support
+- Engaging conversation
+
+### Low Emotional Entropy (below 1.0)
+
+The response is dominated by few emotions or is emotionally neutral. May be:
+- Appropriate for technical content
+- Concerning for empathetic contexts
+- Sign of robotic responses
+
+### Zero Entropy
+
+Only one emotion detected or no emotional content. Could indicate:
+- Purely factual response (acceptable for technical queries)
+- Lack of appropriate emotional expression (concerning for support contexts)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="BestOf Metric" icon="trophy" href="/metrics/best-of">
+    Learn about assistant comparison
+  </Card>
+  <Card title="Metrics Overview" icon="chart-pie" href="/metrics/overview">
+    Explore all available metrics
+  </Card>
+</CardGroup>

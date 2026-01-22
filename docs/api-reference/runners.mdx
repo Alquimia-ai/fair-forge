@@ -1,0 +1,157 @@
+---
+title: Runners API
+description: API reference for Fair Forge runners
+---
+
+# Runners API Reference
+
+## AlquimiaRunner
+
+```python
+from fair_forge.runners import AlquimiaRunner
+```
+
+### Constructor
+
+```python
+def __init__(
+    self,
+    base_url: str,
+    api_key: str,
+    agent_id: str,
+    channel_id: str,
+    api_version: str = "",
+):
+    pass
+```
+
+### run_batch()
+
+```python
+async def run_batch(
+    self,
+    batch: Batch,
+    session_id: str,
+    **kwargs: Any,
+) -> tuple[Batch, bool, float]:
+    """Execute a single test case.
+
+    Returns:
+        tuple: (updated_batch, success, execution_time_ms)
+    """
+    pass
+```
+
+### run_dataset()
+
+```python
+async def run_dataset(
+    self,
+    dataset: Dataset,
+    **kwargs: Any,
+) -> tuple[Dataset, dict[str, Any]]:
+    """Execute all tests in a dataset.
+
+    Returns:
+        tuple: (updated_dataset, summary)
+    """
+    pass
+```
+
+---
+
+## BaseRunner Interface
+
+```python
+from fair_forge.schemas.runner import BaseRunner
+```
+
+### Abstract Class
+
+```python
+class BaseRunner(ABC):
+    @abstractmethod
+    async def run_batch(
+        self,
+        batch: Batch,
+        session_id: str,
+        **kwargs: Any,
+    ) -> tuple[Batch, bool, float]:
+        pass
+
+    @abstractmethod
+    async def run_dataset(
+        self,
+        dataset: Dataset,
+        **kwargs: Any,
+    ) -> tuple[Dataset, dict[str, Any]]:
+        pass
+```
+
+---
+
+## Execution Summary
+
+The `run_dataset` method returns a summary dict:
+
+```python
+summary = {
+    "session_id": str,             # Dataset session ID
+    "total_batches": int,          # Total test cases
+    "successes": int,              # Successful executions
+    "failures": int,               # Failed executions
+    "total_execution_time_ms": float,  # Total time in ms
+    "avg_batch_time_ms": float,    # Average per-batch time
+}
+```
+
+---
+
+## Storage
+
+### create_local_storage()
+
+```python
+from fair_forge.storage import create_local_storage
+
+def create_local_storage(
+    tests_dir: Path,
+    results_dir: Path,
+    enabled_suites: list[str] | None = None,
+) -> LocalStorage
+```
+
+### create_lakefs_storage()
+
+```python
+from fair_forge.storage import create_lakefs_storage
+
+def create_lakefs_storage(
+    host: str,
+    username: str,
+    password: str,
+    repo_id: str,
+    tests_prefix: str = "tests/",
+    results_prefix: str = "results/",
+    branch_name: str = "main",
+    enabled_suites: list[str] | None = None,
+) -> LakeFSStorage
+```
+
+### BaseStorage Interface
+
+```python
+class BaseStorage(ABC):
+    @abstractmethod
+    def load_datasets(self) -> list[Dataset]:
+        pass
+
+    @abstractmethod
+    def save_results(
+        self,
+        datasets: list[Dataset],
+        run_id: str,
+        timestamp: datetime,
+    ) -> str:
+        pass
+```

@@ -1,0 +1,109 @@
+---
+title: {MODULE_NAME}
+description: {MODULE_DESCRIPTION}
+---
+
+# {MODULE_NAME}
+
+{MODULE_LONG_DESCRIPTION}
+
+## Installation
+
+```bash
+uv pip install "fair-forge[runners]"
+```
+
+## Setup
+
+```python
+from {IMPORT_PATH} import {CLASS_NAME}
+
+runner = {CLASS_NAME}(
+{CONSTRUCTOR_PARAMS}
+)
+```
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+{PARAMS_TABLE}
+
+## Methods
+
+### run_batch
+
+Execute a single test case:
+
+```python
+updated_batch, success, exec_time_ms = await runner.run_batch(
+    batch=batch,
+    session_id="test-session",
+)
+```
+
+### run_dataset
+
+Execute all test cases in a dataset:
+
+```python
+updated_dataset, summary = await runner.run_dataset(dataset)
+
+print(f"Success rate: {summary['successes']}/{summary['total_batches']}")
+print(f"Avg time: {summary['avg_batch_time_ms']:.1f}ms")
+```
+
+## Execution Summary
+
+Each run returns a summary dict:
+
+```python
+summary = {
+    "session_id": "test-001",
+    "total_batches": 10,
+    "successes": 9,
+    "failures": 1,
+    "total_execution_time_ms": 5432.1,
+    "avg_batch_time_ms": 543.2,
+}
+```
+
+## Complete Example
+
+```python
+{COMPLETE_EXAMPLE_CODE}
+```
+
+## Error Handling
+
+```python
+try:
+    updated_dataset, summary = await runner.run_dataset(dataset)
+except ConnectionError as e:
+    print(f"Connection failed: {e}")
+except TimeoutError as e:
+    print(f"Request timed out: {e}")
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="{BEST_PRACTICE_1_TITLE}">
+    {BEST_PRACTICE_1_CONTENT}
+  </Accordion>
+
+  <Accordion title="{BEST_PRACTICE_2_TITLE}">
+    {BEST_PRACTICE_2_CONTENT}
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Storage" icon="database" href="/storage/overview">
+    Save and load test results
+  </Card>
+  <Card title="Metrics" icon="chart-pie" href="/metrics/overview">
+    Evaluate collected responses
+  </Card>
+</CardGroup>
