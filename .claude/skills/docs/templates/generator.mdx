@@ -1,0 +1,132 @@
+---
+title: {MODULE_NAME}
+description: {MODULE_DESCRIPTION}
+---
+
+# {MODULE_NAME}
+
+{MODULE_LONG_DESCRIPTION}
+
+## Installation
+
+```bash
+uv pip install "fair-forge[generators]"
+uv pip install langchain-groq  # Or your preferred LLM provider
+```
+
+## Setup
+
+```python
+from {IMPORT_PATH} import {CLASS_NAME}
+from langchain_groq import ChatGroq
+
+model = ChatGroq(
+    model="llama-3.1-8b-instant",
+    temperature=0.4,
+)
+
+generator = {CLASS_NAME}(
+    model=model,
+{CONSTRUCTOR_PARAMS}
+)
+```
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+{PARAMS_TABLE}
+
+## Methods
+
+### generate_dataset
+
+Generate test datasets from context:
+
+```python
+datasets = await generator.generate_dataset(
+    context_loader=loader,
+    source="./documentation.md",
+    assistant_id="my-assistant",
+    num_queries_per_chunk=3,
+)
+
+for dataset in datasets:
+    print(f"Generated {len(dataset.conversation)} queries")
+```
+
+## Generation Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `context_loader` | `BaseContextLoader` | Required | Loader for source documents |
+| `source` | `str` | Required | Path to documentation |
+| `assistant_id` | `str` | Required | ID for generated datasets |
+| `num_queries_per_chunk` | `int` | `3` | Queries per chunk |
+| `conversation_mode` | `bool` | `False` | Generate multi-turn conversations |
+| `selection_strategy` | `BaseStrategy` | `SequentialStrategy` | Chunk selection strategy |
+| `seed_examples` | `list[str]` | `None` | Example queries for style |
+
+## Complete Example
+
+```python
+{COMPLETE_EXAMPLE_CODE}
+```
+
+## LLM Provider Options
+
+<CodeGroup>
+```python Groq
+from langchain_groq import ChatGroq
+
+model = ChatGroq(
+    model="llama-3.1-8b-instant",
+    temperature=0.4,
+)
+```
+
+```python OpenAI
+from langchain_openai import ChatOpenAI
+
+model = ChatOpenAI(
+    model="gpt-4o-mini",
+    temperature=0.4,
+)
+```
+
+```python Ollama (Local)
+from langchain_ollama import ChatOllama
+
+model = ChatOllama(
+    model="llama3.1:8b",
+    temperature=0.4,
+)
+```
+</CodeGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Appropriate Chunk Sizes">
+    Keep chunks between 1000-2000 characters for best results.
+  </Accordion>
+
+  <Accordion title="Provide Seed Examples">
+    Include 2-3 example queries to guide the generation style.
+  </Accordion>
+
+  <Accordion title="Use Conversation Mode for Multi-turn Testing">
+    Enable `conversation_mode=True` when testing dialogue capabilities.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Context Loaders" icon="file-import" href="/generators/context-loaders">
+    Learn about loading documentation
+  </Card>
+  <Card title="Runners" icon="play" href="/runners/overview">
+    Execute generated tests
+  </Card>
+</CardGroup>

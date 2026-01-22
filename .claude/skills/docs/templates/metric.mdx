@@ -1,0 +1,152 @@
+---
+title: {MODULE_NAME}
+description: {MODULE_DESCRIPTION}
+---
+
+# {MODULE_NAME} Metric
+
+{MODULE_LONG_DESCRIPTION}
+
+## Overview
+
+This metric evaluates:
+
+- **{METRIC_ASPECT_1}**: {ASPECT_1_DESCRIPTION}
+- **{METRIC_ASPECT_2}**: {ASPECT_2_DESCRIPTION}
+- **{METRIC_ASPECT_3}**: {ASPECT_3_DESCRIPTION}
+
+## Installation
+
+```bash
+uv pip install "fair-forge[{EXTRA_NAME}]"
+```
+
+{IF_LLM_BASED}
+```bash
+uv pip install langchain-groq  # Or your preferred LLM provider
+```
+{/IF_LLM_BASED}
+
+## Basic Usage
+
+```python
+from {IMPORT_PATH} import {CLASS_NAME}
+{ADDITIONAL_IMPORTS}
+
+{BASIC_USAGE_CODE}
+```
+
+## Parameters
+
+### Required Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `retriever` | `Type[Retriever]` | Data source class |
+{REQUIRED_PARAMS_TABLE}
+
+### Optional Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+{OPTIONAL_PARAMS_TABLE}
+
+## Output Schema
+
+### {CLASS_NAME}Metric
+
+```python
+class {CLASS_NAME}Metric(BaseMetric):
+    session_id: str
+    assistant_id: str
+    qa_id: str
+{OUTPUT_SCHEMA_FIELDS}
+```
+
+## Interpretation
+
+### {MAIN_SCORE_NAME}
+
+| Score Range | Interpretation |
+|-------------|----------------|
+| 0.8 - 1.0 | {INTERPRETATION_EXCELLENT} |
+| 0.6 - 0.8 | {INTERPRETATION_GOOD} |
+| 0.4 - 0.6 | {INTERPRETATION_MODERATE} |
+| 0.2 - 0.4 | {INTERPRETATION_POOR} |
+| 0.0 - 0.2 | {INTERPRETATION_VERY_POOR} |
+
+## Complete Example
+
+```python
+{COMPLETE_EXAMPLE_CODE}
+```
+
+{IF_LLM_BASED}
+## LLM Provider Options
+
+<CodeGroup>
+```python Groq
+from langchain_groq import ChatGroq
+
+model = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    api_key="your-api-key",
+    temperature=0.0,
+)
+```
+
+```python OpenAI
+from langchain_openai import ChatOpenAI
+
+model = ChatOpenAI(
+    model="gpt-4o",
+    api_key="your-api-key",
+    temperature=0.0,
+)
+```
+
+```python Ollama (Local)
+from langchain_ollama import ChatOllama
+
+model = ChatOllama(
+    model="llama3.1:8b",
+    temperature=0.0,
+)
+```
+</CodeGroup>
+{/IF_LLM_BASED}
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="{BEST_PRACTICE_1_TITLE}">
+    {BEST_PRACTICE_1_CONTENT}
+  </Accordion>
+
+  <Accordion title="{BEST_PRACTICE_2_TITLE}">
+    {BEST_PRACTICE_2_CONTENT}
+  </Accordion>
+
+  <Accordion title="{BEST_PRACTICE_3_TITLE}">
+    {BEST_PRACTICE_3_CONTENT}
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="{TROUBLESHOOTING_1_TITLE}">
+    {TROUBLESHOOTING_1_CONTENT}
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="{RELATED_1_TITLE}" icon="{RELATED_1_ICON}" href="{RELATED_1_HREF}">
+    {RELATED_1_DESCRIPTION}
+  </Card>
+  <Card title="{RELATED_2_TITLE}" icon="{RELATED_2_ICON}" href="{RELATED_2_HREF}">
+    {RELATED_2_DESCRIPTION}
+  </Card>
+</CardGroup>

@@ -16,11 +16,11 @@ Fair Forge uses a modular dependency system, allowing you to install only the co
 
 <CodeGroup>
 ```bash uv (Recommended)
-uv pip install alquimia-fair-forge
+uv pip install fair-forge
 ```
 
 ```bash pip
-pip install alquimia-fair-forge
+pip install fair-forge
 ```
 </CodeGroup>
 
@@ -60,22 +60,22 @@ Fair Forge provides optional dependency groups for each metric and feature:
 <CodeGroup>
 ```bash Single Metric
 # Install with toxicity metric support
-uv pip install "alquimia-fair-forge[toxicity]"
+uv pip install "fair-forge[toxicity]"
 ```
 
 ```bash Multiple Metrics
 # Install multiple metrics
-uv pip install "alquimia-fair-forge[toxicity,bias,context]"
+uv pip install "fair-forge[toxicity,bias,context]"
 ```
 
 ```bash Full Installation
 # Install everything
-uv pip install "alquimia-fair-forge[all]"
+uv pip install "fair-forge[all]"
 ```
 
 ```bash Generators + Runners
 # Install for test generation and execution
-uv pip install "alquimia-fair-forge[generators,runners]"
+uv pip install "fair-forge[generators,runners]"
 ```
 </CodeGroup>
 
@@ -150,7 +150,7 @@ print("Installation successful!")
   <Accordion title="ImportError: No module named 'sentence_transformers'">
     Install the toxicity extras:
     ```bash
-    uv pip install "alquimia-fair-forge[toxicity]"
+    uv pip install "fair-forge[toxicity]"
     ```
   </Accordion>
 
@@ -165,7 +165,7 @@ print("Installation successful!")
     For CPU-only installation:
     ```bash
     uv pip install torch --index-url https://download.pytorch.org/whl/cpu
-    uv pip install "alquimia-fair-forge[toxicity]"
+    uv pip install "fair-forge[toxicity]"
     ```
   </Accordion>
 
