@@ -11,17 +11,36 @@ Fair-Forge generators create synthetic test datasets from context documents usin
 
 ## Lambda Implementation
 
-Generators are async and require context to be passed in the payload.
+Generators use a dynamic connector pattern that allows runtime selection of LLM provider.
 
 ```python
-"""run.py - Generators pattern"""
+"""run.py - Generators pattern with dynamic connector"""
 import asyncio
+import importlib
 import os
 import tempfile
 from typing import Any
 
-from fair_forge.generators import BaseGenerator, LocalMarkdownLoader
-from langchain_groq import ChatGroq
+
+def create_llm_connector(connector_config: dict) -> Any:
+    """Factory method to create LLM connector from dynamic class path."""
+    class_path = connector_config.get("class_path")
+    params = connector_config.get("params", {})
+
+    if not class_path:
+        raise ValueError("connector.class_path is required")
+
+    module_path, class_name = class_path.rsplit(".", 1)
+    module = importlib.import_module(module_path)
+    cls = getattr(module, class_name)
+
+    # Support environment variable fallback for api_key
+    if "api_key" not in params or not params["api_key"]:
+        env_key = os.environ.get("LLM_API_KEY")
+        if env_key:
+            params["api_key"] = env_key
+
+    return cls(**params)
 
 
 def run(payload: dict) -> dict[str, Any]:
@@ -31,18 +50,21 @@ def run(payload: dict) -> dict[str, Any]:
 
 async def _async_run(payload: dict) -> dict[str, Any]:
     """Async generator implementation."""
+    from fair_forge.generators import BaseGenerator, LocalMarkdownLoader
+
+    # Get connector config
+    connector_config = payload.get("connector", {})
+    if not connector_config:
+        return {"success": False, "error": "No connector configuration provided"}
+
+    try:
+        model = create_llm_connector(connector_config)
+    except ValueError as e:
+        return {"success": False, "error": str(e)}
+    except Exception as e:
+        return {"success": False, "error": f"Failed to create LLM connector: {e}"}
+
     config = payload.get("config", {})
-    api_key = config.get("api_key") or os.environ.get("LLM_API_KEY")
-
-    if not api_key:
-        return {"success": False, "error": "No API key provided"}
-
-    # Initialize LLM
-    model = ChatGroq(
-        model=config.get("model", "qwen/qwen3-32b"),
-        api_key=api_key,
-        temperature=config.get("temperature", 0.7),
-    )
 
     # Initialize generator
     generator = BaseGenerator(model=model, use_structured_output=True)
@@ -91,10 +113,16 @@ async def _async_run(payload: dict) -> dict[str, Any]:
 
 ```json
 {
+  "connector": {
+    "class_path": "langchain_groq.chat_models.ChatGroq",
+    "params": {
+      "model": "qwen/qwen3-32b",
+      "api_key": "your-api-key",
+      "temperature": 0.7
+    }
+  },
   "context": "# Knowledge Base\n\nYour markdown content here...\n\n## Section 1\n\nContent for section 1...",
   "config": {
-    "api_key": "your-llm-api-key",
-    "model": "qwen/qwen3-32b",
     "assistant_id": "my-assistant",
     "num_queries": 3,
     "language": "english",
@@ -108,6 +136,15 @@ async def _async_run(payload: dict) -> dict[str, Any]:
   }
 }
 ```
+
+## Supported Connectors
+
+| Provider | class_path |
+|----------|-----------|
+| Groq | `langchain_groq.chat_models.ChatGroq` |
+| OpenAI | `langchain_openai.chat_models.ChatOpenAI` |
+| Google Gemini | `langchain_google_genai.chat_models.ChatGoogleGenerativeAI` |
+| Ollama | `langchain_ollama.chat_models.ChatOllama` |
 
 ## Response Format
 

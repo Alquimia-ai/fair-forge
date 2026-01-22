@@ -27,6 +27,7 @@ examples/{module}/aws-lambda/
 ├── handler.py       # Lambda entrypoint
 ├── run.py           # Business logic (customize this)
 ├── requirements.txt # Additional runtime dependencies
+├── README.md        # API documentation
 └── scripts/
     ├── deploy.sh
     ├── update.sh
@@ -59,15 +60,18 @@ Edit `run.py` with your module logic. See reference docs for patterns:
 - `references/runners.md` - Runners implementation patterns
 - `references/generators.md` - Generators implementation patterns
 
-### 4. Update requirements.txt
+### 4. Generate README.md
 
-Add your LLM provider or other dependencies:
+After deployment, create a README.md using the template from `assets/templates/README.md`. Replace the placeholders:
 
-```
-langchain-groq      # Groq
-langchain-openai    # OpenAI
-langchain-anthropic # Anthropic
-```
+| Placeholder | Example |
+|-------------|---------|
+| `{MODULE_NAME}` | `Generators` |
+| `{INVOKE_URL}` | `https://xxx.execute-api.us-east-2.amazonaws.com/run` |
+| `{MODULE_EXTRA}` | `generators` |
+| `{AWS_REGION}` | `us-east-2` |
+
+See the template for full list of placeholders.
 
 ### 5. Deploy
 
@@ -89,6 +93,54 @@ Examples:
 ```bash
 ./scripts/update.sh {extra-name} us-east-2   # Rebuild and update
 ./scripts/cleanup.sh {extra-name} us-east-2  # Remove all resources
+```
+
+## Dynamic LLM Connector API
+
+For modules that use LLMs (generators, metrics), the API uses a dynamic connector pattern that allows runtime selection of LLM provider:
+
+### Request Format
+
+```json
+{
+  "connector": {
+    "class_path": "langchain_groq.chat_models.ChatGroq",
+    "params": {
+      "model": "qwen/qwen3-32b",
+      "api_key": "your-api-key",
+      "temperature": 0.7
+    }
+  },
+  "context": "...",
+  "config": {...}
+}
+```
+
+### Supported Connectors
+
+| Provider | class_path |
+|----------|-----------|
+| Groq | `langchain_groq.chat_models.ChatGroq` |
+| OpenAI | `langchain_openai.chat_models.ChatOpenAI` |
+| Google Gemini | `langchain_google_genai.chat_models.ChatGoogleGenerativeAI` |
+| Ollama | `langchain_ollama.chat_models.ChatOllama` |
+
+### Connector Factory Implementation
+
+The `create_llm_connector` function uses dynamic imports to instantiate any LangChain chat model:
+
+```python
+import importlib
+
+def create_llm_connector(connector_config: dict):
+    class_path = connector_config.get("class_path")
+    params = connector_config.get("params", {})
+
+    module_path, class_name = class_path.rsplit(".", 1)
+    module = importlib.import_module(module_path)
+    cls = getattr(module, class_name)
+
+    return cls(**params)
 ```
 
 ## Dockerfile Build Process
@@ -125,7 +177,8 @@ RUN WHEEL=$(ls /tmp/*.whl) && pip install "${WHEEL}[${MODULE_EXTRA}]" --target "
 - `Dockerfile` - Multi-stage Lambda container build
 - `handler.py` - Lambda entrypoint wrapper
 - `run.py` - Business logic template (customize this)
-- `requirements.txt` - Runtime dependencies
+- `requirements.txt` - Runtime dependencies with all LLM providers
+- `README.md` - API documentation template with placeholders
 
 ### references/
 - `metrics.md` - Metrics module implementation patterns
@@ -162,4 +215,10 @@ This indicates a version mismatch between langchain packages. Pin compatible ver
 ```
 langchain-core>=0.3.0,<0.4.0
 langchain-groq>=0.2.0,<0.3.0
+```
+
+### tiktoken Rust compiler error
+If you see "can't find Rust compiler" when installing langchain-openai, pin tiktoken to a version with pre-built wheels:
+```
+tiktoken>=0.7.0,<0.8.0
 ```
