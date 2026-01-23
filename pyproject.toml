@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "alquimia-fair-forge"
-version = "0.1.2"
+version = "1.0.0"
 description = "Alquimia Fair Forge library - Performance measurement for AI models and assistants"
 readme = "README.md"
 license = {text = "MIT"}
