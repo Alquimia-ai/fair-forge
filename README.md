@@ -10,7 +10,6 @@
 
 <p align="center">
   <a href="https://fairforge.alquimia.ai">Documentation</a> •
-  <a href="https://fairforge.alquimia.ai/llms.txt">LLM-friendly docs</a> •
   <a href="https://github.com/Alquimia-ai/fair-forge">GitHub</a>
 </p>
 
@@ -54,12 +53,6 @@ metrics = Toxicity.run(MyRetriever, verbose=True)
 For complete documentation, guides, and API reference visit:
 
 **[https://fairforge.alquimia.ai](https://fairforge.alquimia.ai)**
-
-### For LLMs
-
-If you want to use the documentation with an LLM, use:
-
-**[https://fairforge.alquimia.ai/llms.txt](https://fairforge.alquimia.ai/llms.txt)**
 
 ## License
 
