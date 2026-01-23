@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
+
 from fair_forge.utils.logging import VerboseLogger
 
 if TYPE_CHECKING:
@@ -26,7 +27,7 @@ class SentimentAnalyzer(ABC):
         Args:
             **kwargs: Additional configuration parameters for specific implementations.
         """
-        self.logger = VerboseLogger(kwargs.get('verbose', False))
+        self.logger = VerboseLogger(kwargs.get("verbose", False))
 
     @abstractmethod
     def infer(self, text: str) -> "SentimentScore":

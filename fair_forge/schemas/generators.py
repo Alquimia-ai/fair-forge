@@ -10,7 +10,8 @@ allowing any LangChain-compatible model to be used for generation.
 import re
 import uuid
 from abc import ABC, abstractmethod
-from typing import Any, Iterator, Optional
+from collections.abc import Iterator
+from typing import Any, Optional
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
@@ -31,7 +32,7 @@ class Chunk(BaseModel):
 
     content: str
     chunk_id: str
-    metadata: Optional[dict] = Field(default_factory=dict)
+    metadata: dict | None = Field(default_factory=dict)
 
 
 class GeneratedQuery(BaseModel):
@@ -44,8 +45,8 @@ class GeneratedQuery(BaseModel):
     """
 
     query: str
-    difficulty: Optional[str] = None
-    query_type: Optional[str] = None
+    difficulty: str | None = None
+    query_type: str | None = None
 
 
 class GeneratedQueriesOutput(BaseModel):
@@ -56,12 +57,8 @@ class GeneratedQueriesOutput(BaseModel):
         chunk_summary: Brief summary of the chunk content
     """
 
-    queries: list[GeneratedQuery] = Field(
-        description="List of generated queries based on the chunk content"
-    )
-    chunk_summary: str = Field(
-        description="Brief summary of the chunk content (1-2 sentences)"
-    )
+    queries: list[GeneratedQuery] = Field(description="List of generated queries based on the chunk content")
+    chunk_summary: str = Field(description="Brief summary of the chunk content (1-2 sentences)")
 
 
 class ConversationTurn(BaseModel):
@@ -79,12 +76,12 @@ class ConversationTurn(BaseModel):
     """
 
     query: str
-    expected_context: Optional[str] = Field(
+    expected_context: str | None = Field(
         default=None,
         description="Context this turn builds upon from previous turns",
     )
-    difficulty: Optional[str] = None
-    query_type: Optional[str] = None
+    difficulty: str | None = None
+    query_type: str | None = None
     turn_number: int = Field(ge=1, description="Position in conversation (1-indexed)")
 
 
@@ -267,21 +264,21 @@ class BaseGenerator:
         Returns:
             GeneratedQueriesOutput: Parsed structured output
         """
-        chat_prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("human", prompt),
-        ])
+        chat_prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", system_prompt),
+                ("human", prompt),
+            ]
+        )
 
         if self.use_structured_output:
             structured_model = self.model.with_structured_output(GeneratedQueriesOutput)
             chain = chat_prompt | structured_model
-            result = chain.invoke({})
-            return result
-        else:
-            chain = chat_prompt | self.model
-            response = chain.invoke({})
-            content = str(response.content)
-            return self._parse_json_response(content)
+            return chain.invoke({})
+        chain = chat_prompt | self.model
+        response = chain.invoke({})
+        content = str(response.content)
+        return self._parse_json_response(content)
 
     async def _call_llm_conversation(
         self,
@@ -297,23 +294,21 @@ class BaseGenerator:
         Returns:
             GeneratedConversationOutput: Parsed structured output
         """
-        chat_prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("human", prompt),
-        ])
+        chat_prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", system_prompt),
+                ("human", prompt),
+            ]
+        )
 
         if self.use_structured_output:
-            structured_model = self.model.with_structured_output(
-                GeneratedConversationOutput
-            )
+            structured_model = self.model.with_structured_output(GeneratedConversationOutput)
             chain = chat_prompt | structured_model
-            result = chain.invoke({})
-            return result
-        else:
-            chain = chat_prompt | self.model
-            response = chain.invoke({})
-            content = str(response.content)
-            return self._parse_conversation_response(content)
+            return chain.invoke({})
+        chain = chat_prompt | self.model
+        response = chain.invoke({})
+        content = str(response.content)
+        return self._parse_conversation_response(content)
 
     def _parse_json_response(self, content: str) -> GeneratedQueriesOutput:
         """Parse JSON from model response.
@@ -367,8 +362,8 @@ class BaseGenerator:
         self,
         chunk: Chunk,
         num_queries: int = 3,
-        seed_examples: Optional[list[str]] = None,
-        custom_system_prompt: Optional[str] = None,
+        seed_examples: list[str] | None = None,
+        custom_system_prompt: str | None = None,
     ) -> list[GeneratedQuery]:
         """Generate independent queries for a single chunk using LangChain.
 
@@ -412,9 +407,7 @@ You MUST respond with a valid JSON object in this exact format:
                 prompt=f"Generate {num_queries} questions.",
                 system_prompt=formatted_prompt,
             )
-            logger.debug(
-                f"Generated {len(output.queries)} queries for chunk {chunk.chunk_id}"
-            )
+            logger.debug(f"Generated {len(output.queries)} queries for chunk {chunk.chunk_id}")
             return output.queries
         except Exception as e:
             logger.error(f"Failed to generate queries for chunk {chunk.chunk_id}: {e}")
@@ -424,8 +417,8 @@ You MUST respond with a valid JSON object in this exact format:
         self,
         chunk: Chunk,
         num_turns: int = 3,
-        seed_examples: Optional[list[str]] = None,
-        custom_system_prompt: Optional[str] = None,
+        seed_examples: list[str] | None = None,
+        custom_system_prompt: str | None = None,
     ) -> list[ConversationTurn]:
         """Generate a coherent multi-turn conversation from a chunk.
 
@@ -441,16 +434,12 @@ You MUST respond with a valid JSON object in this exact format:
         Returns:
             list[ConversationTurn]: Ordered conversation turns.
         """
-        logger.debug(
-            f"Generating {num_turns}-turn conversation for chunk {chunk.chunk_id}"
-        )
+        logger.debug(f"Generating {num_turns}-turn conversation for chunk {chunk.chunk_id}")
 
         seed_section = ""
         if seed_examples:
             examples_str = "\n".join(f"- {ex}" for ex in seed_examples)
-            seed_section = (
-                f"\nExample conversation flow (match this style):\n{examples_str}\n"
-            )
+            seed_section = f"\nExample conversation flow (match this style):\n{examples_str}\n"
 
         system_prompt = custom_system_prompt or DEFAULT_CONVERSATION_PROMPT
         formatted_prompt = system_prompt.format(
@@ -479,14 +468,10 @@ You MUST respond with a valid JSON object in this exact format:
                 prompt=f"Generate a {num_turns}-turn conversation.",
                 system_prompt=formatted_prompt,
             )
-            logger.debug(
-                f"Generated {len(output.turns)} turns for chunk {chunk.chunk_id}"
-            )
+            logger.debug(f"Generated {len(output.turns)} turns for chunk {chunk.chunk_id}")
             return output.turns
         except Exception as e:
-            logger.error(
-                f"Failed to generate conversation for chunk {chunk.chunk_id}: {e}"
-            )
+            logger.error(f"Failed to generate conversation for chunk {chunk.chunk_id}: {e}")
             raise
 
     async def generate_dataset(
@@ -496,8 +481,8 @@ You MUST respond with a valid JSON object in this exact format:
         assistant_id: str,
         num_queries_per_chunk: int = 3,
         language: str = "english",
-        seed_examples: Optional[list[str]] = None,
-        custom_system_prompt: Optional[str] = None,
+        seed_examples: list[str] | None = None,
+        custom_system_prompt: str | None = None,
         selection_strategy: Optional["BaseChunkSelectionStrategy"] = None,
         conversation_mode: bool = False,
     ) -> list[Dataset]:
@@ -583,10 +568,7 @@ You MUST respond with a valid JSON object in this exact format:
                         )
                         batches.append(batch)
 
-            logger.info(
-                f"Generated {len(batches)} batches for chunk group "
-                f"({len(chunk_group)} chunks)"
-            )
+            logger.info(f"Generated {len(batches)} batches for chunk group " f"({len(chunk_group)} chunks)")
 
             dataset = Dataset(
                 session_id=session_id,
@@ -598,16 +580,13 @@ You MUST respond with a valid JSON object in this exact format:
             datasets.append(dataset)
 
         logger.info(
-            f"Generated {len(datasets)} dataset(s) with "
-            f"{sum(len(d.conversation) for d in datasets)} total batches"
+            f"Generated {len(datasets)} dataset(s) with " f"{sum(len(d.conversation) for d in datasets)} total batches"
         )
 
         return datasets
 
 
-def _build_agentic_metadata(
-    chunk: Chunk, generated_query: GeneratedQuery
-) -> dict[str, Any]:
+def _build_agentic_metadata(chunk: Chunk, generated_query: GeneratedQuery) -> dict[str, Any]:
     """Build agentic metadata for a query batch.
 
     Args:
@@ -625,9 +604,7 @@ def _build_agentic_metadata(
     return metadata
 
 
-def _build_conversation_metadata(
-    chunk: Chunk, turn: ConversationTurn
-) -> dict[str, Any]:
+def _build_conversation_metadata(chunk: Chunk, turn: ConversationTurn) -> dict[str, Any]:
     """Build agentic metadata for a conversation turn batch.
 
     Args:

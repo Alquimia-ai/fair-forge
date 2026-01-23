@@ -1,10 +1,12 @@
 """Bias metric schemas."""
-from pydantic import BaseModel
-from typing import Optional, Type
-from enum import Enum
+
 from abc import ABC, abstractmethod
+from enum import Enum
 from functools import partial
+
+from pydantic import BaseModel
 from transformers import AutoTokenizer
+
 from .metrics import BaseMetric
 
 
@@ -17,15 +19,17 @@ class GuardianBias(BaseModel):
         attribute (str): The specific attribute that was analyzed for bias
         certainty (Optional[float]): A confidence score for the bias detection, if available
     """
+
     is_biased: bool
     attribute: str
-    certainty: Optional[float]
+    certainty: float | None
 
 
 class ProtectedAttribute(BaseModel):
     """
     Protected attributes for bias detection.
     """
+
     class Attribute(str, Enum):
         age = "age"
         gender = "gender"
@@ -42,6 +46,7 @@ class BiasMetric(BaseMetric):
     """
     Bias metric for evaluating the bias of the assistant's responses.
     """
+
     class ConfidenceInterval(BaseModel):
         lower_bound: float
         upper_bound: float
@@ -61,6 +66,7 @@ class BiasMetric(BaseMetric):
 
 class LLMGuardianProviderInfer(BaseModel):
     """Result from an LLM guardian provider inference."""
+
     is_bias: bool
     probability: float
 
@@ -72,14 +78,14 @@ class LLMGuardianProvider(ABC):
         self,
         model: str,
         tokenizer: AutoTokenizer,
-        api_key: Optional[str] = None,
-        url: Optional[str] = None,
+        api_key: str | None = None,
+        url: str | None = None,
         temperature: float = 0.0,
         safe_token: str = "No",
         unsafe_token: str = "Yes",
         max_tokens: int = 5,
         logprobs: bool = True,
-        **kwargs
+        **kwargs,
     ):
         self.model = model
         self.api_key = api_key
@@ -98,9 +104,10 @@ class LLMGuardianProvider(ABC):
 
 class GuardianLLMConfig(BaseModel):
     """Configuration for LLM-based guardians."""
+
     model: str
-    api_key: Optional[str] = None
-    url: Optional[str] = None
+    api_key: str | None = None
+    url: str | None = None
     temperature: float
     logprobs: bool = False
-    provider: Type[LLMGuardianProvider]
+    provider: type[LLMGuardianProvider]

@@ -1,4 +1,5 @@
 """Loader abstract base classes for external data."""
+
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
@@ -42,7 +43,7 @@ class ToxicityLoader(ABC):
         self.kwargs = kwargs
 
     @abstractmethod
-    def load(self, language: str) -> list['ToxicityDataset']:
+    def load(self, language: str) -> list["ToxicityDataset"]:
         """Load and return a list of toxicity datasets.
 
         This method must be implemented by concrete subclasses to provide

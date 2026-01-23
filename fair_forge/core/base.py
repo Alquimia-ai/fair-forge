@@ -1,11 +1,13 @@
 """FairForge base class for metrics."""
+
 from abc import ABC, abstractmethod
-from typing import Type, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
+
 from fair_forge.utils.logging import VerboseLogger
 
 if TYPE_CHECKING:
     from fair_forge.core.retriever import Retriever
-    from fair_forge.schemas.common import Batch, Dataset
+    from fair_forge.schemas.common import Batch
 
 
 class FairForge(ABC):
@@ -23,7 +25,7 @@ class FairForge(ABC):
         logger (VerboseLogger): Logger instance for verbose logging.
     """
 
-    def __init__(self, retriever: Type['Retriever'], verbose: bool = False, **kwargs):
+    def __init__(self, retriever: type["Retriever"], verbose: bool = False, **kwargs):
         """
         Initialize FairForge with a data retriever.
 
@@ -46,8 +48,8 @@ class FairForge(ABC):
         session_id: str,
         context: str,
         assistant_id: str,
-        batch: list['Batch'],
-        language: Optional[str],
+        batch: list["Batch"],
+        language: str | None,
     ):
         """
         Process a single batch of conversation data.
@@ -68,7 +70,7 @@ class FairForge(ABC):
         raise NotImplementedError("Should be implemented by each metric")
 
     @classmethod
-    def run(cls, retriever: Type['Retriever'], **kwargs) -> list:
+    def run(cls, retriever: type["Retriever"], **kwargs) -> list:
         """
         Run the metric analysis on the entire dataset.
 

@@ -57,7 +57,7 @@
   description: A model might generate language that leads to physical harm The language might include overtly violent, covertly dangerous, or otherwise indirectly unsafe statements.
   concern: A model generating harmful output can cause immediate physical harm or create prejudices that might lead to future harm.
   examples: []
-  guardian_risks: 
+  guardian_risks:
   - title: violence
   - title: harmful
   - title: sexual content
@@ -432,7 +432,7 @@
     content:
     - paragraphs:
       - "A study cited by researchers at Carnegie Mellon University, The Center for AI Safety, and the Bosch Center for AI, claim to have discovered a simple prompt addendum that allowed the researchers to trick models into generating biased, false, and otherwise toxic information. The researchers showed that they might circumvent these guardrails in a more automated way. These attacks were shown to be effective in a wide range of open source products, including ChatGPT, Google Bard, Meta\u2019s LLaMA, Anthropic\u2019s Claude, and others."
-  guardian_risks: 
+  guardian_risks:
   - title: jailbreaking
 - tag: extraction-attack
   title: Extraction attack
@@ -564,7 +564,7 @@
     content:
     - paragraphs:
       - "Lensa AI is a mobile app with generative features that are trained on Stable Diffusion that can generate \u201CMagic Avatars\u201D based on images that users upload of themselves. According to the source report, some users discovered that generated avatars are sexualized and racialized."
-  guardian_risks: 
+  guardian_risks:
   - title: bias
 - tag: dangerous-use
   title: Dangerous use

@@ -1,7 +1,6 @@
 """Pytest configuration and shared fixtures for Fair-Forge tests."""
 
 import warnings
-import sys
 
 # Suppress all problematic warnings from third-party libraries before importing
 warnings.filterwarnings("ignore", category=SyntaxWarning)
@@ -17,7 +16,8 @@ except Exception:
 
 import pytest
 from pydantic import SecretStr
-from fair_forge.schemas.common import Dataset, Batch
+
+from fair_forge.schemas.common import Batch, Dataset
 
 
 def pytest_configure(config):
@@ -28,27 +28,27 @@ def pytest_configure(config):
         assertrewrite._dont_rewrite.add("umap")
 
 
-from tests.fixtures.mock_retriever import (
-    MockRetriever,
-    EmptyRetriever,
-    SingleDatasetRetriever,
-    MultipleDatasetRetriever,
-    EmotionalDatasetRetriever,
-    ConversationalDatasetRetriever,
-    BiasDatasetRetriever,
-    ToxicityDatasetRetriever,
-    ContextDatasetRetriever,
-    BestOfDatasetRetriever,
-)
 from tests.fixtures.mock_data import (
+    create_bestof_dataset,
+    create_bias_dataset,
+    create_context_dataset,
+    create_conversational_dataset,
+    create_emotional_dataset,
     create_sample_batch,
     create_sample_dataset,
-    create_emotional_dataset,
-    create_conversational_dataset,
-    create_bias_dataset,
     create_toxicity_dataset,
-    create_context_dataset,
-    create_bestof_dataset,
+)
+from tests.fixtures.mock_retriever import (
+    BestOfDatasetRetriever,
+    BiasDatasetRetriever,
+    ContextDatasetRetriever,
+    ConversationalDatasetRetriever,
+    EmotionalDatasetRetriever,
+    EmptyRetriever,
+    MockRetriever,
+    MultipleDatasetRetriever,
+    SingleDatasetRetriever,
+    ToxicityDatasetRetriever,
 )
 
 
@@ -180,7 +180,7 @@ def mock_guardian_config() -> dict:
 @pytest.fixture(autouse=True)
 def reset_metrics():
     """Fixture to reset metric state between tests."""
-    yield
+    return
 
 
 @pytest.fixture

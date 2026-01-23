@@ -6,10 +6,11 @@ from transformers import AutoTokenizer
 from fair_forge.core import Guardian
 from fair_forge.schemas.bias import GuardianBias, GuardianLLMConfig, ProtectedAttribute
 
+
 class IBMGranite(Guardian):
     """
     IBM Granite is a guardian that uses the IBM Granite model to detect bias in AI responses.
-    
+
     This guardian analyzes conversations between users and AI assistants to identify potential
     biases related to protected attributes. It uses IBM's Granite model to make bias assessments
     and provides certainty scores for its determinations.
@@ -23,7 +24,8 @@ class IBMGranite(Guardian):
         config (GuardianLLMConfig): The configuration used for the IBM Granite model
         provider: The configured model provider instance for making inference calls
     """
-    def __init__(self,config:GuardianLLMConfig,**kwargs):
+
+    def __init__(self, config: GuardianLLMConfig, **kwargs):
         super().__init__(**kwargs)
         self.config = config
         self.tokenizer = AutoTokenizer.from_pretrained(config.model)
@@ -35,10 +37,12 @@ class IBMGranite(Guardian):
             temperature=config.temperature,
             safe_token="No",
             logprobs=config.logprobs,
-            unsafe_token="Yes"
+            unsafe_token="Yes",
         )
 
-    def is_biased(self, question: str, answer: str, attribute: ProtectedAttribute , context: Optional[str] = None) -> GuardianBias:
+    def is_biased(
+        self, question: str, answer: str, attribute: ProtectedAttribute, context: str | None = None
+    ) -> GuardianBias:
         messages = [
             {"role": "user", "content": question},
             {"role": "assistant", "content": answer},
@@ -54,16 +58,13 @@ class IBMGranite(Guardian):
             add_generation_prompt=True,
         )
         infer = self.provider.infer(prompt)
-        return GuardianBias(
-            is_biased=infer.is_bias,
-            attribute=attribute.attribute.value,
-            certainty=infer.probability
-        )
-        
+        return GuardianBias(is_biased=infer.is_bias, attribute=attribute.attribute.value, certainty=infer.probability)
+
+
 class LLamaGuard(Guardian):
     """
     LLamaGuard is a guardian that uses the LLamaGuard model to detect bias in AI responses.
-    
+
     This guardian implements bias detection using Meta's LLamaGuard model, which is specifically
     designed for content safety and bias detection. It analyzes conversations and provides
     assessments of potential biases related to protected attributes.
@@ -77,7 +78,8 @@ class LLamaGuard(Guardian):
         config (GuardianLLMConfig): The configuration used for the LLamaGuard model
         provider: The configured model provider instance for making inference calls
     """
-    def __init__(self,config:GuardianLLMConfig,**kwargs):
+
+    def __init__(self, config: GuardianLLMConfig, **kwargs):
         super().__init__(**kwargs)
         self.config = config
         self.tokenizer = AutoTokenizer.from_pretrained(config.model)
@@ -90,24 +92,20 @@ class LLamaGuard(Guardian):
             safe_token="safe",
             unsafe_token="unsafe",
             logprobs=config.logprobs,
-            chat_completions= True
+            chat_completions=True,
         )
 
-    def is_biased(self, question: str, answer: str, attribute: ProtectedAttribute , context: Optional[str] = None) -> GuardianBias:
+    def is_biased(
+        self, question: str, answer: str, attribute: ProtectedAttribute, context: str | None = None
+    ) -> GuardianBias:
         messages = [
-            {"role": "user", "content": [{"type": "text","text": question}]},
-            {"role": "assistant", "content": [{"type": "text","text": answer}]},
+            {"role": "user", "content": [{"type": "text", "text": question}]},
+            {"role": "assistant", "content": [{"type": "text", "text": answer}]},
         ]
         prompt = partial(
             self.tokenizer.apply_chat_template,
-            conversation= messages,
-            categories = {
-                "S1": f"{attribute.attribute.value}.\n{attribute.description}"
-            }
+            conversation=messages,
+            categories={"S1": f"{attribute.attribute.value}.\n{attribute.description}"},
         )
         infer = self.provider.infer(prompt)
-        return GuardianBias(
-            is_biased=infer.is_bias,
-            attribute=attribute.attribute.value,
-            certainty=infer.probability
-        )
+        return GuardianBias(is_biased=infer.is_bias, attribute=attribute.attribute.value, certainty=infer.probability)

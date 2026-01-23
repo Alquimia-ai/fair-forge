@@ -1,14 +1,12 @@
 """Tests for Bias metric."""
-from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 from fair_forge.core import Guardian
 from fair_forge.metrics.bias import Bias
-from fair_forge.schemas import Batch
 from fair_forge.schemas.bias import BiasMetric, GuardianBias, ProtectedAttribute
-from tests.fixtures.mock_retriever import MockRetriever, BiasDatasetRetriever
-from tests.fixtures.mock_data import create_sample_batch, create_bias_dataset
+from tests.fixtures.mock_data import create_sample_batch
+from tests.fixtures.mock_retriever import MockRetriever
 
 
 class MockGuardian(Guardian):
@@ -22,11 +20,7 @@ class MockGuardian(Guardian):
     def is_biased(self, question, answer, attribute, context=None):
         """Return mock bias detection result."""
         self.call_count += 1
-        return GuardianBias(
-            is_biased=self.always_biased,
-            attribute=attribute.attribute.value,
-            certainty=self.certainty
-        )
+        return GuardianBias(is_biased=self.always_biased, attribute=attribute.attribute.value, certainty=self.certainty)
 
 
 class MockGuardianAlternating(Guardian):
@@ -39,11 +33,7 @@ class MockGuardianAlternating(Guardian):
         """Return alternating bias detection result."""
         self.call_count += 1
         is_biased = self.call_count % 2 == 0
-        return GuardianBias(
-            is_biased=is_biased,
-            attribute=attribute.attribute.value,
-            certainty=0.85
-        )
+        return GuardianBias(is_biased=is_biased, attribute=attribute.attribute.value, certainty=0.85)
 
 
 class TestBiasMetric:
@@ -51,10 +41,7 @@ class TestBiasMetric:
 
     def test_initialization_basic(self):
         """Test Bias initialization with basic parameters."""
-        bias = Bias(
-            retriever=MockRetriever,
-            guardian=MockGuardian
-        )
+        bias = Bias(retriever=MockRetriever, guardian=MockGuardian)
 
         assert bias.guardian is not None
         assert bias.confidence_level == 0.95
@@ -62,27 +49,20 @@ class TestBiasMetric:
 
     def test_initialization_custom_confidence(self):
         """Test Bias initialization with custom confidence level."""
-        bias = Bias(
-            retriever=MockRetriever,
-            guardian=MockGuardian,
-            confidence_level=0.80
-        )
+        bias = Bias(retriever=MockRetriever, guardian=MockGuardian, confidence_level=0.80)
 
         assert bias.confidence_level == 0.80
 
     def test_protected_attributes_defined(self):
         """Test that all protected attributes are defined."""
-        bias = Bias(
-            retriever=MockRetriever,
-            guardian=MockGuardian
-        )
+        bias = Bias(retriever=MockRetriever, guardian=MockGuardian)
 
         expected_attributes = {
             ProtectedAttribute.Attribute.gender,
             ProtectedAttribute.Attribute.race,
             ProtectedAttribute.Attribute.religion,
             ProtectedAttribute.Attribute.nationality,
-            ProtectedAttribute.Attribute.sexual_orientation
+            ProtectedAttribute.Attribute.sexual_orientation,
         }
 
         actual_attributes = {attr.attribute for attr in bias.protected_attributes}
@@ -90,11 +70,7 @@ class TestBiasMetric:
 
     def test_clopper_pearson_basic(self):
         """Test Clopper-Pearson confidence interval calculation."""
-        bias = Bias(
-            retriever=MockRetriever,
-            guardian=MockGuardian,
-            confidence_level=0.95
-        )
+        bias = Bias(retriever=MockRetriever, guardian=MockGuardian, confidence_level=0.95)
 
         result = bias._clopper_pearson_confidence_interval(samples=100, k_success=70)
 
@@ -109,10 +85,7 @@ class TestBiasMetric:
 
     def test_clopper_pearson_all_success(self):
         """Test Clopper-Pearson when all samples are successes."""
-        bias = Bias(
-            retriever=MockRetriever,
-            guardian=MockGuardian
-        )
+        bias = Bias(retriever=MockRetriever, guardian=MockGuardian)
 
         result = bias._clopper_pearson_confidence_interval(samples=100, k_success=100)
 
@@ -121,10 +94,7 @@ class TestBiasMetric:
 
     def test_clopper_pearson_no_success(self):
         """Test Clopper-Pearson when no samples are successes."""
-        bias = Bias(
-            retriever=MockRetriever,
-            guardian=MockGuardian
-        )
+        bias = Bias(retriever=MockRetriever, guardian=MockGuardian)
 
         result = bias._clopper_pearson_confidence_interval(samples=100, k_success=0)
 
@@ -135,10 +105,7 @@ class TestBiasMetric:
 
     def test_get_guardian_biased_attributes(self):
         """Test _get_guardian_biased_attributes method."""
-        bias = Bias(
-            retriever=MockRetriever,
-            guardian=MockGuardian
-        )
+        bias = Bias(retriever=MockRetriever, guardian=MockGuardian)
 
         batches = [
             create_sample_batch(qa_id="qa_001"),
@@ -146,9 +113,7 @@ class TestBiasMetric:
         ]
 
         result = bias._get_guardian_biased_attributes(
-            batch=batches,
-            attributes=bias.protected_attributes,
-            context="test context"
+            batch=batches, attributes=bias.protected_attributes, context="test context"
         )
 
         # Should have entries for all protected attributes
@@ -160,26 +125,17 @@ class TestBiasMetric:
 
     def test_calculate_confidence_intervals(self):
         """Test _calculate_confidence_intervals method."""
-        bias = Bias(
-            retriever=MockRetriever,
-            guardian=MockGuardian
-        )
+        bias = Bias(retriever=MockRetriever, guardian=MockGuardian)
 
         # Create mock biases_by_attributes
         biases_by_attributes = {}
         for attr in bias.protected_attributes:
             biases_by_attributes[attr.attribute.value] = [
                 BiasMetric.GuardianInteraction(
-                    qa_id="qa_001",
-                    is_biased=False,
-                    attribute=attr.attribute.value,
-                    certainty=0.9
+                    qa_id="qa_001", is_biased=False, attribute=attr.attribute.value, certainty=0.9
                 ),
                 BiasMetric.GuardianInteraction(
-                    qa_id="qa_002",
-                    is_biased=False,
-                    attribute=attr.attribute.value,
-                    certainty=0.85
+                    qa_id="qa_002", is_biased=False, attribute=attr.attribute.value, certainty=0.85
                 ),
             ]
 
@@ -194,22 +150,14 @@ class TestBiasMetric:
 
     def test_batch_processing(self):
         """Test batch method processes correctly."""
-        bias = Bias(
-            retriever=MockRetriever,
-            guardian=MockGuardian
-        )
+        bias = Bias(retriever=MockRetriever, guardian=MockGuardian)
 
         batches = [
             create_sample_batch(qa_id="qa_001"),
             create_sample_batch(qa_id="qa_002"),
         ]
 
-        bias.batch(
-            session_id="test_session",
-            context="test context",
-            assistant_id="test_assistant",
-            batch=batches
-        )
+        bias.batch(session_id="test_session", context="test context", assistant_id="test_assistant", batch=batches)
 
         assert len(bias.metrics) == 1
         metric = bias.metrics[0]
@@ -221,22 +169,11 @@ class TestBiasMetric:
 
     def test_batch_multiple_interactions(self):
         """Test batch method with multiple interactions."""
-        bias = Bias(
-            retriever=MockRetriever,
-            guardian=MockGuardian,
-            verbose=False
-        )
+        bias = Bias(retriever=MockRetriever, guardian=MockGuardian, verbose=False)
 
-        batches = [
-            create_sample_batch(qa_id=f"qa_{i}") for i in range(5)
-        ]
+        batches = [create_sample_batch(qa_id=f"qa_{i}") for i in range(5)]
 
-        bias.batch(
-            session_id="test_session",
-            context="test context",
-            assistant_id="test_assistant",
-            batch=batches
-        )
+        bias.batch(session_id="test_session", context="test context", assistant_id="test_assistant", batch=batches)
 
         assert len(bias.metrics) == 1
         metric = bias.metrics[0]
@@ -246,21 +183,11 @@ class TestBiasMetric:
 
     def test_batch_with_alternating_guardian(self):
         """Test batch with alternating biased/not biased responses."""
-        bias = Bias(
-            retriever=MockRetriever,
-            guardian=MockGuardianAlternating
-        )
+        bias = Bias(retriever=MockRetriever, guardian=MockGuardianAlternating)
 
-        batches = [
-            create_sample_batch(qa_id=f"qa_{i}") for i in range(4)
-        ]
+        batches = [create_sample_batch(qa_id=f"qa_{i}") for i in range(4)]
 
-        bias.batch(
-            session_id="test_session",
-            context="test context",
-            assistant_id="test_assistant",
-            batch=batches
-        )
+        bias.batch(session_id="test_session", context="test context", assistant_id="test_assistant", batch=batches)
 
         metric = bias.metrics[0]
         # Check that some interactions are biased and some are not
@@ -272,11 +199,7 @@ class TestBiasMetric:
 
     def test_confidence_interval_calculation_with_biased(self):
         """Test confidence interval calculation when some responses are biased."""
-        bias = Bias(
-            retriever=MockRetriever,
-            guardian=MockGuardianAlternating,
-            confidence_level=0.90
-        )
+        bias = Bias(retriever=MockRetriever, guardian=MockGuardianAlternating, confidence_level=0.90)
 
         biases_by_attributes = {}
         for attr in bias.protected_attributes:
@@ -304,10 +227,6 @@ class TestBiasMetric:
 
     def test_verbose_mode(self):
         """Test that verbose mode doesn't break initialization."""
-        bias = Bias(
-            retriever=MockRetriever,
-            guardian=MockGuardian,
-            verbose=True
-        )
+        bias = Bias(retriever=MockRetriever, guardian=MockGuardian, verbose=True)
 
         assert bias.verbose is True

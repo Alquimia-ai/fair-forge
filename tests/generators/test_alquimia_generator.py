@@ -1,10 +1,11 @@
 """Tests for AlquimiaGenerator and AlquimiaChatModel."""
 
 import sys
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from pathlib import Path
 from types import ModuleType
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from fair_forge.generators import (
     AlquimiaGenerator,
@@ -12,12 +13,12 @@ from fair_forge.generators import (
     create_alquimia_generator,
 )
 from fair_forge.generators.alquimia_generator import AlquimiaChatModel
+from fair_forge.schemas.common import Batch, Dataset
 from fair_forge.schemas.generators import (
     Chunk,
-    GeneratedQuery,
     GeneratedQueriesOutput,
+    GeneratedQuery,
 )
-from fair_forge.schemas.common import Dataset, Batch
 
 
 def _create_mock_alquimia_module(mock_client):
@@ -127,9 +128,7 @@ class TestAlquimiaGeneratorGenerateQueries:
             assert all(isinstance(q, GeneratedQuery) for q in queries)
 
     @pytest.mark.asyncio
-    async def test_generate_queries_handles_agent_error(
-        self, mock_alquimia_config: dict, sample_chunk: Chunk
-    ):
+    async def test_generate_queries_handles_agent_error(self, mock_alquimia_config: dict, sample_chunk: Chunk):
         """Test that generate_queries raises on agent error."""
         generator = AlquimiaGenerator(**mock_alquimia_config)
 
@@ -145,9 +144,7 @@ class TestAlquimiaGeneratorGenerateQueries:
                 await generator.generate_queries(sample_chunk, num_queries=2)
 
     @pytest.mark.asyncio
-    async def test_generate_queries_handles_empty_response(
-        self, mock_alquimia_config: dict, sample_chunk: Chunk
-    ):
+    async def test_generate_queries_handles_empty_response(self, mock_alquimia_config: dict, sample_chunk: Chunk):
         """Test that generate_queries raises on empty response."""
         generator = AlquimiaGenerator(**mock_alquimia_config)
 
@@ -168,9 +165,7 @@ class TestAlquimiaGeneratorGenerateQueries:
                 await generator.generate_queries(sample_chunk, num_queries=2)
 
     @pytest.mark.asyncio
-    async def test_generate_queries_handles_no_stream_id(
-        self, mock_alquimia_config: dict, sample_chunk: Chunk
-    ):
+    async def test_generate_queries_handles_no_stream_id(self, mock_alquimia_config: dict, sample_chunk: Chunk):
         """Test that generate_queries raises when no stream_id returned."""
         generator = AlquimiaGenerator(**mock_alquimia_config)
 

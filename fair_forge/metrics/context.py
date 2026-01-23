@@ -1,5 +1,4 @@
 """Context metric for evaluating AI response alignment with provided context."""
-from typing import Optional, Type
 
 from langchain_core.language_models.chat_models import BaseChatModel
 
@@ -27,7 +26,7 @@ class Context(FairForge):
 
     def __init__(
         self,
-        retriever: Type[Retriever],
+        retriever: type[Retriever],
         model: BaseChatModel,
         use_structured_output: bool = False,
         bos_json_clause: str = "```json",
@@ -46,7 +45,7 @@ class Context(FairForge):
         context: str,
         assistant_id: str,
         batch: list[Batch],
-        language: Optional[str] = "english",
+        language: str | None = "english",
     ):
         judge = Judge(
             model=self.model,
@@ -78,9 +77,7 @@ class Context(FairForge):
                 )
 
             if result is None:
-                raise ValueError(
-                    f"[FAIR FORGE/CONTEXT] No valid response from judge for QA ID: {interaction.qa_id}"
-                )
+                raise ValueError(f"[FAIR FORGE/CONTEXT] No valid response from judge for QA ID: {interaction.qa_id}")
 
             if self.use_structured_output:
                 insight = result.insight

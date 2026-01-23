@@ -3,13 +3,16 @@
 This module provides storage implementations for loading test datasets
 and saving execution results from various sources (local filesystem, LakeFS, etc.).
 """
+
 from pathlib import Path
 from typing import Literal
+
 from loguru import logger
 
 from fair_forge.schemas.storage import BaseStorage
-from .local_storage import LocalStorage
+
 from .lakefs_storage import LakeFSStorage
+from .local_storage import LocalStorage
 
 
 def create_local_storage(
@@ -114,17 +117,16 @@ def create_storage(
     """
     if backend == "local":
         return create_local_storage(**kwargs)
-    elif backend == "lakefs":
+    if backend == "lakefs":
         return create_lakefs_storage(**kwargs)
-    else:
-        raise ValueError(f"Unknown storage backend: {backend}. Valid options: 'local', 'lakefs'")
+    raise ValueError(f"Unknown storage backend: {backend}. Valid options: 'local', 'lakefs'")
 
 
 __all__ = [
     "BaseStorage",
-    "LocalStorage",
     "LakeFSStorage",
-    "create_local_storage",
+    "LocalStorage",
     "create_lakefs_storage",
+    "create_local_storage",
     "create_storage",
 ]

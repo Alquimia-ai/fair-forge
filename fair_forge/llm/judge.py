@@ -1,7 +1,8 @@
 """Judge class for LLM-based evaluation."""
+
 import json
 import logging
-from typing import Optional, Type, TypeVar
+from typing import TypeVar
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
@@ -46,7 +47,7 @@ class Judge:
         system_prompt: str,
         query: str,
         data: dict,
-        output_schema: Optional[Type[T]] = None,
+        output_schema: type[T] | None = None,
     ) -> tuple[str, T | dict | None]:
         """Evaluate using the model.
 
@@ -72,7 +73,7 @@ class Judge:
             return self._check_structured(system_prompt, query, data, output_schema)
         return self._check_regex(system_prompt, query, data, output_schema)
 
-    def _get_json_schema_for_prompt(self, schema: Type[BaseModel]) -> str:
+    def _get_json_schema_for_prompt(self, schema: type[BaseModel]) -> str:
         """Generate full JSON schema instruction to include in prompt."""
         schema_json = schema.model_json_schema()
         props = schema_json.get("properties", {})
@@ -100,7 +101,7 @@ Do not include any additional text after the JSON.
         system_prompt: str,
         query: str,
         data: dict,
-        output_schema: Type[T],
+        output_schema: type[T],
     ) -> tuple[str, T | None]:
         """Use with_structured_output for schema validation via API."""
         # Clean up model_kwargs to remove use_structured_output if present
@@ -112,12 +113,10 @@ Do not include any additional text after the JSON.
             if len(cleaned_kwargs) != len(model.model_kwargs):
                 # Only create a new model instance if we actually removed something
                 model = model.__class__(**{**model.dict(), "model_kwargs": cleaned_kwargs})
-        
+
         structured_model = model.with_structured_output(output_schema)
         self.chat_history.append(("human", query))
-        prompt = ChatPromptTemplate.from_messages(
-            [("system", system_prompt), *self.chat_history]
-        )
+        prompt = ChatPromptTemplate.from_messages([("system", system_prompt), *self.chat_history])
         chain = prompt | structured_model
         result = chain.invoke(data)
         return "", result
@@ -127,7 +126,7 @@ Do not include any additional text after the JSON.
         system_prompt: str,
         query: str,
         data: dict,
-        output_schema: Optional[Type[BaseModel]] = None,
+        output_schema: type[BaseModel] | None = None,
     ) -> tuple[str, dict | None]:
         """Use regex extraction - full schema included in prompt if provided."""
         if output_schema:
@@ -157,8 +156,8 @@ Do not include any additional text after the JSON.
         if match:
             try:
                 return json.loads(match.group(1).strip())
-            except json.JSONDecodeError as e:
-                logging.error(f"[FAIR FORGE/JUDGE] JSON decode error: {e}")
+            except json.JSONDecodeError:
+                logging.exception("[FAIR FORGE/JUDGE] JSON decode error")
                 return None
         logging.error(f"[FAIR FORGE/JUDGE] No JSON found between {self.bos_json_clause} and {self.eos_json_clause}")
         return None

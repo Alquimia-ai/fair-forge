@@ -1,7 +1,7 @@
 """Base class for chunk selection strategies."""
 
 from abc import ABC, abstractmethod
-from typing import Iterator
+from collections.abc import Iterator
 
 from fair_forge.schemas.generators import Chunk
 

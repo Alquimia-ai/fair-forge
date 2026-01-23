@@ -1,6 +1,6 @@
 """Sequential chunk selection strategy."""
 
-from typing import Iterator
+from collections.abc import Iterator
 
 from fair_forge.schemas.generators import Chunk
 

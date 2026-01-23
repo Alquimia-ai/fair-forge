@@ -1,4 +1,5 @@
 """Tests for Context metric."""
+
 from unittest.mock import MagicMock, patch
 
 import pytest

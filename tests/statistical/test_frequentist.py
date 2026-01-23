@@ -1,5 +1,7 @@
 """Tests for Frequentist statistical mode."""
+
 import pytest
+
 from fair_forge.statistical import FrequentistMode
 
 
@@ -19,8 +21,8 @@ class TestFrequentistMode:
     def test_distribution_divergence_basic(self):
         """Test distribution divergence with basic proportions."""
         mode = FrequentistMode()
-        observed = {'A': 0.3, 'B': 0.7}
-        reference = {'A': 0.5, 'B': 0.5}
+        observed = {"A": 0.3, "B": 0.7}
+        reference = {"A": 0.5, "B": 0.5}
 
         result = mode.distribution_divergence(observed, reference)
 
@@ -30,8 +32,8 @@ class TestFrequentistMode:
     def test_distribution_divergence_identical(self):
         """Test distribution divergence with identical distributions."""
         mode = FrequentistMode()
-        observed = {'A': 0.5, 'B': 0.5}
-        reference = {'A': 0.5, 'B': 0.5}
+        observed = {"A": 0.5, "B": 0.5}
+        reference = {"A": 0.5, "B": 0.5}
 
         result = mode.distribution_divergence(observed, reference)
 
@@ -40,8 +42,8 @@ class TestFrequentistMode:
     def test_distribution_divergence_max_different(self):
         """Test distribution divergence with maximally different distributions."""
         mode = FrequentistMode()
-        observed = {'A': 1.0, 'B': 0.0}
-        reference = {'A': 0.0, 'B': 1.0}
+        observed = {"A": 1.0, "B": 0.0}
+        reference = {"A": 0.0, "B": 1.0}
 
         result = mode.distribution_divergence(observed, reference)
 
@@ -50,8 +52,8 @@ class TestFrequentistMode:
     def test_distribution_divergence_missing_keys(self):
         """Test distribution divergence with missing keys."""
         mode = FrequentistMode()
-        observed = {'A': 0.5, 'B': 0.3, 'C': 0.2}
-        reference = {'A': 0.5, 'B': 0.5}
+        observed = {"A": 0.5, "B": 0.3, "C": 0.2}
+        reference = {"A": 0.5, "B": 0.5}
 
         result = mode.distribution_divergence(observed, reference)
 
@@ -61,8 +63,8 @@ class TestFrequentistMode:
     def test_distribution_divergence_not_implemented_type(self):
         """Test distribution divergence raises error for unsupported type."""
         mode = FrequentistMode()
-        observed = {'A': 0.5, 'B': 0.5}
-        reference = {'A': 0.5, 'B': 0.5}
+        observed = {"A": 0.5, "B": 0.5}
+        reference = {"A": 0.5, "B": 0.5}
 
         with pytest.raises(NotImplementedError):
             mode.distribution_divergence(observed, reference, divergence_type="kl_divergence")
@@ -114,8 +116,8 @@ class TestFrequentistMode:
         """Test aggregation of metrics with equal weights."""
         mode = FrequentistMode()
 
-        metrics = {'metric1': 0.3, 'metric2': 0.7}
-        weights = {'metric1': 1.0, 'metric2': 1.0}
+        metrics = {"metric1": 0.3, "metric2": 0.7}
+        weights = {"metric1": 1.0, "metric2": 1.0}
 
         result = mode.aggregate_metrics(metrics, weights)
 
@@ -126,8 +128,8 @@ class TestFrequentistMode:
         """Test aggregation with different weights."""
         mode = FrequentistMode()
 
-        metrics = {'metric1': 0.0, 'metric2': 1.0}
-        weights = {'metric1': 1.0, 'metric2': 3.0}
+        metrics = {"metric1": 0.0, "metric2": 1.0}
+        weights = {"metric1": 1.0, "metric2": 3.0}
 
         result = mode.aggregate_metrics(metrics, weights)
 
@@ -137,8 +139,8 @@ class TestFrequentistMode:
         """Test aggregation with zero total weight."""
         mode = FrequentistMode()
 
-        metrics = {'metric1': 0.5}
-        weights = {'metric1': 0.0}
+        metrics = {"metric1": 0.5}
+        weights = {"metric1": 0.0}
 
         result = mode.aggregate_metrics(metrics, weights)
 
@@ -148,7 +150,7 @@ class TestFrequentistMode:
         """Test dispersion metric with mean center."""
         mode = FrequentistMode()
 
-        values = {'v1': 0.2, 'v2': 0.4, 'v3': 0.6}
+        values = {"v1": 0.2, "v2": 0.4, "v3": 0.6}
 
         result = mode.dispersion_metric(values, center="mean")
 
@@ -161,7 +163,7 @@ class TestFrequentistMode:
         """Test dispersion metric with median center."""
         mode = FrequentistMode()
 
-        values = {'v1': 0.0, 'v2': 0.5, 'v3': 1.0}
+        values = {"v1": 0.0, "v2": 0.5, "v3": 1.0}
 
         result = mode.dispersion_metric(values, center="median")
 
@@ -182,7 +184,7 @@ class TestFrequentistMode:
         """Test dispersion metric raises error for invalid center."""
         mode = FrequentistMode()
 
-        values = {'v1': 0.5}
+        values = {"v1": 0.5}
 
         with pytest.raises(ValueError, match="Unknown center type"):
             mode.dispersion_metric(values, center="invalid")
@@ -191,7 +193,7 @@ class TestFrequentistMode:
         """Test dispersion metric with single value."""
         mode = FrequentistMode()
 
-        values = {'v1': 0.5}
+        values = {"v1": 0.5}
 
         result = mode.dispersion_metric(values, center="mean")
 
@@ -202,7 +204,7 @@ class TestFrequentistMode:
         """Test dispersion metric with all same values."""
         mode = FrequentistMode()
 
-        values = {'v1': 0.5, 'v2': 0.5, 'v3': 0.5}
+        values = {"v1": 0.5, "v2": 0.5, "v3": 0.5}
 
         result = mode.dispersion_metric(values, center="mean")
 

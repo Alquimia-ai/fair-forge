@@ -24,6 +24,6 @@ from .sequential import SequentialStrategy
 
 __all__ = [
     "BaseChunkSelectionStrategy",
-    "SequentialStrategy",
     "RandomSamplingStrategy",
+    "SequentialStrategy",
 ]
