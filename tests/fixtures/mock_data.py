@@ -1,5 +1,6 @@
 """Mock datasets for testing metrics."""
-from fair_forge.schemas.common import Dataset, Batch
+
+from fair_forge.schemas.common import Batch, Dataset
 
 
 def create_sample_batch(

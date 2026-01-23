@@ -1,4 +1,5 @@
 """Logging utilities for Fair Forge."""
+
 import logging
 
 
@@ -7,12 +8,13 @@ class VerboseLogger:
     Custom logger class that handles verbose logging.
     Only logs messages when verbose mode is enabled.
     """
+
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
         self.logger = logging.getLogger(__name__)
         if not self.logger.hasHandlers():
             handler = logging.StreamHandler()
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
 
@@ -40,7 +42,4 @@ class VerboseLogger:
 
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")

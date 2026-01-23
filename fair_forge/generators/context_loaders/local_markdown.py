@@ -3,7 +3,6 @@
 import glob as glob_module
 import re
 from pathlib import Path
-from typing import Optional, Union
 
 from loguru import logger
 
@@ -34,7 +33,7 @@ class LocalMarkdownLoader(BaseContextLoader):
         max_chunk_size: int = 2000,
         min_chunk_size: int = 200,
         overlap: int = 100,
-        header_levels: Optional[list[int]] = None,
+        header_levels: list[int] | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -152,16 +151,13 @@ class LocalMarkdownLoader(BaseContextLoader):
                 base_id = f"section_{i + 1}"
 
             # Prefix with file stem to ensure unique chunk IDs across files
-            file_prefix = re.sub(r"[^a-zA-Z0-9]+", "_", file_path.stem.lower()).strip(
-                "_"
-            )
+            file_prefix = re.sub(r"[^a-zA-Z0-9]+", "_", file_path.stem.lower()).strip("_")
             full_chunk_id = f"{file_prefix}_{base_id}"
 
             # If section is too long, apply size-based splitting
             if len(section_content) > self.max_chunk_size:
                 logger.debug(
-                    f"Section '{header}' ({len(section_content)} chars) "
-                    f"exceeds max size, splitting further"
+                    f"Section '{header}' ({len(section_content)} chars) " f"exceeds max size, splitting further"
                 )
                 sub_chunks = self._split_by_size(section_content, full_chunk_id)
                 for sub_chunk in sub_chunks:
@@ -184,16 +180,14 @@ class LocalMarkdownLoader(BaseContextLoader):
         # If no header-based chunks were created, fall back to pure size-based
         if not chunks:
             logger.info("No header-based chunks created, using size-based chunking")
-            file_prefix = re.sub(
-                r"[^a-zA-Z0-9]+", "_", file_path.stem.lower()
-            ).strip("_")
+            file_prefix = re.sub(r"[^a-zA-Z0-9]+", "_", file_path.stem.lower()).strip("_")
             chunks = self._split_by_size(content, file_prefix)
             for chunk in chunks:
                 chunk.metadata["source_file"] = str(file_path)
 
         return chunks
 
-    def _resolve_paths(self, source: Union[str, list[str]]) -> list[Path]:
+    def _resolve_paths(self, source: str | list[str]) -> list[Path]:
         """Resolve source to a list of file paths.
 
         Args:
@@ -232,16 +226,14 @@ class LocalMarkdownLoader(BaseContextLoader):
                 # Directory - load all markdown files
                 md_files = list(path.glob("**/*.md")) + list(path.glob("**/*.markdown"))
                 if not md_files:
-                    raise FileNotFoundError(
-                        f"No markdown files found in directory: {source}"
-                    )
+                    raise FileNotFoundError(f"No markdown files found in directory: {source}")
                 paths.extend(sorted(md_files))
             else:
                 raise FileNotFoundError(f"Markdown file not found: {source}")
 
         return paths
 
-    def load(self, source: Union[str, list[str]]) -> list[Chunk]:
+    def load(self, source: str | list[str]) -> list[Chunk]:
         """Load and chunk markdown files.
 
         Supports multiple input formats:
@@ -279,9 +271,7 @@ class LocalMarkdownLoader(BaseContextLoader):
             file_chunks = self._load_single_file(file_path)
             all_chunks.extend(file_chunks)
 
-        logger.info(
-            f"Created {len(all_chunks)} total chunks from {len(paths)} file(s)"
-        )
+        logger.info(f"Created {len(all_chunks)} total chunks from {len(paths)} file(s)")
         return all_chunks
 
 

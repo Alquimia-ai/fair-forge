@@ -261,20 +261,35 @@ ignore = [
     "PLR0913",  # too many arguments
     "PLR0912",  # too many branches
     "PLR0915",  # too many statements
+    "PLR0911",  # too many return statements
+    "PLR2004",  # magic value comparison
     "TRY003",   # avoid specifying long messages outside exception class
-    "PD901",    # avoid using 'df' as variable name
     "B008",     # do not perform function calls in argument defaults (needed for FastAPI/Pydantic)
     "ISC001",   # conflicts with ruff formatter
     "EM101",    # exception must not use string literal
     "EM102",    # exception must not use f-string literal
+    "PLC0415",  # import not at top level (common in lazy loading)
+    "SIM108",   # use ternary operator (readability preference)
+    "TRY300",   # consider moving to else block
+    "RUF013",   # implicit Optional (legacy code)
+    "RUF012",   # mutable class attributes
+    "ARG002",   # unused method argument (common in base classes)
+    "N806",     # variable should be lowercase (math notation)
+    "DTZ005",   # datetime without tz argument
+    "PLW2901",  # loop variable overwritten
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401", "E402"]  # Allow unused imports and module-level imports
-"tests/**/*.py" = ["ARG", "PLR2004", "S101", "N802", "N806", "PTH123", "DTZ"]  # Relaxed rules for tests
-"examples/**/*.py" = ["ARG", "PTH", "B007", "C408", "T201", "PLR2004"]  # Examples can be more relaxed
-"examples/**/*.ipynb" = ["ARG", "PTH", "B007", "C408", "T201", "PLR2004"]  # Notebooks can be more relaxed
-".claude/**/*.py" = ["ARG", "PTH"]  # Claude skills templates
+"__init__.py" = ["F401", "E402", "RUF022"]
+"tests/**/*.py" = ["ARG", "PLR2004", "S101", "N802", "N806", "PTH", "DTZ", "B007", "UP038", "SIM117", "E402", "C401"]
+"examples/**/*.py" = ["ARG", "PTH", "B007", "C408", "T201", "PLR2004", "DTZ", "C401"]
+"examples/**/*.ipynb" = ["ARG", "PTH", "B007", "C408", "T201", "PLR2004", "DTZ", "C401"]
+".claude/**/*.py" = ["ARG", "PTH"]
+"fair_forge/metrics/toxicity.py" = ["N802", "N803"]  # Mathematical notation (DR, DTO, ASB)
+"fair_forge/llm/prompts.py" = ["N816"]  # Template variable names
+"fair_forge/storage/*.py" = ["PTH123"]
+"fair_forge/generators/context_loaders/*.py" = ["PTH207"]  # glob module usage
+"setup.py" = ["PTH123"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["fair_forge"]

@@ -70,16 +70,13 @@ class TestRandomSamplingStrategy:
         groups1 = list(strategy1.select(sample_chunks))
         groups2 = list(strategy2.select(sample_chunks))
 
-        for g1, g2 in zip(groups1, groups2):
+        for g1, g2 in zip(groups1, groups2, strict=False):
             assert g1 == g2
 
     def test_random_sampling_different_seeds(self, sample_chunks: list[Chunk]):
         """Test that different seeds can produce different results."""
         # Create enough chunks to make collision unlikely
-        many_chunks = [
-            Chunk(content=f"Content {i}", chunk_id=f"chunk_{i}", metadata={})
-            for i in range(10)
-        ]
+        many_chunks = [Chunk(content=f"Content {i}", chunk_id=f"chunk_{i}", metadata={}) for i in range(10)]
 
         strategy1 = RandomSamplingStrategy(
             num_samples=5,
@@ -96,7 +93,7 @@ class TestRandomSamplingStrategy:
         groups2 = list(strategy2.select(many_chunks))
 
         # At least some groups should be different
-        differences = sum(1 for g1, g2 in zip(groups1, groups2) if g1 != g2)
+        differences = sum(1 for g1, g2 in zip(groups1, groups2, strict=False) if g1 != g2)
         assert differences > 0
 
     def test_random_sampling_chunks_per_sample_exceeds_available(self):
@@ -140,10 +137,7 @@ class TestRandomSamplingStrategy:
 
     def test_random_sampling_without_replacement(self):
         """Test sampling without replacement has no duplicates within a sample."""
-        chunks = [
-            Chunk(content=f"Content {i}", chunk_id=f"chunk_{i}", metadata={})
-            for i in range(5)
-        ]
+        chunks = [Chunk(content=f"Content {i}", chunk_id=f"chunk_{i}", metadata={}) for i in range(5)]
 
         strategy = RandomSamplingStrategy(
             num_samples=3,
@@ -200,7 +194,7 @@ class TestBaseChunkSelectionStrategy:
 
     def test_custom_strategy_implementation(self, sample_chunks: list[Chunk]):
         """Test implementing a custom strategy."""
-        from typing import Iterator
+        from collections.abc import Iterator
 
         class EvenChunksStrategy(BaseChunkSelectionStrategy):
             """Custom strategy that selects every other chunk."""

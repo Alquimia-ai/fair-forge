@@ -1,12 +1,13 @@
 """Common data models for Fair Forge."""
+
 from pydantic import BaseModel
-from typing import Optional
 
 
 class Logprobs(BaseModel):
     """
     Logprobs are the log probabilities of the tokens in the response.
     """
+
     tokens: list[str]
     token_logprobs: list[float]
 
@@ -26,13 +27,14 @@ class Batch(BaseModel):
         ground_truth_agentic (Optional[dict]): Expected or reference metadata for the agent's behavior
         logprobs (Optional[dict]): Log probabilities for tokens
     """
+
     ground_truth_assistant: str
-    logprobs: Optional[dict] = {}
-    observation: Optional[str] = None
+    logprobs: dict | None = {}
+    observation: str | None = None
     assistant: str
     query: str
-    agentic: Optional[dict] = {}
-    ground_truth_agentic: Optional[dict] = {}
+    agentic: dict | None = {}
+    ground_truth_agentic: dict | None = {}
     qa_id: str
 
 
@@ -48,8 +50,9 @@ class Dataset(BaseModel):
         context (str): Additional context or background information for the conversation
         conversation (list[Batch]): List of all interactions (batches) in the conversation
     """
+
     session_id: str
     assistant_id: str
-    language: Optional[str] = "english"
+    language: str | None = "english"
     context: str
     conversation: list[Batch]

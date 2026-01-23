@@ -1,10 +1,11 @@
 """Statistical modes for Fair Forge metrics."""
+
 from .base import StatisticalMode
-from .frequentist import FrequentistMode
 from .bayesian import BayesianMode
+from .frequentist import FrequentistMode
 
 __all__ = [
-    'StatisticalMode',
-    'FrequentistMode',
-    'BayesianMode',
+    "BayesianMode",
+    "FrequentistMode",
+    "StatisticalMode",
 ]

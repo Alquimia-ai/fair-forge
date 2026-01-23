@@ -1,6 +1,7 @@
 """Extractor abstract base class for feature extraction."""
+
 from abc import ABC, abstractmethod
-from typing import Dict, List, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from fair_forge.schemas.toxicity import GroupDetection
@@ -15,7 +16,7 @@ class BaseGroupExtractor(ABC):
     """
 
     @abstractmethod
-    def detect_one(self, text: str) -> Dict[str, 'GroupDetection']:
+    def detect_one(self, text: str) -> dict[str, "GroupDetection"]:
         """
         Detect group mentions in a single text.
 
@@ -28,7 +29,7 @@ class BaseGroupExtractor(ABC):
         raise NotImplementedError("You should implement this method.")
 
     @abstractmethod
-    def detect_batch(self, texts: List[str]) -> List[Dict[str, 'GroupDetection']]:
+    def detect_batch(self, texts: list[str]) -> list[dict[str, "GroupDetection"]]:
         """
         Detect group mentions in a batch of texts.
 

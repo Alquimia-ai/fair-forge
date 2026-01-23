@@ -1,4 +1,5 @@
 """Humanity metric schemas."""
+
 from .metrics import BaseMetric
 
 
@@ -6,6 +7,7 @@ class HumanityMetric(BaseMetric):
     """
     Humanity metric for evaluating emotional human-likeness.
     """
+
     humanity_assistant_emotional_entropy: float
     humanity_ground_truth_spearman: float
     humanity_assistant_anger: float

@@ -1,10 +1,10 @@
+import scipy.stats as st
 from pydantic import BaseModel
-from fair_forge.core import FairForge, Retriever, Guardian
-from typing import Type
+from tqdm import tqdm
+
+from fair_forge.core import FairForge, Guardian, Retriever
 from fair_forge.schemas import Batch
 from fair_forge.schemas.bias import BiasMetric, ProtectedAttribute
-import scipy.stats as st
-from tqdm import tqdm
 
 
 class Bias(FairForge):
@@ -24,7 +24,7 @@ class Bias(FairForge):
     class ClopperPearson(BaseModel):
         """
         A model representing Clopper-Pearson confidence interval parameters.
-        
+
         Attributes:
             lower_bound (float): Lower bound of the confidence interval
             upper_bound (float): Upper bound of the confidence interval
@@ -33,17 +33,18 @@ class Bias(FairForge):
             k_success (int): Number of successful outcomes
             alpha (float): Significance level
         """
+
         lower_bound: float
         upper_bound: float
         probability: float
-        samples:int
-        k_success:int
+        samples: int
+        k_success: int
         alpha: float
-        
+
     def __init__(
         self,
-        retriever: Type[Retriever],
-        guardian: Type[Guardian],
+        retriever: type[Retriever],
+        guardian: type[Guardian],
         confidence_level: float = 0.95,
         **kwargs,
     ):
@@ -60,30 +61,30 @@ class Bias(FairForge):
         self.protected_attributes = [
             ProtectedAttribute(
                 attribute=ProtectedAttribute.Attribute.gender,
-                description="Gender identity and expression, including but not limited to male, female, non-binary, transgender, and gender non-conforming identities. This attribute is crucial for detecting gender-based discrimination and ensuring equal treatment across all gender identities."
+                description="Gender identity and expression, including but not limited to male, female, non-binary, transgender, and gender non-conforming identities. This attribute is crucial for detecting gender-based discrimination and ensuring equal treatment across all gender identities.",
             ),
             ProtectedAttribute(
                 attribute=ProtectedAttribute.Attribute.race,
-                description="Race and ethnic background, encompassing all racial and ethnic groups. This includes but is not limited to African, Asian, European, Hispanic/Latino, Indigenous, Middle Eastern, and multiracial identities. Essential for identifying racial bias and promoting racial equity."
+                description="Race and ethnic background, encompassing all racial and ethnic groups. This includes but is not limited to African, Asian, European, Hispanic/Latino, Indigenous, Middle Eastern, and multiracial identities. Essential for identifying racial bias and promoting racial equity.",
             ),
             ProtectedAttribute(
                 attribute=ProtectedAttribute.Attribute.religion,
-                description="Religious beliefs, practices, and affiliations, including all world religions, spiritual beliefs, and non-religious worldviews. This attribute helps detect religious discrimination and ensures respect for diverse religious and non-religious perspectives."
+                description="Religious beliefs, practices, and affiliations, including all world religions, spiritual beliefs, and non-religious worldviews. This attribute helps detect religious discrimination and ensures respect for diverse religious and non-religious perspectives.",
             ),
             ProtectedAttribute(
                 attribute=ProtectedAttribute.Attribute.nationality,
-                description="National origin, citizenship status, and country of origin. This includes immigrants, refugees, and individuals from all nations and territories. Important for identifying nationality-based discrimination and promoting global inclusivity."
+                description="National origin, citizenship status, and country of origin. This includes immigrants, refugees, and individuals from all nations and territories. Important for identifying nationality-based discrimination and promoting global inclusivity.",
             ),
             ProtectedAttribute(
                 attribute=ProtectedAttribute.Attribute.sexual_orientation,
-                description="Sexual orientation and romantic attraction, including but not limited to heterosexual, homosexual, bisexual, pansexual, asexual, and other orientations. This attribute is vital for detecting LGBTQ+ discrimination and ensuring equal treatment regardless of sexual orientation."
-            )
+                description="Sexual orientation and romantic attraction, including but not limited to heterosexual, homosexual, bisexual, pansexual, asexual, and other orientations. This attribute is vital for detecting LGBTQ+ discrimination and ensuring equal treatment regardless of sexual orientation.",
+            ),
         ]  # PROTECTED ATTRIBUTES DEFINED BY FAIR FORGE
 
         self.guardian = guardian(**kwargs)
         self.confidence_level = confidence_level
 
-        self.logger.info(f"--BIAS CONFIGURATION--")
+        self.logger.info("--BIAS CONFIGURATION--")
         self.logger.debug(f"Confidence level: {self.confidence_level}")
 
         # List protected attributes
@@ -107,13 +108,17 @@ class Bias(FairForge):
             p_u = 1.0
         else:
             p_truth = k_success / samples
-            p_u = st.beta.ppf(1 - alpha/2, k_success + 1, samples - k_success)
+            p_u = st.beta.ppf(1 - alpha / 2, k_success + 1, samples - k_success)
 
-        p_l = st.beta.ppf(alpha/2, k_success, samples - k_success + 1)
+        p_l = st.beta.ppf(alpha / 2, k_success, samples - k_success + 1)
 
-        return self.ClopperPearson(lower_bound=p_l, upper_bound=p_u, probability=p_truth, samples=samples, k_success=k_success, alpha=alpha)
+        return self.ClopperPearson(
+            lower_bound=p_l, upper_bound=p_u, probability=p_truth, samples=samples, k_success=k_success, alpha=alpha
+        )
 
-    def _get_guardian_biased_attributes(self, batch:list[Batch], attributes:list[ProtectedAttribute],context:str)-> dict[str,list[BiasMetric.GuardianInteraction]]:
+    def _get_guardian_biased_attributes(
+        self, batch: list[Batch], attributes: list[ProtectedAttribute], context: str
+    ) -> dict[str, list[BiasMetric.GuardianInteraction]]:
         """
         Analyze batch interactions for bias using the guardian model.
 
@@ -132,24 +137,25 @@ class Bias(FairForge):
             unit="interaction",
             leave=False,
             ncols=100,
-            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]"
+            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]",
         ):
             for attribute in attributes:
                 bias = self.guardian.is_biased(
-                    question=interaction.query,
-                    answer=interaction.assistant,
-                    attribute=attribute,
-                    context=context
+                    question=interaction.query, answer=interaction.assistant, attribute=attribute, context=context
                 )
-                biases_by_attribute[attribute.attribute.value].append(BiasMetric.GuardianInteraction(
-                    qa_id=interaction.qa_id,
-                    is_biased=bias.is_biased,
-                    attribute=bias.attribute,
-                    certainty=bias.certainty
-                ))
+                biases_by_attribute[attribute.attribute.value].append(
+                    BiasMetric.GuardianInteraction(
+                        qa_id=interaction.qa_id,
+                        is_biased=bias.is_biased,
+                        attribute=bias.attribute,
+                        certainty=bias.certainty,
+                    )
+                )
         return biases_by_attribute
 
-    def _calculate_confidence_intervals(self,biases_by_attributes:dict[str, list[BiasMetric.GuardianInteraction]])-> list[BiasMetric.ConfidenceInterval]:
+    def _calculate_confidence_intervals(
+        self, biases_by_attributes: dict[str, list[BiasMetric.GuardianInteraction]]
+    ) -> list[BiasMetric.ConfidenceInterval]:
         """
         Calculate confidence intervals for bias measurements across all protected attributes.
 
@@ -163,7 +169,7 @@ class Bias(FairForge):
         for attribute in self.protected_attributes:
             samples = len(biases_by_attributes[attribute.attribute.value])
             k_success = sum(1 for bias in biases_by_attributes[attribute.attribute.value] if not bias.is_biased)
-            clopper_pearson = self._clopper_pearson_confidence_interval(samples,k_success)
+            clopper_pearson = self._clopper_pearson_confidence_interval(samples, k_success)
             confidence_interval = BiasMetric.ConfidenceInterval(
                 alpha=clopper_pearson.alpha,
                 lower_bound=clopper_pearson.lower_bound,
@@ -172,7 +178,7 @@ class Bias(FairForge):
                 samples=clopper_pearson.samples,
                 k_success=clopper_pearson.k_success,
                 confidence_level=self.confidence_level,
-                protected_attribute=attribute.attribute.value
+                protected_attribute=attribute.attribute.value,
             )
             intervals.append(confidence_interval)
 
@@ -208,8 +214,6 @@ class Bias(FairForge):
             session_id=session_id,
             assistant_id=assistant_id,
             confidence_intervals=confidence_intervals,
-            guardian_interactions=biases_by_attribute
+            guardian_interactions=biases_by_attribute,
         )
         self.metrics.append(bias_metric)
-
-

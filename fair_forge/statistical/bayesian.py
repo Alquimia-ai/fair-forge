@@ -1,6 +1,9 @@
 """Bayesian statistical mode implementation."""
-from typing import Dict, Any, Optional
+
+from typing import Any
+
 import numpy as np
+
 from .base import StatisticalMode
 
 
@@ -14,7 +17,7 @@ class BayesianMode(StatisticalMode):
         dirichlet_prior: float = 1.0,
         beta_prior_a: float = 1.0,
         beta_prior_b: float = 1.0,
-        rng_seed: Optional[int] = 42
+        rng_seed: int | None = 42,
     ):
         """
         Initialize Bayesian mode with prior parameters.
@@ -35,11 +38,8 @@ class BayesianMode(StatisticalMode):
         self.rng = np.random.default_rng(rng_seed)
 
     def distribution_divergence(
-        self,
-        observed_counts: Dict[str, int],
-        reference: Dict[str, float],
-        divergence_type: str = "total_variation"
-    ) -> Dict[str, Any]:
+        self, observed_counts: dict[str, int], reference: dict[str, float], divergence_type: str = "total_variation"
+    ) -> dict[str, Any]:
         """
         Bayesian divergence with Dirichlet posterior.
 
@@ -75,7 +75,7 @@ class BayesianMode(StatisticalMode):
 
         return self._summarize(divergences)
 
-    def rate_estimation(self, successes: int, trials: int) -> Dict[str, Any]:
+    def rate_estimation(self, successes: int, trials: int) -> dict[str, Any]:
         """Beta-Binomial posterior for rate."""
         if trials <= 0:
             return self._empty_summary()
@@ -86,11 +86,7 @@ class BayesianMode(StatisticalMode):
         samples = self.rng.beta(a_posterior, b_posterior, size=self.mc_samples)
         return self._summarize(samples)
 
-    def aggregate_metrics(
-        self,
-        metrics: Dict[str, Dict[str, Any]],
-        weights: Dict[str, float]
-    ) -> Dict[str, Any]:
+    def aggregate_metrics(self, metrics: dict[str, dict[str, Any]], weights: dict[str, float]) -> dict[str, Any]:
         """Aggregate by combining samples with weights."""
         total_weight = sum(weights.values())
         if total_weight == 0:
@@ -102,19 +98,15 @@ class BayesianMode(StatisticalMode):
         aggregated_samples = np.zeros(self.mc_samples)
         for name, metric_result in metrics.items():
             weight = normalized_weights.get(name, 0.0)
-            if 'samples' in metric_result and len(metric_result['samples']) == self.mc_samples:
-                aggregated_samples += weight * metric_result['samples']
+            if "samples" in metric_result and len(metric_result["samples"]) == self.mc_samples:
+                aggregated_samples += weight * metric_result["samples"]
             else:
                 # Fallback if no samples or wrong size
-                aggregated_samples += weight * metric_result.get('mean', 0.0)
+                aggregated_samples += weight * metric_result.get("mean", 0.0)
 
         return self._summarize(aggregated_samples)
 
-    def dispersion_metric(
-        self,
-        values: Dict[str, Dict[str, Any]],
-        center: str = "mean"
-    ) -> Dict[str, Any]:
+    def dispersion_metric(self, values: dict[str, dict[str, Any]], center: str = "mean") -> dict[str, Any]:
         """Compute dispersion from samples."""
         if not values:
             return self._empty_summary()
@@ -122,11 +114,11 @@ class BayesianMode(StatisticalMode):
         # Stack all samples
         all_samples = []
         for v in values.values():
-            if 'samples' in v and len(v['samples']) == self.mc_samples:
-                all_samples.append(v['samples'])
+            if "samples" in v and len(v["samples"]) == self.mc_samples:
+                all_samples.append(v["samples"])
             else:
                 # Fallback to point estimate if no samples or wrong size
-                all_samples.append(np.full(self.mc_samples, v.get('mean', 0.0)))
+                all_samples.append(np.full(self.mc_samples, v.get("mean", 0.0)))
 
         all_samples = np.array(all_samples)
 
@@ -143,27 +135,22 @@ class BayesianMode(StatisticalMode):
 
         return self._summarize(dispersion_samples)
 
-    def _summarize(self, samples: np.ndarray) -> Dict[str, Any]:
+    def _summarize(self, samples: np.ndarray) -> dict[str, Any]:
         """Convert samples to summary statistics."""
         if samples.size == 0:
             return self._empty_summary()
 
         alpha = (1.0 - self.ci_level) / 2.0
         return {
-            'mean': float(samples.mean()),
-            'ci_low': float(np.quantile(samples, alpha)),
-            'ci_high': float(np.quantile(samples, 1.0 - alpha)),
-            'samples': samples
+            "mean": float(samples.mean()),
+            "ci_low": float(np.quantile(samples, alpha)),
+            "ci_high": float(np.quantile(samples, 1.0 - alpha)),
+            "samples": samples,
         }
 
-    def _empty_summary(self) -> Dict[str, Any]:
+    def _empty_summary(self) -> dict[str, Any]:
         """Return empty summary for edge cases."""
-        return {
-            'mean': 0.0,
-            'ci_low': 0.0,
-            'ci_high': 0.0,
-            'samples': np.zeros(self.mc_samples)
-        }
+        return {"mean": 0.0, "ci_low": 0.0, "ci_high": 0.0, "samples": np.zeros(self.mc_samples)}
 
     def get_result_type(self) -> str:
         return "distribution"

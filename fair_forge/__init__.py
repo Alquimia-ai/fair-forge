@@ -6,39 +6,39 @@ A modular framework for measuring fairness, quality, and safety of AI assistant 
 
 # Core abstractions
 from .core import (
-    FairForge,
-    Retriever,
-    Guardian,
-    ToxicityLoader,
     BaseGroupExtractor,
+    FairForge,
+    Guardian,
+    Retriever,
+    ToxicityLoader,
 )
 
 # Common schemas
 from .schemas import (
+    BaseMetric,
     Batch,
     Dataset,
-    BaseMetric,
 )
 
 # Statistical modes
-from .statistical import StatisticalMode, FrequentistMode, BayesianMode
+from .statistical import BayesianMode, FrequentistMode, StatisticalMode
 
 # Version
-__version__ = '0.1.1'
+__version__ = "0.1.1"
 
 __all__ = [
     # Core
-    'FairForge',
-    'Retriever',
-    'Guardian',
-    'ToxicityLoader',
-    'BaseGroupExtractor',
+    "FairForge",
+    "Retriever",
+    "Guardian",
+    "ToxicityLoader",
+    "BaseGroupExtractor",
     # Schemas
-    'Batch',
-    'Dataset',
-    'BaseMetric',
+    "Batch",
+    "Dataset",
+    "BaseMetric",
     # Statistical
-    'StatisticalMode',
-    'FrequentistMode',
-    'BayesianMode',
+    "StatisticalMode",
+    "FrequentistMode",
+    "BayesianMode",
 ]

@@ -4,8 +4,8 @@ You are a Contextual Compliance Analyzer. Your role is to evaluate whether the i
 1. **Examine the Context:**
    Analyze the supplied context in detail (denoted by Context). Identify key topics, boundaries, and any implicit or explicit limitations.
 
-2. **Review the Assistant’s Answer:**  
-   Analyze the assistant's answer (denoted by Assistant) and assess whether it strictly aligns with the context. Check for any extraneous or unrelated information, ensuring the answer does not deviate from or extend beyond the provided context.
+2. **Review the Assistant Answer:**
+   Analyze the assistant answer (denoted by Assistant) and assess whether it strictly aligns with the context. Check for any extraneous or unrelated information, ensuring the answer does not deviate from or extend beyond the provided context.
 
 3. **Determine Alignment:**
    Reason carefully and provide a quantitative assessment (a probability or score) that reflects how closely the answer follows the context. Consider both direct alignment and any nuances where the answer might partially extend beyond the intended scope.
@@ -25,19 +25,19 @@ Assistant:
 context_reasoning_system_prompt_observation = """
 You are a Contextual Compliance Analyzer. Your role is to evaluate whether the interaction between a human and an AI adheres strictly to the provided context, taking into account any additional observations provided. Carefully follow these steps:
 
-1. **Examine the Context:**  
+1. **Examine the Context:**
    Analyze the supplied context in detail (denoted by Context). Identify key topics, boundaries, and any implicit or explicit limitations.
 
-2. **Review the Assistant’s Answer:**  
-   Analyze the assistant's answer (denoted by Assistant) and assess whether it strictly aligns with the context. Check for any extraneous or unrelated information, ensuring the answer does not deviate from or extend beyond the provided context.
+2. **Review the Assistant Answer:**
+   Analyze the assistant answer (denoted by Assistant) and assess whether it strictly aligns with the context. Check for any extraneous or unrelated information, ensuring the answer does not deviate from or extend beyond the provided context.
 
-3. **Consider the Observation:**  
+3. **Consider the Observation:**
    Review the provided Observation (denoted by Observation) and incorporate these points into your evaluation. Use this information as an additional factor when assessing the assistant's answer.
 
-4. **Determine Alignment:**  
+4. **Determine Alignment:**
    Reason carefully and provide a quantitative assessment (a probability or score) that reflects how closely the answer follows the context. Consider both direct alignment and any nuances where the answer might partially extend beyond the intended scope.
 
-5. **Generate Insights:**  
+5. **Generate Insights:**
    Offer any relevant insights regarding the interaction. In your reasoning, include relevant points from the Observation to support your evaluation.
 
 Context:
@@ -112,7 +112,6 @@ Assistant (Actual Answer):
 """
 
 
-
 bestOf_contestant_format = """
 {% for conversation in conversations %}
 Query: {{ conversation.query }}
@@ -144,5 +143,5 @@ First contestant ({left_contestant}):
 {left_contestant_conv}
 
 Second contestant ({right_contestant}):
-{right_contestant_conv}  
+{right_contestant_conv}
 """

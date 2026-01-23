@@ -1,7 +1,8 @@
 """Tests for LocalMarkdownLoader."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from fair_forge.generators.context_loaders import LocalMarkdownLoader
 from fair_forge.schemas.generators import Chunk
@@ -65,9 +66,7 @@ class TestLocalMarkdownLoader:
         chunks = loader.load(str(temp_markdown_long_section_file))
 
         # Long section should be split into multiple chunks
-        long_section_chunks = [
-            c for c in chunks if "long_section" in c.chunk_id.lower()
-        ]
+        long_section_chunks = [c for c in chunks if "long_section" in c.chunk_id.lower()]
         assert len(long_section_chunks) > 1
 
     def test_load_raises_on_missing_file(self):
@@ -263,7 +262,7 @@ class TestLocalMarkdownLoaderMultipleFiles:
         assert len(chunk_ids) == len(set(chunk_ids)), "Chunk IDs should be unique"
 
         # Verify source files are tracked
-        source_files = set(c.metadata.get("source_file") for c in chunks)
+        source_files = {c.metadata.get("source_file") for c in chunks}
         assert str(file1) in source_files
         assert str(file2) in source_files
 
@@ -297,9 +296,7 @@ class TestLocalMarkdownLoaderMultipleFiles:
         sub_dir.mkdir()
 
         (docs_dir / "intro.md").write_text("# Intro\n\nIntro content.", encoding="utf-8")
-        (sub_dir / "advanced.md").write_text(
-            "# Advanced\n\nAdvanced content.", encoding="utf-8"
-        )
+        (sub_dir / "advanced.md").write_text("# Advanced\n\nAdvanced content.", encoding="utf-8")
 
         loader = LocalMarkdownLoader()
         chunks = loader.load(str(docs_dir / "**/*.md"))
@@ -316,9 +313,7 @@ class TestLocalMarkdownLoaderMultipleFiles:
 
         (docs_dir / "file1.md").write_text("# File 1\n\nContent 1.", encoding="utf-8")
         (docs_dir / "file2.md").write_text("# File 2\n\nContent 2.", encoding="utf-8")
-        (docs_dir / "file3.markdown").write_text(
-            "# File 3\n\nContent 3.", encoding="utf-8"
-        )
+        (docs_dir / "file3.markdown").write_text("# File 3\n\nContent 3.", encoding="utf-8")
 
         loader = LocalMarkdownLoader()
         chunks = loader.load(str(docs_dir))
@@ -399,7 +394,9 @@ class TestLocalMarkdownLoaderMultipleFiles:
 
         # Files should be sorted alphabetically
         source_files = [c.metadata.get("source_file") for c in chunks]
-        assert source_files.index(next(f for f in source_files if "apple" in f)) < \
-               source_files.index(next(f for f in source_files if "mango" in f))
-        assert source_files.index(next(f for f in source_files if "mango" in f)) < \
-               source_files.index(next(f for f in source_files if "zebra" in f))
+        assert source_files.index(next(f for f in source_files if "apple" in f)) < source_files.index(
+            next(f for f in source_files if "mango" in f)
+        )
+        assert source_files.index(next(f for f in source_files if "mango" in f)) < source_files.index(
+            next(f for f in source_files if "zebra" in f)
+        )

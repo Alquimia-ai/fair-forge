@@ -87,4 +87,4 @@ If you have any questions or need help, please:
 
 By contributing to this project, you agree that your contributions will be licensed under the project's existing license.
 
-Thank you for contributing to Fair Forge! 
+Thank you for contributing to Fair Forge!

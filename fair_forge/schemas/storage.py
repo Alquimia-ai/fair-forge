@@ -1,4 +1,5 @@
 """Storage interfaces for Fair Forge."""
+
 from abc import ABC, abstractmethod
 from datetime import datetime
 
@@ -21,7 +22,6 @@ class BaseStorage(ABC):
         Returns:
             list[Dataset]: List of test datasets loaded from storage
         """
-        pass
 
     @abstractmethod
     def save_results(self, datasets: list[Dataset], run_id: str, timestamp: datetime) -> str:
@@ -36,7 +36,6 @@ class BaseStorage(ABC):
         Returns:
             str: Path or identifier where results were saved
         """
-        pass
 
 
 __all__ = ["BaseStorage"]

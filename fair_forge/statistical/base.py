@@ -1,6 +1,7 @@
 """Statistical mode abstract base class."""
+
 from abc import ABC, abstractmethod
-from typing import Dict, Union, Any
+from typing import Any
 
 
 class StatisticalMode(ABC):
@@ -15,11 +16,8 @@ class StatisticalMode(ABC):
 
     @abstractmethod
     def distribution_divergence(
-        self,
-        observed: Dict[str, Union[int, float]],
-        reference: Dict[str, float],
-        divergence_type: str = "total_variation"
-    ) -> Union[float, Dict[str, Any]]:
+        self, observed: dict[str, int | float], reference: dict[str, float], divergence_type: str = "total_variation"
+    ) -> float | dict[str, Any]:
         """
         Compute divergence between two probability distributions.
 
@@ -35,11 +33,7 @@ class StatisticalMode(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def rate_estimation(
-        self,
-        successes: int,
-        trials: int
-    ) -> Union[float, Dict[str, Any]]:
+    def rate_estimation(self, successes: int, trials: int) -> float | dict[str, Any]:
         """
         Estimate a rate/proportion with uncertainty.
 
@@ -55,10 +49,8 @@ class StatisticalMode(ABC):
 
     @abstractmethod
     def aggregate_metrics(
-        self,
-        metrics: Dict[str, Union[float, Dict[str, Any]]],
-        weights: Dict[str, float]
-    ) -> Union[float, Dict[str, Any]]:
+        self, metrics: dict[str, float | dict[str, Any]], weights: dict[str, float]
+    ) -> float | dict[str, Any]:
         """
         Aggregate multiple metrics with weights.
 
@@ -74,10 +66,8 @@ class StatisticalMode(ABC):
 
     @abstractmethod
     def dispersion_metric(
-        self,
-        values: Dict[str, Union[float, Dict[str, Any]]],
-        center: str = "mean"
-    ) -> Union[float, Dict[str, Any]]:
+        self, values: dict[str, float | dict[str, Any]], center: str = "mean"
+    ) -> float | dict[str, Any]:
         """
         Compute dispersion/spread of values around a center.
         Useful for metrics like DTO that measure deviation.

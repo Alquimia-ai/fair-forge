@@ -1,10 +1,6 @@
 #!/usr/bin/env python
-import os
-import sys
-from distutils.core import setup
-
 import setuptools
-from setuptools.command.install import install
+from distutils.core import setup
 
 VERSION = "v0.1.0"
 
@@ -21,5 +17,5 @@ setup(
     url="https://github.com/Alquimia-ai/fair-forge.git",
     packages=setuptools.find_packages(),
     include_package_data=True,
-    install_requires=requirements
+    install_requires=requirements,
 )

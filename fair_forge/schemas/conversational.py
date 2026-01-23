@@ -1,4 +1,5 @@
 """Conversational metric schemas."""
+
 from .metrics import BaseMetric
 
 
@@ -6,6 +7,7 @@ class ConversationalMetric(BaseMetric):
     """
     Conversational metric for evaluating the assistant's conversational abilities.
     """
+
     conversational_memory: float
     conversational_insight: str
     conversational_language: float

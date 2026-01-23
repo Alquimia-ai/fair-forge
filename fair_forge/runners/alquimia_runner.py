@@ -1,9 +1,11 @@
 """Alquimia AI runner implementation."""
+
 import time
 from datetime import datetime
 from typing import Any
-from loguru import logger
+
 from alquimia_client import AlquimiaClient
+from loguru import logger
 
 from fair_forge.schemas.common import Batch, Dataset
 from fair_forge.schemas.runner import BaseRunner

@@ -1,6 +1,9 @@
 """HurtLex toxicity dataset loader."""
+
 from importlib.resources import files
+
 import pandas as pd
+
 from fair_forge.core.loader import ToxicityLoader
 from fair_forge.schemas.toxicity import ToxicityDataset
 
@@ -24,15 +27,10 @@ class HurtlexLoader(ToxicityLoader):
             List of ToxicityDataset entries
         """
         # Use importlib.resources instead of deprecated pkg_resources
-        toxicity_file = files("fair_forge").joinpath(
-            f"artifacts/toxicity/hurtlex_{language}.tsv"
-        )
-        df = pd.read_csv(
+        toxicity_file = files("fair_forge").joinpath(f"artifacts/toxicity/hurtlex_{language}.tsv")
+        hurtlex_data = pd.read_csv(
             toxicity_file,
             sep="\t",
             header=0,
         )
-        return [
-            ToxicityDataset(word=row["lemma"], category=row["category"])
-            for _, row in df.iterrows()
-        ]
+        return [ToxicityDataset(word=row["lemma"], category=row["category"]) for _, row in hurtlex_data.iterrows()]

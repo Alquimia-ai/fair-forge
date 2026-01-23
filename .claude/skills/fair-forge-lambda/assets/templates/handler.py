@@ -1,5 +1,7 @@
 """AWS Lambda handler for Fair-Forge modules."""
+
 import json
+
 from run import run
 
 

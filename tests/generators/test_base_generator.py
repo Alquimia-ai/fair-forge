@@ -1,23 +1,24 @@
 """Tests for BaseGenerator with LangChain models."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from fair_forge.generators import (
     BaseGenerator,
     LocalMarkdownLoader,
-    SequentialStrategy,
     RandomSamplingStrategy,
+    SequentialStrategy,
 )
+from fair_forge.schemas.common import Batch, Dataset
 from fair_forge.schemas.generators import (
     Chunk,
-    GeneratedQuery,
-    GeneratedQueriesOutput,
     ConversationTurn,
     GeneratedConversationOutput,
+    GeneratedQueriesOutput,
+    GeneratedQuery,
 )
-from fair_forge.schemas.common import Dataset, Batch
 
 
 class TestBaseGeneratorInitialization:
@@ -50,10 +51,10 @@ class TestBaseGeneratorParsing:
         mock_model = MagicMock()
         generator = BaseGenerator(model=mock_model)
 
-        content = '''Here is the response:
+        content = """Here is the response:
 ```json
 {"queries": [{"query": "What is X?", "difficulty": "easy", "query_type": "factual"}], "chunk_summary": "Summary"}
-```'''
+```"""
 
         result = generator._parse_json_response(content)
 
@@ -89,7 +90,7 @@ class TestBaseGeneratorParsing:
         mock_model = MagicMock()
         generator = BaseGenerator(model=mock_model)
 
-        content = '''Here is the conversation:
+        content = """Here is the conversation:
 ```json
 {
     "turns": [
@@ -98,7 +99,7 @@ class TestBaseGeneratorParsing:
     "conversation_summary": "A brief conversation",
     "chunk_summary": "Test chunk"
 }
-```'''
+```"""
 
         result = generator._parse_conversation_response(content)
 
@@ -144,9 +145,9 @@ class TestBaseGeneratorGenerateQueries:
 
         # Mock the response content
         mock_response = MagicMock()
-        mock_response.content = '''```json
+        mock_response.content = """```json
 {"queries": [{"query": "Regex question?", "difficulty": "medium", "query_type": "inferential"}], "chunk_summary": "Summary"}
-```'''
+```"""
         mock_model.invoke = MagicMock(return_value=mock_response)
 
         # Create a mock chain that returns our mock response
@@ -209,9 +210,7 @@ class TestBaseGeneratorGenerateDataset:
     """Test suite for BaseGenerator.generate_dataset method."""
 
     @pytest.mark.asyncio
-    async def test_generate_dataset_creates_valid_dataset(
-        self, temp_markdown_file: Path
-    ):
+    async def test_generate_dataset_creates_valid_dataset(self, temp_markdown_file: Path):
         """Test generate_dataset creates a valid list of Dataset objects."""
         mock_model = MagicMock()
 
@@ -251,9 +250,7 @@ class TestBaseGeneratorGenerateDataset:
                 assert batch.assistant == ""
 
     @pytest.mark.asyncio
-    async def test_generate_dataset_conversation_mode(
-        self, temp_markdown_file: Path
-    ):
+    async def test_generate_dataset_conversation_mode(self, temp_markdown_file: Path):
         """Test generate_dataset with conversation_mode=True."""
         mock_model = MagicMock()
         mock_structured_model = MagicMock()
@@ -441,9 +438,7 @@ class TestBaseGeneratorWithStrategies:
         assert len(session_ids) == len(set(session_ids))
 
     @pytest.mark.asyncio
-    async def test_random_sampling_with_conversation_mode(
-        self, temp_markdown_file: Path
-    ):
+    async def test_random_sampling_with_conversation_mode(self, temp_markdown_file: Path):
         """Test combining random sampling with conversation mode."""
         mock_model = MagicMock()
 
