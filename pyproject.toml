@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "alquimia-fair-forge"
+name = "fair-forge"
 version = "0.1.2"
 description = "Alquimia Fair Forge library - Performance measurement for AI models and assistants"
 readme = "README.md"
@@ -90,7 +90,7 @@ bias = [
 
 # All metrics
 metrics = [
-    "alquimia-fair-forge[context,conversational,bestof,humanity,toxicity,bias]",
+    "fair-forge[context,conversational,bestof,humanity,toxicity,bias]",
 ]
 
 # Runners module
@@ -117,7 +117,7 @@ cloud = [
 
 # Everything
 all = [
-    "alquimia-fair-forge[metrics,runners,generators,generators-alquimia,cloud]",
+    "fair-forge[metrics,runners,generators,generators-alquimia,cloud]",
 ]
 
 # Development tools
@@ -132,6 +132,10 @@ dev = [
     "ruff>=0.8.0",
     "mypy>=1.8.0",
     "pre-commit>=3.5.0",
+
+    # Release management
+    "commitizen>=4.0.0",
+    "python-semantic-release>=9.0.0",
 
     # Type stubs
     "types-tqdm>=4.66.0",
@@ -166,6 +170,10 @@ dev = [
     "ruff>=0.8.0",
     "mypy>=1.8.0",
     "pre-commit>=3.5.0",
+
+    # Release management
+    "commitizen>=4.0.0",
+    "python-semantic-release>=9.0.0",
 
     # Type stubs
     "types-tqdm>=4.66.0",
@@ -256,11 +264,17 @@ ignore = [
     "TRY003",   # avoid specifying long messages outside exception class
     "PD901",    # avoid using 'df' as variable name
     "B008",     # do not perform function calls in argument defaults (needed for FastAPI/Pydantic)
+    "ISC001",   # conflicts with ruff formatter
+    "EM101",    # exception must not use string literal
+    "EM102",    # exception must not use f-string literal
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "E402"]  # Allow unused imports and module-level imports
-"tests/**/*.py" = ["ARG", "PLR2004", "S101"]  # Allow unused arguments, magic values, and asserts in tests
+"tests/**/*.py" = ["ARG", "PLR2004", "S101", "N802", "N806", "PTH123", "DTZ"]  # Relaxed rules for tests
+"examples/**/*.py" = ["ARG", "PTH", "B007", "C408", "T201", "PLR2004"]  # Examples can be more relaxed
+"examples/**/*.ipynb" = ["ARG", "PTH", "B007", "C408", "T201", "PLR2004"]  # Notebooks can be more relaxed
+".claude/**/*.py" = ["ARG", "PTH"]  # Claude skills templates
 
 [tool.ruff.lint.isort]
 known-first-party = ["fair_forge"]
@@ -338,9 +352,9 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
     "ignore::UserWarning:pkg_resources",
-    "ignore::SyntaxWarning",  
-    "ignore::ImportWarning:umap",  
-    "error",  
+    "ignore::SyntaxWarning",
+    "ignore::ImportWarning:umap",
+    "error",
 ]
 
 # Coverage configuration
@@ -369,3 +383,55 @@ exclude_lines = [
 ]
 precision = 2
 show_missing = true
+
+# Commitizen configuration
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_scheme = "semver"
+version_provider = "pep621"
+update_changelog_on_bump = true
+changelog_file = "CHANGELOG.md"
+major_version_zero = true
+
+# Python Semantic Release configuration
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+version_variables = []
+build_command = "uv build"
+branch = "main"
+commit_message = "chore(release): v{version}"
+tag_format = "v{version}"
+
+[tool.semantic_release.changelog]
+exclude_commit_patterns = [
+    "^chore\\(release\\):",
+    "^Merge",
+]
+
+[tool.semantic_release.changelog.default_templates]
+changelog_file = "CHANGELOG.md"
+
+[tool.semantic_release.commit_parser_options]
+allowed_tags = [
+    "feat",
+    "fix",
+    "docs",
+    "style",
+    "refactor",
+    "perf",
+    "test",
+    "build",
+    "ci",
+    "chore",
+]
+minor_tags = ["feat"]
+patch_tags = ["fix", "perf"]
+
+[tool.semantic_release.remote]
+type = "github"
+token = { env = "GH_TOKEN" }
+
+[tool.semantic_release.publish]
+dist_glob_patterns = ["dist/*"]
+upload_to_vcs_release = true
