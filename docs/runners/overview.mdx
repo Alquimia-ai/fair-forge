@@ -106,23 +106,17 @@ runner = AlquimiaRunner(
 
 ## Workflow
 
+<Frame>
+```mermaid
+flowchart TD
+    A[Test Datasets] --> B[Runner]
+    B --> C[AI System]
+    C --> D[Responses]
+    D --> E[Updated Dataset]
+    E --> F[Storage]
+    E --> G[Metrics]
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Test Datasets  │────▶│     Runner      │────▶│   AI System     │
-│  (Generated)    │     │  (Orchestrates) │     │  (Under Test)   │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-        │                       │                       │
-        │                       ▼                       │
-        │               ┌───────────────┐               │
-        │               │   Responses   │◀──────────────┘
-        │               └───────────────┘
-        │                       │
-        ▼                       ▼
-┌─────────────────┐     ┌─────────────────┐
-│    Storage      │◀────│ Updated Dataset │
-│  (Results)      │     │  (With Answers) │
-└─────────────────┘     └─────────────────┘
-```
+</Frame>
 
 ## Execution Summary
 
