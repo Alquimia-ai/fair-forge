@@ -47,9 +47,20 @@ jobs:
 
       - name: Python Semantic Release
         id: release
-        uses: python-semantic-release/python-semantic-release@v9.15.2
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OUTPUT=$(uv run semantic-release version --print 2>&1) || true
+          echo "$OUTPUT"
+          if echo "$OUTPUT" | grep -q "No release will be made"; then
+            echo "released=false" >> $GITHUB_OUTPUT
+          else
+            uv run semantic-release version
+            echo "released=true" >> $GITHUB_OUTPUT
+            VERSION=$(uv run semantic-release version --print-last-released)
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          fi
 
       - name: Publish to PyPI
         if: steps.release.outputs.released == 'true'
@@ -59,6 +70,6 @@ jobs:
 
       - name: Publish to GitHub Releases
         if: steps.release.outputs.released == 'true'
-        uses: python-semantic-release/publish-action@v9.15.2
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: uv run semantic-release publish
