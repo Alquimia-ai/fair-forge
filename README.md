@@ -9,6 +9,13 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/Alquimia-ai/fair-forge/actions/workflows/release.yml"><img src="https://github.com/Alquimia-ai/fair-forge/actions/workflows/release.yml/badge.svg" alt="CI"></a>
+  <a href="https://pypi.org/project/fair-forge/"><img src="https://img.shields.io/pypi/v/fair-forge" alt="PyPI"></a>
+  <a href="https://pypi.org/project/fair-forge/"><img src="https://img.shields.io/pypi/pyversions/fair-forge" alt="Python Versions"></a>
+  <a href="https://github.com/Alquimia-ai/fair-forge/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Alquimia-ai/fair-forge" alt="License"></a>
+</p>
+
+<p align="center">
   <a href="https://fairforge.alquimia.ai">Documentation</a> •
   <a href="https://github.com/Alquimia-ai/fair-forge">GitHub</a>
 </p>
