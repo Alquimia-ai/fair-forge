@@ -9,24 +9,14 @@ Fair Forge follows a simple yet powerful architecture designed for extensibility
 
 ## Overview
 
+<Frame>
+```mermaid
+flowchart LR
+    A[Retriever<br/>Your Data] --> B[FairForge<br/>Base]
+    B --> C[Metrics<br/>Results]
+    B --> D[Statistical<br/>Modes]
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Fair Forge                           │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐  │
-│   │  Retriever  │────▶│  FairForge  │────▶│   Metrics   │  │
-│   │  (Your Data)│     │    Base     │     │  (Results)  │  │
-│   └─────────────┘     └─────────────┘     └─────────────┘  │
-│                             │                               │
-│                             ▼                               │
-│                    ┌─────────────────┐                      │
-│                    │  Statistical    │                      │
-│                    │     Modes       │                      │
-│                    └─────────────────┘                      │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+</Frame>
 
 ## Data Flow
 
@@ -37,19 +27,20 @@ The core data flow in Fair Forge is:
 3. **Metric** implementations process each conversation batch
 4. **Results** are collected in `self.metrics`
 
-```python
-# The core pattern
-Retriever.load_dataset() -> list[Dataset]
-    |
-    v
-FairForge._process() iterates datasets
-    |
-    v
-Metric.batch() processes each conversation
-    |
-    v
-Results in self.metrics
-```
+<Steps>
+  <Step title="Load Data">
+    `Retriever.load_dataset()` returns `list[Dataset]`
+  </Step>
+  <Step title="Process Datasets">
+    `FairForge._process()` iterates through datasets
+  </Step>
+  <Step title="Compute Metrics">
+    `Metric.batch()` processes each conversation
+  </Step>
+  <Step title="Collect Results">
+    Results stored in `self.metrics`
+  </Step>
+</Steps>
 
 ## Core Components
 

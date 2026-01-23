@@ -80,18 +80,20 @@ for metric in results:
 
 Fair Forge follows a simple yet powerful architecture:
 
-```
-Retriever.load_dataset() -> list[Dataset]
-    |
-    v
-FairForge._process() iterates datasets
-    |
-    v
-Metric.batch() processes each conversation
-    |
-    v
-Results in self.metrics
-```
+<Steps>
+  <Step title="Load Data">
+    `Retriever.load_dataset()` returns `list[Dataset]`
+  </Step>
+  <Step title="Process">
+    `FairForge._process()` iterates datasets
+  </Step>
+  <Step title="Evaluate">
+    `Metric.batch()` processes each conversation
+  </Step>
+  <Step title="Results">
+    Collected in `self.metrics`
+  </Step>
+</Steps>
 
 All metrics inherit from the `FairForge` base class and implement the `batch()` method to process conversation batches. Users provide data through custom `Retriever` implementations.
 
