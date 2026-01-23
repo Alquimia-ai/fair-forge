@@ -162,18 +162,23 @@ Dataset(
 
 ## Workflow
 
+<Frame>
+```mermaid
+flowchart LR
+    subgraph Generation
+        A[Documentation] --> B[Generator]
+        B --> C[Test Datasets]
+    end
+    subgraph Execution
+        C --> D[Runners]
+        D --> E[AI System]
+        E --> D
+    end
+    subgraph Evaluation
+        D --> F[Metrics]
+    end
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Documentation  │────▶│    Generator    │────▶│  Test Datasets  │
-│  (Markdown)     │     │  (LLM-powered)  │     │  (JSON/Dataset) │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-                                                        │
-                                                        ▼
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│    Metrics      │◀────│    Runners      │◀────│   AI System     │
-│  (Evaluation)   │     │  (Execution)    │     │  (Under Test)   │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-```
+</Frame>
 
 ## Supported LLM Providers
 

@@ -326,18 +326,14 @@ aws logs tail "/aws/lambda/fair-forge-runners" --follow --region us-east-2
 
 ## Architecture
 
+<Frame>
+```mermaid
+flowchart LR
+    A[API Gateway<br/>HTTP API] --> B[Lambda<br/>Function]
+    B --> C[LLM Provider<br/>Groq/OpenAI]
+    B --> D[JSON Response<br/>Datasets]
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  API Gateway    │────▶│  Lambda         │────▶│  LLM Provider   │
-│  HTTP API       │     │  Function       │     │  (Groq/OpenAI)  │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-                               │
-                               ▼
-                        ┌─────────────────┐
-                        │  JSON Response  │
-                        │  (Datasets)     │
-                        └─────────────────┘
-```
+</Frame>
 
 ## Integration Example
 
