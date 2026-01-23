@@ -83,7 +83,7 @@ You need Python 3.11+ installed on your system.
 
 Run the following command to install:
 ```
-pip install fair-forge
+pip install alquimia-fair-forge
 ```
 
 ## Advanced Usage

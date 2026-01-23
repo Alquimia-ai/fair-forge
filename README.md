@@ -10,8 +10,8 @@
 
 <p align="center">
   <a href="https://github.com/Alquimia-ai/fair-forge/actions/workflows/release.yml"><img src="https://github.com/Alquimia-ai/fair-forge/actions/workflows/release.yml/badge.svg" alt="CI"></a>
-  <a href="https://pypi.org/project/fair-forge/"><img src="https://img.shields.io/pypi/v/fair-forge" alt="PyPI"></a>
-  <a href="https://pypi.org/project/fair-forge/"><img src="https://img.shields.io/pypi/pyversions/fair-forge" alt="Python Versions"></a>
+  <a href="https://pypi.org/project/alquimia-fair-forge/"><img src="https://img.shields.io/pypi/v/alquimia-fair-forge" alt="PyPI"></a>
+  <a href="https://pypi.org/project/alquimia-fair-forge/"><img src="https://img.shields.io/pypi/pyversions/alquimia-fair-forge" alt="Python Versions"></a>
   <a href="https://github.com/Alquimia-ai/fair-forge/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Alquimia-ai/fair-forge" alt="License"></a>
 </p>
 
@@ -35,12 +35,12 @@ Fair Forge provides comprehensive metrics for evaluating AI systems:
 
 ```bash
 # Install with pip
-pip install fair-forge
+pip install alquimia-fair-forge
 
 # Or install specific modules
-pip install "fair-forge[toxicity]"
-pip install "fair-forge[bias]"
-pip install "fair-forge[all]"
+pip install "alquimia-fair-forge[toxicity]"
+pip install "alquimia-fair-forge[bias]"
+pip install "alquimia-fair-forge[all]"
 ```
 
 ```python
