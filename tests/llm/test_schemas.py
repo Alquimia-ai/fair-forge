@@ -1,4 +1,5 @@
 """Tests for LLM output schemas."""
+
 import pytest
 from pydantic import ValidationError
 
@@ -163,27 +164,19 @@ class TestBestOfJudgeOutput:
 
     def test_confidence_bounds(self):
         """Test confidence at bounds."""
-        output_low = BestOfJudgeOutput(
-            winner="a", verdict="Test", confidence=0.0, reasoning={}
-        )
+        output_low = BestOfJudgeOutput(winner="a", verdict="Test", confidence=0.0, reasoning={})
         assert output_low.confidence == 0.0
 
-        output_high = BestOfJudgeOutput(
-            winner="a", verdict="Test", confidence=1.0, reasoning={}
-        )
+        output_high = BestOfJudgeOutput(winner="a", verdict="Test", confidence=1.0, reasoning={})
         assert output_high.confidence == 1.0
 
     def test_confidence_out_of_range(self):
         """Test confidence out of range raises error."""
         with pytest.raises(ValidationError):
-            BestOfJudgeOutput(
-                winner="a", verdict="Test", confidence=1.5, reasoning={}
-            )
+            BestOfJudgeOutput(winner="a", verdict="Test", confidence=1.5, reasoning={})
 
         with pytest.raises(ValidationError):
-            BestOfJudgeOutput(
-                winner="a", verdict="Test", confidence=-0.1, reasoning={}
-            )
+            BestOfJudgeOutput(winner="a", verdict="Test", confidence=-0.1, reasoning={})
 
     def test_from_dict(self):
         """Test creating from dictionary."""

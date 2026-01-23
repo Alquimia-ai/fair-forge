@@ -1,4 +1,5 @@
 """Runner interfaces for Fair Forge."""
+
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -29,7 +30,6 @@ class BaseRunner(ABC):
                 - success: Boolean indicating whether execution succeeded
                 - execution_time_ms: Execution time in milliseconds
         """
-        pass
 
     @abstractmethod
     async def run_dataset(self, dataset: Dataset, **kwargs: Any) -> tuple[Dataset, dict[str, Any]]:
@@ -51,7 +51,6 @@ class BaseRunner(ABC):
                     - total_execution_time_ms: float
                     - avg_batch_time_ms: float
         """
-        pass
 
 
 __all__ = ["BaseRunner"]

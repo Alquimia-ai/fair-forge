@@ -1,8 +1,10 @@
 """LakeFS storage implementation."""
+
 import json
-import lakefs
 from datetime import datetime
-from lakefs.client import Client as lakefs_client_class
+
+import lakefs
+from lakefs.client import Client as LakeFSClient
 from loguru import logger
 
 from fair_forge.schemas.common import Dataset
@@ -37,11 +39,9 @@ class LakeFSStorage(BaseStorage):
             branch_name: Branch name to use (default: "main")
         """
         if not all([host, username, password, repo_id]):
-            raise ValueError(
-                "LakeFS credentials are incomplete. Required: host, username, password, repo_id"
-            )
+            raise ValueError("LakeFS credentials are incomplete. Required: host, username, password, repo_id")
 
-        self.client = lakefs_client_class(
+        self.client = LakeFSClient(
             username=username,
             password=password,
             host=host,

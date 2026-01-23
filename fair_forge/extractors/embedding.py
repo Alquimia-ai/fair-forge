@@ -1,7 +1,8 @@
 """Embedding-based group extractor."""
-from typing import Dict, List, Optional
+
 import numpy as np
 from sentence_transformers import SentenceTransformer
+
 from fair_forge.core.extractor import BaseGroupExtractor
 from fair_forge.schemas.toxicity import GroupDetection
 
@@ -22,8 +23,8 @@ class EmbeddingGroupExtractor(BaseGroupExtractor):
     def __init__(
         self,
         embedder: SentenceTransformer,
-        group_prototypes: Dict[str, List[str]],
-        thresholds: Optional[Dict[str, float]] = None,
+        group_prototypes: dict[str, list[str]],
+        thresholds: dict[str, float] | None = None,
         default_threshold: float = 0.50,
         batch_size: int = 64,
         normalize_embeddings: bool = True,
@@ -43,9 +44,7 @@ class EmbeddingGroupExtractor(BaseGroupExtractor):
             raise ValueError("group_prototypes must be non-empty.")
         for g, ps in group_prototypes.items():
             if not ps:
-                raise ValueError(
-                    f"group_prototypes['{g}'] is empty; each group needs at least 1 prototype."
-                )
+                raise ValueError(f"group_prototypes['{g}'] is empty; each group needs at least 1 prototype.")
 
         self.embedder = embedder
         self.group_prototypes = group_prototypes
@@ -55,16 +54,14 @@ class EmbeddingGroupExtractor(BaseGroupExtractor):
         self.normalize_embeddings = bool(normalize_embeddings)
 
         # Precompute embeddings for prototypes
-        self._proto_embs: Dict[str, np.ndarray] = {}
+        self._proto_embs: dict[str, np.ndarray] = {}
         for g, protos in self.group_prototypes.items():
             embs = self._encode(protos)
             if embs.ndim != 2:
-                raise ValueError(
-                    f"Prototype embeddings for group '{g}' must be 2D, got shape={embs.shape}"
-                )
+                raise ValueError(f"Prototype embeddings for group '{g}' must be 2D, got shape={embs.shape}")
             self._proto_embs[g] = embs
 
-    def _encode(self, texts: List[str]) -> np.ndarray:
+    def _encode(self, texts: list[str]) -> np.ndarray:
         """Encode texts to embeddings."""
         try:
             embs = self.embedder.encode(
@@ -87,7 +84,7 @@ class EmbeddingGroupExtractor(BaseGroupExtractor):
 
         return embs
 
-    def detect_one(self, text: str) -> Dict[str, GroupDetection]:
+    def detect_one(self, text: str) -> dict[str, GroupDetection]:
         """
         Detect group mentions in a single text.
 
@@ -102,7 +99,7 @@ class EmbeddingGroupExtractor(BaseGroupExtractor):
 
         e = self._encode([text])[0]
 
-        results: Dict[str, GroupDetection] = {}
+        results: dict[str, GroupDetection] = {}
         for g, P in self._proto_embs.items():
             sims = P @ e  # cosine if normalized
             best_idx = int(np.argmax(sims))
@@ -116,7 +113,7 @@ class EmbeddingGroupExtractor(BaseGroupExtractor):
             )
         return results
 
-    def detect_batch(self, texts: List[str]) -> List[Dict[str, GroupDetection]]:
+    def detect_batch(self, texts: list[str]) -> list[dict[str, GroupDetection]]:
         """
         Detect group mentions in a batch of texts.
 
@@ -130,11 +127,11 @@ class EmbeddingGroupExtractor(BaseGroupExtractor):
             raise TypeError("texts must be a list[str]")
 
         E = self._encode(texts)
-        out: List[Dict[str, GroupDetection]] = []
+        out: list[dict[str, GroupDetection]] = []
 
         for i in range(E.shape[0]):
             e = E[i]
-            row: Dict[str, GroupDetection] = {}
+            row: dict[str, GroupDetection] = {}
             for g, P in self._proto_embs.items():
                 sims = P @ e
                 best_idx = int(np.argmax(sims))

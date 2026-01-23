@@ -1,6 +1,7 @@
 """Frequentist statistical mode implementation."""
-from typing import Dict, Union
+
 import numpy as np
+
 from .base import StatisticalMode
 
 
@@ -8,10 +9,7 @@ class FrequentistMode(StatisticalMode):
     """Frequentist statistical computation - point estimates."""
 
     def distribution_divergence(
-        self,
-        observed: Dict[str, Union[int, float]],
-        reference: Dict[str, float],
-        divergence_type: str = "total_variation"
+        self, observed: dict[str, int | float], reference: dict[str, float], divergence_type: str = "total_variation"
     ) -> float:
         """
         Total variation distance: 0.5 * sum(|p - q|)
@@ -22,34 +20,23 @@ class FrequentistMode(StatisticalMode):
             raise NotImplementedError(f"Divergence type '{divergence_type}' not implemented")
 
         keys = set(observed.keys()) | set(reference.keys())
-        divergence = 0.5 * sum(
-            abs(float(observed.get(k, 0.0)) - float(reference.get(k, 0.0)))
-            for k in keys
-        )
+        divergence = 0.5 * sum(abs(float(observed.get(k, 0.0)) - float(reference.get(k, 0.0))) for k in keys)
         return float(divergence)
 
     def rate_estimation(self, successes: int, trials: int) -> float:
         """Simple proportion."""
         return float(successes / trials) if trials > 0 else 0.0
 
-    def aggregate_metrics(
-        self,
-        metrics: Dict[str, float],
-        weights: Dict[str, float]
-    ) -> float:
+    def aggregate_metrics(self, metrics: dict[str, float], weights: dict[str, float]) -> float:
         """Weighted sum."""
         total_weight = sum(weights.values())
         if total_weight == 0:
             return 0.0
 
         normalized_weights = {k: v / total_weight for k, v in weights.items()}
-        return float(sum(metrics[k] * normalized_weights[k] for k in metrics.keys()))
+        return float(sum(metrics[k] * normalized_weights[k] for k in metrics))
 
-    def dispersion_metric(
-        self,
-        values: Dict[str, float],
-        center: str = "mean"
-    ) -> float:
+    def dispersion_metric(self, values: dict[str, float], center: str = "mean") -> float:
         """Mean absolute deviation from center."""
         if not values:
             return 0.0

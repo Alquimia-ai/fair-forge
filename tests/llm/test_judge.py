@@ -1,4 +1,5 @@
 """Tests for Judge module."""
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -39,9 +40,7 @@ class TestJudge:
 
     def test_initialization_custom_json_clauses(self, mock_model):
         """Test Judge initialization with custom JSON clauses."""
-        judge = Judge(
-            model=mock_model, bos_json_clause="<json>", eos_json_clause="</json>"
-        )
+        judge = Judge(model=mock_model, bos_json_clause="<json>", eos_json_clause="</json>")
         assert judge.bos_json_clause == "<json>"
         assert judge.eos_json_clause == "</json>"
 
@@ -49,9 +48,7 @@ class TestJudge:
     def test_check_regex_mode_valid_json(self, mock_template, mock_model):
         """Test check method in regex mode with valid JSON."""
         mock_response = MagicMock()
-        mock_response.content = (
-            'Here is the result:\n```json\n{"score": 0.85, "valid": true}\n```'
-        )
+        mock_response.content = 'Here is the result:\n```json\n{"score": 0.85, "valid": true}\n```'
         mock_response.additional_kwargs = {}
 
         mock_chain = MagicMock()
@@ -121,10 +118,8 @@ class TestJudge:
         mock_prompt.__or__ = MagicMock(return_value=mock_chain)
         mock_template.from_messages.return_value = mock_prompt
 
-        judge = Judge(
-            model=mock_model, bos_json_clause="<json>", eos_json_clause="</json>"
-        )
-        thought, json_data = judge.check("System", "Query", {})
+        judge = Judge(model=mock_model, bos_json_clause="<json>", eos_json_clause="</json>")
+        _thought, json_data = judge.check("System", "Query", {})
 
         assert json_data == {"value": 42}
 
@@ -164,9 +159,7 @@ class TestJudge:
         mock_template.from_messages.return_value = mock_prompt
 
         judge = Judge(model=mock_model, use_structured_output=True)
-        thought, result = judge.check(
-            "System", "Query", {}, output_schema=ContextJudgeOutput
-        )
+        thought, result = judge.check("System", "Query", {}, output_schema=ContextJudgeOutput)
 
         assert thought == ""
         assert result == expected_result
@@ -187,7 +180,7 @@ class TestJudge:
         mock_template.from_messages.return_value = mock_prompt
 
         judge = Judge(model=mock_model, use_structured_output=True)
-        thought, result = judge.check("System", "Query", {}, output_schema=None)
+        _thought, result = judge.check("System", "Query", {}, output_schema=None)
 
         assert result == {"score": 0.5}
 
@@ -231,7 +224,7 @@ class TestJudge:
         mock_template.from_messages.return_value = mock_prompt
 
         judge = Judge(model=mock_model)
-        thought, json_data = judge.check("System", "Query", {})
+        _thought, json_data = judge.check("System", "Query", {})
 
         assert json_data == {"key": "value"}
 
@@ -250,7 +243,7 @@ class TestJudge:
         mock_template.from_messages.return_value = mock_prompt
 
         judge = Judge(model=mock_model)
-        thought, json_data = judge.check("System", "Query", {})
+        _thought, json_data = judge.check("System", "Query", {})
 
         assert json_data == {"outer": {"inner": [1, 2, 3]}}
 
@@ -278,9 +271,7 @@ class TestJudge:
         mock_template.from_messages.return_value = mock_prompt
 
         judge = Judge(model=mock_model, use_structured_output=False)
-        thought, result = judge.check(
-            "System", "Query", {}, output_schema=ContextJudgeOutput
-        )
+        _thought, result = judge.check("System", "Query", {}, output_schema=ContextJudgeOutput)
 
         assert result == {"score": 0.7, "insight": "test"}
 

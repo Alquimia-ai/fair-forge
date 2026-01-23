@@ -1,8 +1,9 @@
 """Fixtures for generator tests."""
 
-import pytest
-from pathlib import Path
 import tempfile
+from pathlib import Path
+
+import pytest
 
 from fair_forge.schemas.generators import Chunk, GeneratedQuery
 
@@ -125,9 +126,7 @@ This is the conclusion.
 @pytest.fixture
 def temp_markdown_file(sample_markdown_content: str):
     """Fixture providing a temporary markdown file."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".md", delete=False, encoding="utf-8"
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as f:
         f.write(sample_markdown_content)
         f.flush()
         yield Path(f.name)
@@ -138,9 +137,7 @@ def temp_markdown_file(sample_markdown_content: str):
 @pytest.fixture
 def temp_markdown_no_headers_file(sample_markdown_no_headers: str):
     """Fixture providing a temporary markdown file without headers."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".md", delete=False, encoding="utf-8"
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as f:
         f.write(sample_markdown_no_headers)
         f.flush()
         yield Path(f.name)
@@ -151,9 +148,7 @@ def temp_markdown_no_headers_file(sample_markdown_no_headers: str):
 @pytest.fixture
 def temp_markdown_long_section_file(sample_markdown_long_section: str):
     """Fixture providing a temporary markdown file with a long section."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".md", delete=False, encoding="utf-8"
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8") as f:
         f.write(sample_markdown_long_section)
         f.flush()
         yield Path(f.name)
@@ -224,7 +219,7 @@ def sample_conversation_turns():
 @pytest.fixture
 def mock_conversation_response() -> str:
     """Fixture providing mock conversation generation response string."""
-    return '''```json
+    return """```json
 {
     "turns": [
         {"query": "What is the main topic?", "turn_number": 1, "difficulty": "easy", "query_type": "factual", "expected_context": null},
@@ -234,4 +229,4 @@ def mock_conversation_response() -> str:
     "conversation_summary": "A conversation exploring the main topic in depth",
     "chunk_summary": "Introduction to the platform"
 }
-```'''
+```"""

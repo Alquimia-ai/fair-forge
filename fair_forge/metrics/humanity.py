@@ -1,15 +1,16 @@
+import math
+import re
 from collections import defaultdict
-from typing import Type, Optional, Any
+from importlib.resources import files
+from typing import Any
+
+import numpy as np
 import pandas as pd
+from scipy.stats import spearmanr
+
 from fair_forge.core import FairForge, Retriever
 from fair_forge.schemas import Batch
 from fair_forge.schemas.humanity import HumanityMetric
-import re
-import math
-import numpy as np
-from scipy.stats import spearmanr
-from importlib.resources import files
-
 
 # TODO:
 # - Implement Emotion matching
@@ -17,8 +18,9 @@ from importlib.resources import files
 # - Implement Agreeableness
 # - Implement Empathy, Empathic Concern
 
+
 class Humanity(FairForge):
-    def __init__(self, retriever: Type[Retriever], **kwargs):
+    def __init__(self, retriever: type[Retriever], **kwargs):
         super().__init__(retriever, **kwargs)
         self.emotion_columns = [
             "Anger",
@@ -33,15 +35,15 @@ class Humanity(FairForge):
 
     def _load_emotion_lexicon(
         self,
-        path: Optional[str] = None,
-        separator: Optional[str] = ";",
-        language: Optional[str] = "english",
+        path: str | None = None,
+        separator: str | None = ";",
+        language: str | None = "english",
     ):
         if path is None:
             path = str(files("fair_forge").joinpath("artifacts/lexicons/nrc_emotion.csv"))
         nrc = pd.read_csv(str(path), sep=separator, encoding="utf-8")
         lexicon = {}
-        for index, row in nrc.iterrows():
+        for _index, row in nrc.iterrows():
             word = str(row[language]).lower()
             emotions = [e for e in self.emotion_columns if row[e] == 1]
             lexicon[word] = emotions
@@ -51,9 +53,7 @@ class Humanity(FairForge):
         return re.findall(r"\b\w+\b", text.lower())
 
     def _get_emotion_distribution(self, text: str, lexicon, emotion_list):
-        counts = defaultdict(
-            int
-        )  ## Creates a  dictionary that if no index found returns 0
+        counts = defaultdict(int)  ## Creates a  dictionary that if no index found returns 0
         total = 0
         for word in self._tokenize(text):
             if word in lexicon:
@@ -62,11 +62,9 @@ class Humanity(FairForge):
                     total += 1
 
         if total == 0:
-            return {emotion: 0 for emotion in emotion_list}
+            return dict.fromkeys(emotion_list, 0)
 
-        return {
-            emotion: counts[emotion] / total for emotion in emotion_list
-        }  # frequency / total
+        return {emotion: counts[emotion] / total for emotion in emotion_list}  # frequency / total
 
     def _emotional_entropy(self, distribution):
         entropy = 0
@@ -81,8 +79,8 @@ class Humanity(FairForge):
         context: str,
         assistant_id: str,
         batch: list[Batch],
-        language: Optional[str] = "english",
-        path: Optional[str] = None,
+        language: str | None = "english",
+        path: str | None = None,
     ):
         lexicon = self._load_emotion_lexicon(path=path, language=language)
         for interaction in batch:
@@ -91,7 +89,7 @@ class Humanity(FairForge):
             assistant_distribution = self._get_emotion_distribution(
                 interaction.assistant, lexicon, self.emotion_columns
             )
-            
+
             generated_vec = [assistant_distribution[e] for e in self.emotion_columns]
             self.logger.debug(f"Assistant distribution: {assistant_distribution}")
             self.logger.debug(f"Generated vector: {generated_vec}")
@@ -103,9 +101,7 @@ class Humanity(FairForge):
                     interaction.ground_truth_assistant, lexicon, self.emotion_columns
                 )
                 ## Spearman correlation between ground truth and real assistant answer
-                expected_vec = [
-                    ground_truth_assistant_distribution[e] for e in self.emotion_columns
-                ]
+                expected_vec = [ground_truth_assistant_distribution[e] for e in self.emotion_columns]
 
                 ## If the standard deviation is 0, the correlation is not defined
                 if np.std(generated_vec) == 0 or np.std(expected_vec) == 0:
@@ -114,16 +110,13 @@ class Humanity(FairForge):
                     result: Any = spearmanr(expected_vec, generated_vec)
                     spearman_val = result.correlation
             metric = HumanityMetric(
-                    session_id=session_id,
-                    qa_id=interaction.qa_id,
-                    assistant_id=assistant_id,
-                    humanity_assistant_emotional_entropy=ent,
-                    humanity_ground_truth_spearman=round(spearman_val, 3),
-                    **{
-                        f"humanity_assistant_{key.lower()}": assistant_distribution[key]
-                        for key in self.emotion_columns
-                    },
-                )
+                session_id=session_id,
+                qa_id=interaction.qa_id,
+                assistant_id=assistant_id,
+                humanity_assistant_emotional_entropy=ent,
+                humanity_ground_truth_spearman=round(spearman_val, 3),
+                **{f"humanity_assistant_{key.lower()}": assistant_distribution[key] for key in self.emotion_columns},
+            )
             self.logger.debug(f"Spearman value: {metric.humanity_ground_truth_spearman}")
             self.logger.debug(f"Emotional entropy: {metric.humanity_assistant_emotional_entropy}")
             for key in self.emotion_columns:

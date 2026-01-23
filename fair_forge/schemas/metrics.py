@@ -1,4 +1,5 @@
 """Base metric schemas for Fair Forge."""
+
 from pydantic import BaseModel
 
 
@@ -8,5 +9,6 @@ class BaseMetric(BaseModel):
 
     All metrics should include at minimum the session and assistant identifiers.
     """
+
     session_id: str
     assistant_id: str

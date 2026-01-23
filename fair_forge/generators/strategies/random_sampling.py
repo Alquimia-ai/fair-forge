@@ -1,7 +1,7 @@
 """Random sampling chunk selection strategy."""
 
 import random
-from typing import Iterator, Optional
+from collections.abc import Iterator
 
 from fair_forge.schemas.generators import Chunk
 
@@ -35,7 +35,7 @@ class RandomSamplingStrategy(BaseChunkSelectionStrategy):
         self,
         num_samples: int = 5,
         chunks_per_sample: int = 3,
-        seed: Optional[int] = None,
+        seed: int | None = None,
         with_replacement: bool = False,
     ):
         """Initialize the random sampling strategy.

@@ -8,7 +8,7 @@ import asyncio
 import re
 import uuid
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any
 
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -115,8 +115,7 @@ class AlquimiaChatModel(BaseChatModel):
             from alquimia_client import AlquimiaClient
         except ImportError as e:
             raise ImportError(
-                "alquimia-client is required for AlquimiaChatModel. "
-                "Install it with: uv pip install alquimia-client"
+                "alquimia-client is required for AlquimiaChatModel. " "Install it with: uv pip install alquimia-client"
             ) from e
 
         # Strip trailing slash from base_url
@@ -178,18 +177,16 @@ class AlquimiaChatModel(BaseChatModel):
                     )
                     return future.result()
             else:
-                return loop.run_until_complete(
-                    self._ainvoke_agent(query, session_id, extra_data)
-                )
+                return loop.run_until_complete(self._ainvoke_agent(query, session_id, extra_data))
         except RuntimeError:
             # No event loop exists, create one
             return asyncio.run(self._ainvoke_agent(query, session_id, extra_data))
 
     def _generate(
         self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
         """Generate a response from the Alquimia agent.
@@ -273,7 +270,7 @@ class AlquimiaStructuredOutputModel(Runnable):
     def invoke(
         self,
         input: Any,
-        config: Optional[RunnableConfig] = None,
+        config: RunnableConfig | None = None,
         **kwargs,
     ) -> Any:
         """Invoke the model and parse output to schema.
@@ -359,7 +356,7 @@ class AlquimiaStructuredOutputModel(Runnable):
                 chunk_summary="Parsed from plain text response",
             )
 
-        elif self._schema == GeneratedConversationOutput:
+        if self._schema == GeneratedConversationOutput:
             turns = []
             lines = response.strip().split("\n")
             turn_number = 1
@@ -394,8 +391,7 @@ class AlquimiaStructuredOutputModel(Runnable):
                 chunk_summary="Parsed from plain text response",
             )
 
-        else:
-            raise ValueError(f"Unsupported output schema: {self._schema}")
+        raise ValueError(f"Unsupported output schema: {self._schema}")
 
 
 class AlquimiaGenerator(BaseGenerator):
@@ -474,8 +470,8 @@ class AlquimiaGenerator(BaseGenerator):
         self,
         chunk: Chunk,
         num_queries: int = 3,
-        seed_examples: Optional[list[str]] = None,
-        custom_system_prompt: Optional[str] = None,
+        seed_examples: list[str] | None = None,
+        custom_system_prompt: str | None = None,
     ) -> list[GeneratedQuery]:
         """Generate independent queries for a single chunk using Alquimia.
 
@@ -515,9 +511,7 @@ class AlquimiaGenerator(BaseGenerator):
 
             # Parse the response
             output = self._parse_queries_response(response)
-            logger.debug(
-                f"Generated {len(output.queries)} queries for chunk {chunk.chunk_id}"
-            )
+            logger.debug(f"Generated {len(output.queries)} queries for chunk {chunk.chunk_id}")
             return output.queries
 
         except Exception as e:
@@ -530,8 +524,8 @@ class AlquimiaGenerator(BaseGenerator):
         self,
         chunk: Chunk,
         num_turns: int = 3,
-        seed_examples: Optional[list[str]] = None,
-        custom_system_prompt: Optional[str] = None,
+        seed_examples: list[str] | None = None,
+        custom_system_prompt: str | None = None,
     ) -> list[ConversationTurn]:
         """Generate a coherent multi-turn conversation from a chunk.
 
@@ -572,15 +566,11 @@ class AlquimiaGenerator(BaseGenerator):
 
             # Parse the response
             output = self._parse_conversation_response(response)
-            logger.debug(
-                f"Generated {len(output.turns)} turns for chunk {chunk.chunk_id}"
-            )
+            logger.debug(f"Generated {len(output.turns)} turns for chunk {chunk.chunk_id}")
             return output.turns
 
         except Exception as e:
-            logger.error(
-                f"Failed to generate conversation for chunk {chunk.chunk_id}: {e}"
-            )
+            logger.error(f"Failed to generate conversation for chunk {chunk.chunk_id}: {e}")
             raise
         finally:
             self.model.clear_extra_data()
@@ -697,4 +687,4 @@ class AlquimiaGenerator(BaseGenerator):
         )
 
 
-__all__ = ["AlquimiaGenerator", "AlquimiaChatModel"]
+__all__ = ["AlquimiaChatModel", "AlquimiaGenerator"]

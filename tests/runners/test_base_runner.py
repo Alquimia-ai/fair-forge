@@ -1,8 +1,11 @@
 """Tests for BaseRunner interface."""
-import pytest
+
 from typing import Any
-from fair_forge.schemas.runner import BaseRunner
+
+import pytest
+
 from fair_forge.schemas.common import Batch, Dataset
+from fair_forge.schemas.runner import BaseRunner
 
 
 class MockRunner(BaseRunner):

@@ -1,5 +1,4 @@
 """BestOf metric for tournament-style evaluation of AI responses."""
-from typing import Optional, Type
 
 from jinja2 import Template
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -26,7 +25,7 @@ class BestOf(FairForge):
 
     def __init__(
         self,
-        retriever: Type[Retriever],
+        retriever: type[Retriever],
         model: BaseChatModel,
         use_structured_output: bool = False,
         bos_json_clause: str = "```json",
@@ -47,7 +46,7 @@ class BestOf(FairForge):
         context: str,
         agent_id: str,
         batch: list[Batch],
-        language: Optional[str] = "english",
+        language: str | None = "english",
     ):
         # BestOf processes in _process() instead of batch()
         for interaction in batch:
@@ -118,9 +117,7 @@ class BestOf(FairForge):
                 )
 
                 if result is None:
-                    raise ValueError(
-                        f"[FAIR FORGE/BESTOF] No valid response from judge for {left_id} vs {right_id}"
-                    )
+                    raise ValueError(f"[FAIR FORGE/BESTOF] No valid response from judge for {left_id} vs {right_id}")
 
                 if self.use_structured_output:
                     winner = result.winner

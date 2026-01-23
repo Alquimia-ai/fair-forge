@@ -1,4 +1,5 @@
 """Pydantic schemas for LLM structured outputs."""
+
 from pydantic import BaseModel, Field
 
 

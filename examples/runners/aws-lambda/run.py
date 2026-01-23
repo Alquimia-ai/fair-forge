@@ -3,6 +3,7 @@
 Executes test batches against AI systems and collects responses for evaluation.
 Supports both Alquimia API and direct LLM testing via dynamic connectors.
 """
+
 import asyncio
 import importlib
 import os
@@ -10,7 +11,7 @@ import time
 from typing import Any
 
 from fair_forge.runners import AlquimiaRunner
-from fair_forge.schemas import Dataset, Batch
+from fair_forge.schemas import Batch, Dataset
 
 
 def create_llm_connector(connector_config: dict) -> Any:
@@ -92,9 +93,7 @@ class LLMRunner:
         total_time = 0.0
 
         for batch in dataset.conversation:
-            updated, success, time_ms = await self.run_batch(
-                batch, dataset.session_id, dataset.context
-            )
+            updated, success, time_ms = await self.run_batch(batch, dataset.session_id, dataset.context)
             updated_batches.append(updated)
             total_time += time_ms
             if success:

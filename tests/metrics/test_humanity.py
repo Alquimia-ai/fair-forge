@@ -1,12 +1,9 @@
 """Unit tests for Humanity metric."""
-import math
-
-import pytest
 
 from fair_forge.metrics.humanity import Humanity
 from fair_forge.schemas.humanity import HumanityMetric
-from tests.fixtures.mock_retriever import EmotionalDatasetRetriever, MockRetriever
-from tests.fixtures.mock_data import create_sample_batch, create_emotional_dataset
+from tests.fixtures.mock_data import create_sample_batch
+from tests.fixtures.mock_retriever import MockRetriever
 
 
 class TestHumanityMetric:
@@ -16,7 +13,7 @@ class TestHumanityMetric:
         """Test that Humanity metric initializes correctly."""
         humanity = Humanity(emotional_dataset_retriever)
         assert humanity is not None
-        assert hasattr(humanity, 'emotion_columns')
+        assert hasattr(humanity, "emotion_columns")
         assert len(humanity.emotion_columns) == 8
         expected_emotions = ["Anger", "Anticipation", "Disgust", "Fear", "Joy", "Sadness", "Surprise", "Trust"]
         assert humanity.emotion_columns == expected_emotions
@@ -98,7 +95,7 @@ class TestHumanityMetric:
         """Test emotional entropy calculation."""
         humanity = Humanity(emotional_dataset_retriever)
 
-        uniform_distribution = {emotion: 1/8 for emotion in humanity.emotion_columns}
+        uniform_distribution = dict.fromkeys(humanity.emotion_columns, 1 / 8)
         entropy = humanity._emotional_entropy(uniform_distribution)
 
         assert isinstance(entropy, float)
@@ -110,7 +107,7 @@ class TestHumanityMetric:
         """Test emotional entropy with zero distribution."""
         humanity = Humanity(emotional_dataset_retriever)
 
-        zero_distribution = {emotion: 0 for emotion in humanity.emotion_columns}
+        zero_distribution = dict.fromkeys(humanity.emotion_columns, 0)
         entropy = humanity._emotional_entropy(zero_distribution)
 
         assert entropy == 0.0
@@ -152,8 +149,8 @@ class TestHumanityMetric:
 
         for metric in humanity.metrics:
             assert isinstance(metric, HumanityMetric)
-            assert hasattr(metric, 'humanity_assistant_emotional_entropy')
-            assert hasattr(metric, 'humanity_ground_truth_spearman')
+            assert hasattr(metric, "humanity_assistant_emotional_entropy")
+            assert hasattr(metric, "humanity_ground_truth_spearman")
 
             assert isinstance(metric.humanity_assistant_emotional_entropy, float)
             assert isinstance(metric.humanity_ground_truth_spearman, float)
@@ -197,7 +194,7 @@ class TestHumanityMetric:
 
     def test_spearman_correlation_calculation(self, mock_retriever):
         """Test Spearman correlation calculation between assistant and ground truth."""
-        from tests.fixtures.mock_data import create_sample_batch, create_sample_dataset
+        from tests.fixtures.mock_data import create_sample_dataset
 
         batch = create_sample_batch(
             qa_id="qa_001",
@@ -207,9 +204,7 @@ class TestHumanityMetric:
         )
 
         dataset = create_sample_dataset(conversation=[batch])
-        retriever = type('TestRetriever', (MockRetriever,), {
-            'load_dataset': lambda self: [dataset]
-        })
+        retriever = type("TestRetriever", (MockRetriever,), {"load_dataset": lambda self: [dataset]})
 
         humanity = Humanity(retriever)
         humanity.batch(
@@ -228,7 +223,7 @@ class TestHumanityMetric:
 
     def test_spearman_zero_std(self, mock_retriever):
         """Test Spearman correlation when standard deviation is zero."""
-        from tests.fixtures.mock_data import create_sample_batch, create_sample_dataset
+        from tests.fixtures.mock_data import create_sample_dataset
 
         batch = create_sample_batch(
             qa_id="qa_001",
@@ -238,9 +233,7 @@ class TestHumanityMetric:
         )
 
         dataset = create_sample_dataset(conversation=[batch])
-        retriever = type('TestRetriever', (MockRetriever,), {
-            'load_dataset': lambda self: [dataset]
-        })
+        retriever = type("TestRetriever", (MockRetriever,), {"load_dataset": lambda self: [dataset]})
 
         humanity = Humanity(retriever)
         humanity.batch(
@@ -264,11 +257,11 @@ class TestHumanityMetric:
         metric = metrics[0]
 
         required_attributes = [
-            'session_id',
-            'qa_id',
-            'assistant_id',
-            'humanity_assistant_emotional_entropy',
-            'humanity_ground_truth_spearman',
+            "session_id",
+            "qa_id",
+            "assistant_id",
+            "humanity_assistant_emotional_entropy",
+            "humanity_ground_truth_spearman",
         ]
 
         for attr in required_attributes:
@@ -286,7 +279,7 @@ class TestHumanityMetric:
 
     def test_no_ground_truth(self, mock_retriever):
         """Test behavior when ground truth is not provided."""
-        from tests.fixtures.mock_data import create_sample_batch, create_sample_dataset
+        from tests.fixtures.mock_data import create_sample_dataset
 
         batch = create_sample_batch(
             qa_id="qa_001",
@@ -296,12 +289,10 @@ class TestHumanityMetric:
         )
 
         dataset = create_sample_dataset(conversation=[batch])
-        retriever = type('TestRetriever', (MockRetriever,), {
-            'load_dataset': lambda self: [dataset]
-        })
+        retriever = type("TestRetriever", (MockRetriever,), {"load_dataset": lambda self: [dataset]})
 
         metrics = Humanity.run(retriever, verbose=False)
 
         assert len(metrics) > 0
         metric = metrics[0]
-        assert hasattr(metric, 'humanity_ground_truth_spearman')
+        assert hasattr(metric, "humanity_ground_truth_spearman")

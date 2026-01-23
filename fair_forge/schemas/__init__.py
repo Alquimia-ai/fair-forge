@@ -11,17 +11,18 @@ from their modules to avoid loading unnecessary dependencies:
     from fair_forge.schemas.best_of import BestOfMetric
     from fair_forge.schemas.generators import BaseGenerator, BaseContextLoader
 """
+
 from .common import Batch, Dataset, Logprobs
+from .generators import (
+    BaseContextLoader,
+    BaseGenerator,
+    Chunk,
+    GeneratedQueriesOutput,
+    GeneratedQuery,
+)
 from .metrics import BaseMetric
 from .runner import BaseRunner
 from .storage import BaseStorage
-from .generators import (
-    BaseGenerator,
-    BaseContextLoader,
-    Chunk,
-    GeneratedQuery,
-    GeneratedQueriesOutput,
-)
 
 __all__ = [
     # Common

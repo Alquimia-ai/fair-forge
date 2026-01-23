@@ -1,4 +1,5 @@
 """Retriever abstract base class for loading datasets."""
+
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
@@ -27,7 +28,7 @@ class Retriever(ABC):
         self.kwargs = kwargs
 
     @abstractmethod
-    def load_dataset(self) -> list['Dataset']:
+    def load_dataset(self) -> list["Dataset"]:
         """
         Load dataset from cold storage.
 
@@ -40,6 +41,4 @@ class Retriever(ABC):
         Raises:
             Exception: If the method is not implemented by a subclass.
         """
-        raise NotImplementedError(
-            "You should implement this method according to the type of storage you are using."
-        )
+        raise NotImplementedError("You should implement this method according to the type of storage you are using.")

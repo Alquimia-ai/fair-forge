@@ -1,7 +1,8 @@
 """Tests for Embedding Group Extractor."""
-import pytest
+
 import numpy as np
-from unittest.mock import Mock, MagicMock
+import pytest
+
 from fair_forge.extractors.embedding import EmbeddingGroupExtractor
 from fair_forge.schemas.toxicity import GroupDetection
 
@@ -49,27 +50,24 @@ class TestEmbeddingGroupExtractor:
         """Test basic initialization."""
         embedder = MockEmbedder()
         group_prototypes = {
-            'gender': ['man', 'woman'],
-            'race': ['white', 'black', 'asian'],
+            "gender": ["man", "woman"],
+            "race": ["white", "black", "asian"],
         }
 
-        extractor = EmbeddingGroupExtractor(
-            embedder=embedder,
-            group_prototypes=group_prototypes
-        )
+        extractor = EmbeddingGroupExtractor(embedder=embedder, group_prototypes=group_prototypes)
 
         assert extractor.default_threshold == 0.50
         assert extractor.batch_size == 64
         assert extractor.normalize_embeddings is True
         assert len(extractor._proto_embs) == 2
-        assert 'gender' in extractor._proto_embs
-        assert 'race' in extractor._proto_embs
+        assert "gender" in extractor._proto_embs
+        assert "race" in extractor._proto_embs
 
     def test_initialization_custom_params(self):
         """Test initialization with custom parameters."""
         embedder = MockEmbedder()
-        group_prototypes = {'category': ['proto1', 'proto2']}
-        thresholds = {'category': 0.7}
+        group_prototypes = {"category": ["proto1", "proto2"]}
+        thresholds = {"category": 0.7}
 
         extractor = EmbeddingGroupExtractor(
             embedder=embedder,
@@ -77,13 +75,13 @@ class TestEmbeddingGroupExtractor:
             thresholds=thresholds,
             default_threshold=0.6,
             batch_size=32,
-            normalize_embeddings=False
+            normalize_embeddings=False,
         )
 
         assert extractor.default_threshold == 0.6
         assert extractor.batch_size == 32
         assert extractor.normalize_embeddings is False
-        assert extractor.thresholds == {'category': 0.7}
+        assert extractor.thresholds == {"category": 0.7}
 
     def test_initialization_empty_prototypes_raises(self):
         """Test initialization raises error with empty prototypes."""
@@ -97,42 +95,36 @@ class TestEmbeddingGroupExtractor:
         embedder = MockEmbedder()
 
         with pytest.raises(ValueError, match="group_prototypes\\['empty_group'\\] is empty"):
-            EmbeddingGroupExtractor(
-                embedder=embedder,
-                group_prototypes={'empty_group': []}
-            )
+            EmbeddingGroupExtractor(embedder=embedder, group_prototypes={"empty_group": []})
 
     def test_detect_one_basic(self):
         """Test detect_one with basic input."""
         embedder = MockEmbedder()
         group_prototypes = {
-            'gender': ['man', 'woman', 'person'],
+            "gender": ["man", "woman", "person"],
         }
 
         extractor = EmbeddingGroupExtractor(
             embedder=embedder,
             group_prototypes=group_prototypes,
-            default_threshold=0.0  # Low threshold to ensure detection
+            default_threshold=0.0,  # Low threshold to ensure detection
         )
 
         result = extractor.detect_one("The man walked to the store")
 
-        assert 'gender' in result
-        assert isinstance(result['gender'], GroupDetection)
-        assert hasattr(result['gender'], 'present')
-        assert hasattr(result['gender'], 'score')
-        assert hasattr(result['gender'], 'best_prototype')
-        assert hasattr(result['gender'], 'best_prototype_index')
+        assert "gender" in result
+        assert isinstance(result["gender"], GroupDetection)
+        assert hasattr(result["gender"], "present")
+        assert hasattr(result["gender"], "score")
+        assert hasattr(result["gender"], "best_prototype")
+        assert hasattr(result["gender"], "best_prototype_index")
 
     def test_detect_one_non_string_raises(self):
         """Test detect_one raises error for non-string input."""
         embedder = MockEmbedder()
-        group_prototypes = {'gender': ['man', 'woman']}
+        group_prototypes = {"gender": ["man", "woman"]}
 
-        extractor = EmbeddingGroupExtractor(
-            embedder=embedder,
-            group_prototypes=group_prototypes
-        )
+        extractor = EmbeddingGroupExtractor(embedder=embedder, group_prototypes=group_prototypes)
 
         with pytest.raises(TypeError, match="text must be a string"):
             extractor.detect_one(123)
@@ -141,24 +133,20 @@ class TestEmbeddingGroupExtractor:
         """Test detect_one respects per-group thresholds."""
         embedder = MockEmbedder()
         group_prototypes = {
-            'gender': ['man', 'woman'],
-            'race': ['white', 'black'],
+            "gender": ["man", "woman"],
+            "race": ["white", "black"],
         }
         thresholds = {
-            'gender': 0.9,  # High threshold
-            'race': -1.0,   # Very low threshold (always detect)
+            "gender": 0.9,  # High threshold
+            "race": -1.0,  # Very low threshold (always detect)
         }
 
-        extractor = EmbeddingGroupExtractor(
-            embedder=embedder,
-            group_prototypes=group_prototypes,
-            thresholds=thresholds
-        )
+        extractor = EmbeddingGroupExtractor(embedder=embedder, group_prototypes=group_prototypes, thresholds=thresholds)
 
         result = extractor.detect_one("some text")
 
         # Race should be detected (very low threshold)
-        assert result['race'].present is True
+        assert result["race"].present is True
         # Gender might not be detected (high threshold)
         # The actual result depends on embeddings
 
@@ -166,32 +154,25 @@ class TestEmbeddingGroupExtractor:
         """Test detect_batch with basic input."""
         embedder = MockEmbedder()
         group_prototypes = {
-            'gender': ['man', 'woman'],
+            "gender": ["man", "woman"],
         }
 
-        extractor = EmbeddingGroupExtractor(
-            embedder=embedder,
-            group_prototypes=group_prototypes,
-            default_threshold=0.0
-        )
+        extractor = EmbeddingGroupExtractor(embedder=embedder, group_prototypes=group_prototypes, default_threshold=0.0)
 
         texts = ["The man is here", "The woman is there", "A person walks"]
         results = extractor.detect_batch(texts)
 
         assert len(results) == 3
         for result in results:
-            assert 'gender' in result
-            assert isinstance(result['gender'], GroupDetection)
+            assert "gender" in result
+            assert isinstance(result["gender"], GroupDetection)
 
     def test_detect_batch_non_list_raises(self):
         """Test detect_batch raises error for non-list input."""
         embedder = MockEmbedder()
-        group_prototypes = {'gender': ['man', 'woman']}
+        group_prototypes = {"gender": ["man", "woman"]}
 
-        extractor = EmbeddingGroupExtractor(
-            embedder=embedder,
-            group_prototypes=group_prototypes
-        )
+        extractor = EmbeddingGroupExtractor(embedder=embedder, group_prototypes=group_prototypes)
 
         with pytest.raises(TypeError, match="texts must be a list"):
             extractor.detect_batch("not a list")
@@ -199,12 +180,9 @@ class TestEmbeddingGroupExtractor:
     def test_detect_batch_non_string_elements_raises(self):
         """Test detect_batch raises error for non-string elements."""
         embedder = MockEmbedder()
-        group_prototypes = {'gender': ['man', 'woman']}
+        group_prototypes = {"gender": ["man", "woman"]}
 
-        extractor = EmbeddingGroupExtractor(
-            embedder=embedder,
-            group_prototypes=group_prototypes
-        )
+        extractor = EmbeddingGroupExtractor(embedder=embedder, group_prototypes=group_prototypes)
 
         with pytest.raises(TypeError, match="texts must be a list"):
             extractor.detect_batch(["valid", 123, "also valid"])
@@ -212,110 +190,89 @@ class TestEmbeddingGroupExtractor:
     def test_detect_batch_single_item(self):
         """Test detect_batch with single item list."""
         embedder = MockEmbedder()
-        group_prototypes = {'gender': ['man', 'woman']}
+        group_prototypes = {"gender": ["man", "woman"]}
 
-        extractor = EmbeddingGroupExtractor(
-            embedder=embedder,
-            group_prototypes=group_prototypes,
-            default_threshold=0.0
-        )
+        extractor = EmbeddingGroupExtractor(embedder=embedder, group_prototypes=group_prototypes, default_threshold=0.0)
 
         results = extractor.detect_batch(["hello world"])
 
         assert len(results) == 1
-        assert 'gender' in results[0]
+        assert "gender" in results[0]
 
     def test_encode_normalizes_1d_embedding(self):
         """Test _encode handles 1D embedding arrays."""
         embedder = MockEmbedder()
-        group_prototypes = {'test': ['single']}
+        group_prototypes = {"test": ["single"]}
 
         # Create an extractor with a single prototype
         extractor = EmbeddingGroupExtractor(
-            embedder=embedder,
-            group_prototypes=group_prototypes,
-            normalize_embeddings=True
+            embedder=embedder, group_prototypes=group_prototypes, normalize_embeddings=True
         )
 
         # The initialization should handle the prototype encoding
-        assert 'test' in extractor._proto_embs
-        assert extractor._proto_embs['test'].shape[0] == 1
+        assert "test" in extractor._proto_embs
+        assert extractor._proto_embs["test"].shape[0] == 1
 
     def test_encode_fallback_no_normalize_param(self):
         """Test _encode falls back when embedder doesn't support normalize param."""
         embedder = MockEmbedderNoNormalize()
-        group_prototypes = {'test': ['prototype1', 'prototype2']}
+        group_prototypes = {"test": ["prototype1", "prototype2"]}
 
         extractor = EmbeddingGroupExtractor(
-            embedder=embedder,
-            group_prototypes=group_prototypes,
-            normalize_embeddings=True
+            embedder=embedder, group_prototypes=group_prototypes, normalize_embeddings=True
         )
 
         # Should still work via fallback
         result = extractor.detect_one("test text")
-        assert 'test' in result
+        assert "test" in result
 
     def test_group_detection_score_range(self):
         """Test that detection scores are in valid range."""
         embedder = MockEmbedder()
-        group_prototypes = {'category': ['word1', 'word2', 'word3']}
+        group_prototypes = {"category": ["word1", "word2", "word3"]}
 
-        extractor = EmbeddingGroupExtractor(
-            embedder=embedder,
-            group_prototypes=group_prototypes
-        )
+        extractor = EmbeddingGroupExtractor(embedder=embedder, group_prototypes=group_prototypes)
 
         result = extractor.detect_one("test sentence")
 
         # Score should be between -1 and 1 for cosine similarity
-        assert -1.0 <= result['category'].score <= 1.0
+        assert -1.0 <= result["category"].score <= 1.0
 
     def test_best_prototype_index_valid(self):
         """Test that best_prototype_index is valid."""
         embedder = MockEmbedder()
-        prototypes = ['proto1', 'proto2', 'proto3']
-        group_prototypes = {'category': prototypes}
+        prototypes = ["proto1", "proto2", "proto3"]
+        group_prototypes = {"category": prototypes}
 
-        extractor = EmbeddingGroupExtractor(
-            embedder=embedder,
-            group_prototypes=group_prototypes
-        )
+        extractor = EmbeddingGroupExtractor(embedder=embedder, group_prototypes=group_prototypes)
 
         result = extractor.detect_one("test text")
 
-        assert 0 <= result['category'].best_prototype_index < len(prototypes)
-        assert result['category'].best_prototype in prototypes
+        assert 0 <= result["category"].best_prototype_index < len(prototypes)
+        assert result["category"].best_prototype in prototypes
 
     def test_multiple_groups(self):
         """Test detection with multiple groups."""
         embedder = MockEmbedder()
         group_prototypes = {
-            'gender': ['male', 'female'],
-            'age': ['young', 'old'],
-            'occupation': ['doctor', 'engineer', 'teacher'],
+            "gender": ["male", "female"],
+            "age": ["young", "old"],
+            "occupation": ["doctor", "engineer", "teacher"],
         }
 
-        extractor = EmbeddingGroupExtractor(
-            embedder=embedder,
-            group_prototypes=group_prototypes,
-            default_threshold=0.0
-        )
+        extractor = EmbeddingGroupExtractor(embedder=embedder, group_prototypes=group_prototypes, default_threshold=0.0)
 
         result = extractor.detect_one("The young female doctor")
 
         assert len(result) == 3
-        assert all(group in result for group in ['gender', 'age', 'occupation'])
+        assert all(group in result for group in ["gender", "age", "occupation"])
 
     def test_batch_consistency(self):
         """Test that batch and single detection give same results."""
         embedder = MockEmbedder()
-        group_prototypes = {'category': ['word1', 'word2']}
+        group_prototypes = {"category": ["word1", "word2"]}
 
-        extractor = EmbeddingGroupExtractor(
-            embedder=embedder,
-            group_prototypes=group_prototypes
-        )
+        extractor = EmbeddingGroupExtractor(embedder=embedder, group_prototypes=group_prototypes)
 
         texts = ["text one", "text two"]
         batch_results = extractor.detect_batch(texts)
@@ -323,6 +280,4 @@ class TestEmbeddingGroupExtractor:
 
         for i in range(len(texts)):
             # Scores should be the same
-            assert batch_results[i]['category'].score == pytest.approx(
-                single_results[i]['category'].score, abs=0.01
-            )
+            assert batch_results[i]["category"].score == pytest.approx(single_results[i]["category"].score, abs=0.01)
