@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "fair-forge"
+name = "alquimia-fair-forge"
 version = "0.1.2"
 description = "Alquimia Fair Forge library - Performance measurement for AI models and assistants"
 readme = "README.md"
@@ -90,7 +90,7 @@ bias = [
 
 # All metrics
 metrics = [
-    "fair-forge[context,conversational,bestof,humanity,toxicity,bias]",
+    "alquimia-fair-forge[context,conversational,bestof,humanity,toxicity,bias]",
 ]
 
 # Runners module
@@ -117,7 +117,7 @@ cloud = [
 
 # Everything
 all = [
-    "fair-forge[metrics,runners,generators,generators-alquimia,cloud]",
+    "alquimia-fair-forge[metrics,runners,generators,generators-alquimia,cloud]",
 ]
 
 # Development tools
