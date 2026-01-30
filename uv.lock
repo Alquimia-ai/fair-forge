@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -172,6 +172,188 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/97/bb/dc8a87bbe0e8ca8492ce8445fad9aa3027b1a1b99cec364864145265181f/alquimia_client-0.1.1.tar.gz", hash = "sha256:e8ecb2621f438be175e4dfa294a15711a917a487970b2fff6868ecfab33ec8c1", size = 16010, upload-time = "2025-11-03T21:30:32Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/41/54/55f1a1db6e80e5b9cc5b8c86aaf5f484c59d8a9ea1d8a2f75d3cd842dd2e/alquimia_client-0.1.1-py3-none-any.whl", hash = "sha256:29f3c815069ee59a1632df3a50cef093fd8214b033f95e07b34aa3abe9865dd9", size = 16384, upload-time = "2025-11-03T21:30:30.809Z" },
+]
+
+[[package]]
+name = "alquimia-fair-forge"
+version = "1.0.0"
+source = { editable = "." }
+dependencies = [
+    { name = "jinja2" },
+    { name = "langchain-core" },
+    { name = "loguru" },
+    { name = "pydantic" },
+    { name = "scipy" },
+    { name = "tqdm" },
+    { name = "transformers" },
+]
+
+[package.optional-dependencies]
+all = [
+    { name = "aiosseclient" },
+    { name = "alquimia-client" },
+    { name = "boto3" },
+    { name = "hdbscan" },
+    { name = "httpx" },
+    { name = "lakefs" },
+    { name = "nltk" },
+    { name = "numba" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "python-dotenv" },
+    { name = "scikit-learn" },
+    { name = "sentence-transformers" },
+    { name = "torch" },
+    { name = "umap-learn" },
+]
+bias = [
+    { name = "torch" },
+]
+cloud = [
+    { name = "boto3" },
+    { name = "lakefs" },
+]
+dev = [
+    { name = "commitizen" },
+    { name = "ipykernel" },
+    { name = "jupyter" },
+    { name = "mypy" },
+    { name = "notebook" },
+    { name = "pandas-stubs" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "pytest-xdist" },
+    { name = "python-semantic-release" },
+    { name = "ruff" },
+    { name = "sphinx" },
+    { name = "sphinx-rtd-theme" },
+    { name = "types-tqdm" },
+]
+generators-alquimia = [
+    { name = "alquimia-client" },
+]
+humanity = [
+    { name = "numpy" },
+    { name = "pandas" },
+]
+metrics = [
+    { name = "hdbscan" },
+    { name = "nltk" },
+    { name = "numba" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "scikit-learn" },
+    { name = "sentence-transformers" },
+    { name = "torch" },
+    { name = "umap-learn" },
+]
+runners = [
+    { name = "aiosseclient" },
+    { name = "alquimia-client" },
+    { name = "httpx" },
+    { name = "python-dotenv" },
+]
+toxicity = [
+    { name = "hdbscan" },
+    { name = "nltk" },
+    { name = "numba" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "scikit-learn" },
+    { name = "sentence-transformers" },
+    { name = "torch" },
+    { name = "umap-learn" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "commitizen" },
+    { name = "ipykernel" },
+    { name = "jupyter" },
+    { name = "mypy" },
+    { name = "notebook" },
+    { name = "pandas-stubs" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "pytest-xdist" },
+    { name = "python-semantic-release" },
+    { name = "ruff" },
+    { name = "sphinx" },
+    { name = "sphinx-rtd-theme" },
+    { name = "types-tqdm" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiosseclient", marker = "extra == 'runners'", specifier = ">=0.1.8" },
+    { name = "alquimia-client", marker = "extra == 'generators-alquimia'", specifier = ">=0.1.0" },
+    { name = "alquimia-client", marker = "extra == 'runners'", specifier = ">=0.1.0" },
+    { name = "alquimia-fair-forge", extras = ["context", "conversational", "bestof", "humanity", "toxicity", "bias"], marker = "extra == 'metrics'" },
+    { name = "alquimia-fair-forge", extras = ["metrics", "runners", "generators", "generators-alquimia", "cloud"], marker = "extra == 'all'" },
+    { name = "boto3", marker = "extra == 'cloud'", specifier = ">=1.28.0" },
+    { name = "commitizen", marker = "extra == 'dev'", specifier = ">=4.0.0" },
+    { name = "hdbscan", marker = "extra == 'toxicity'", specifier = ">=0.8.41" },
+    { name = "httpx", marker = "extra == 'runners'", specifier = ">=0.28.1" },
+    { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.0.0" },
+    { name = "jinja2", specifier = ">=3.1.0" },
+    { name = "jupyter", marker = "extra == 'dev'", specifier = ">=1.0.0" },
+    { name = "lakefs", marker = "extra == 'cloud'", specifier = ">=0.14.0" },
+    { name = "langchain-core", specifier = ">=0.3.0,<1.0.0" },
+    { name = "loguru", specifier = ">=0.7.3" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8.0" },
+    { name = "nltk", marker = "extra == 'toxicity'", specifier = ">=3.8.0" },
+    { name = "notebook", marker = "extra == 'dev'", specifier = ">=7.0.0" },
+    { name = "numba", marker = "extra == 'toxicity'", specifier = ">=0.57.0" },
+    { name = "numpy", marker = "extra == 'humanity'", specifier = ">=1.24.0" },
+    { name = "numpy", marker = "extra == 'toxicity'", specifier = ">=1.24.0" },
+    { name = "pandas", marker = "extra == 'humanity'", specifier = ">=2.0.0" },
+    { name = "pandas", marker = "extra == 'toxicity'", specifier = ">=2.0.0" },
+    { name = "pandas-stubs", marker = "extra == 'dev'", specifier = ">=2.0.0" },
+    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.5.0" },
+    { name = "pydantic", specifier = ">=2.0.0,<3.0.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
+    { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.5.0" },
+    { name = "python-dotenv", marker = "extra == 'runners'", specifier = ">=1.0.0" },
+    { name = "python-semantic-release", marker = "extra == 'dev'", specifier = ">=9.0.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
+    { name = "scikit-learn", marker = "extra == 'toxicity'", specifier = ">=1.3.0,<1.8" },
+    { name = "scipy", specifier = ">=1.14.1" },
+    { name = "sentence-transformers", marker = "extra == 'toxicity'", specifier = ">=5.0.0" },
+    { name = "sphinx", marker = "extra == 'dev'", specifier = ">=7.0.0" },
+    { name = "sphinx-rtd-theme", marker = "extra == 'dev'", specifier = ">=2.0.0" },
+    { name = "torch", marker = "extra == 'bias'", specifier = ">=2.0.0" },
+    { name = "torch", marker = "extra == 'toxicity'", specifier = ">=2.0.0" },
+    { name = "tqdm", specifier = ">=4.65.0" },
+    { name = "transformers", specifier = ">=4.35.0" },
+    { name = "types-tqdm", marker = "extra == 'dev'", specifier = ">=4.66.0" },
+    { name = "umap-learn", marker = "extra == 'toxicity'", specifier = ">=0.5.6,<0.6.0" },
+]
+provides-extras = ["context", "conversational", "bestof", "humanity", "toxicity", "bias", "metrics", "runners", "generators", "generators-alquimia", "cloud", "all", "dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "commitizen", specifier = ">=4.0.0" },
+    { name = "ipykernel", specifier = ">=6.0.0" },
+    { name = "jupyter", specifier = ">=1.0.0" },
+    { name = "mypy", specifier = ">=1.8.0" },
+    { name = "notebook", specifier = ">=7.0.0" },
+    { name = "pandas-stubs", specifier = ">=2.0.0" },
+    { name = "pre-commit", specifier = ">=3.5.0" },
+    { name = "pytest", specifier = ">=8.0.0" },
+    { name = "pytest-asyncio", specifier = ">=0.23.0" },
+    { name = "pytest-cov", specifier = ">=5.0.0" },
+    { name = "pytest-xdist", specifier = ">=3.5.0" },
+    { name = "python-semantic-release", specifier = ">=9.0.0" },
+    { name = "ruff", specifier = ">=0.8.0" },
+    { name = "sphinx", specifier = ">=7.0.0" },
+    { name = "sphinx-rtd-theme", specifier = ">=2.0.0" },
+    { name = "types-tqdm", specifier = ">=4.66.0" },
 ]
 
 [[package]]
@@ -789,188 +971,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/cc/28/c14e053b6762b1044f34a13aab6859bbf40456d37d23aa286ac24cfd9a5d/executing-2.2.1.tar.gz", hash = "sha256:3632cc370565f6648cc328b32435bd120a1e4ebb20c77e3fdde9a13cd1e533c4", size = 1129488, upload-time = "2025-09-01T09:48:10.866Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c1/ea/53f2148663b321f21b5a606bd5f191517cf40b7072c0497d3c92c4a13b1e/executing-2.2.1-py2.py3-none-any.whl", hash = "sha256:760643d3452b4d777d295bb167ccc74c64a81df23fb5e08eff250c425a4b2017", size = 28317, upload-time = "2025-09-01T09:48:08.5Z" },
-]
-
-[[package]]
-name = "fair-forge"
-version = "0.1.2"
-source = { editable = "." }
-dependencies = [
-    { name = "jinja2" },
-    { name = "langchain-core" },
-    { name = "loguru" },
-    { name = "pydantic" },
-    { name = "scipy" },
-    { name = "tqdm" },
-    { name = "transformers" },
-]
-
-[package.optional-dependencies]
-all = [
-    { name = "aiosseclient" },
-    { name = "alquimia-client" },
-    { name = "boto3" },
-    { name = "hdbscan" },
-    { name = "httpx" },
-    { name = "lakefs" },
-    { name = "nltk" },
-    { name = "numba" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "python-dotenv" },
-    { name = "scikit-learn" },
-    { name = "sentence-transformers" },
-    { name = "torch" },
-    { name = "umap-learn" },
-]
-bias = [
-    { name = "torch" },
-]
-cloud = [
-    { name = "boto3" },
-    { name = "lakefs" },
-]
-dev = [
-    { name = "commitizen" },
-    { name = "ipykernel" },
-    { name = "jupyter" },
-    { name = "mypy" },
-    { name = "notebook" },
-    { name = "pandas-stubs" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "pytest-xdist" },
-    { name = "python-semantic-release" },
-    { name = "ruff" },
-    { name = "sphinx" },
-    { name = "sphinx-rtd-theme" },
-    { name = "types-tqdm" },
-]
-generators-alquimia = [
-    { name = "alquimia-client" },
-]
-humanity = [
-    { name = "numpy" },
-    { name = "pandas" },
-]
-metrics = [
-    { name = "hdbscan" },
-    { name = "nltk" },
-    { name = "numba" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "scikit-learn" },
-    { name = "sentence-transformers" },
-    { name = "torch" },
-    { name = "umap-learn" },
-]
-runners = [
-    { name = "aiosseclient" },
-    { name = "alquimia-client" },
-    { name = "httpx" },
-    { name = "python-dotenv" },
-]
-toxicity = [
-    { name = "hdbscan" },
-    { name = "nltk" },
-    { name = "numba" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "scikit-learn" },
-    { name = "sentence-transformers" },
-    { name = "torch" },
-    { name = "umap-learn" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "commitizen" },
-    { name = "ipykernel" },
-    { name = "jupyter" },
-    { name = "mypy" },
-    { name = "notebook" },
-    { name = "pandas-stubs" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "pytest-xdist" },
-    { name = "python-semantic-release" },
-    { name = "ruff" },
-    { name = "sphinx" },
-    { name = "sphinx-rtd-theme" },
-    { name = "types-tqdm" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiosseclient", marker = "extra == 'runners'", specifier = ">=0.1.8" },
-    { name = "alquimia-client", marker = "extra == 'generators-alquimia'", specifier = ">=0.1.0" },
-    { name = "alquimia-client", marker = "extra == 'runners'", specifier = ">=0.1.0" },
-    { name = "boto3", marker = "extra == 'cloud'", specifier = ">=1.28.0" },
-    { name = "commitizen", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "fair-forge", extras = ["context", "conversational", "bestof", "humanity", "toxicity", "bias"], marker = "extra == 'metrics'" },
-    { name = "fair-forge", extras = ["metrics", "runners", "generators", "generators-alquimia", "cloud"], marker = "extra == 'all'" },
-    { name = "hdbscan", marker = "extra == 'toxicity'", specifier = ">=0.8.41" },
-    { name = "httpx", marker = "extra == 'runners'", specifier = ">=0.28.1" },
-    { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.0.0" },
-    { name = "jinja2", specifier = ">=3.1.0" },
-    { name = "jupyter", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "lakefs", marker = "extra == 'cloud'", specifier = ">=0.14.0" },
-    { name = "langchain-core", specifier = ">=0.3.0,<1.0.0" },
-    { name = "loguru", specifier = ">=0.7.3" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8.0" },
-    { name = "nltk", marker = "extra == 'toxicity'", specifier = ">=3.8.0" },
-    { name = "notebook", marker = "extra == 'dev'", specifier = ">=7.0.0" },
-    { name = "numba", marker = "extra == 'toxicity'", specifier = ">=0.57.0" },
-    { name = "numpy", marker = "extra == 'humanity'", specifier = ">=1.24.0" },
-    { name = "numpy", marker = "extra == 'toxicity'", specifier = ">=1.24.0" },
-    { name = "pandas", marker = "extra == 'humanity'", specifier = ">=2.0.0" },
-    { name = "pandas", marker = "extra == 'toxicity'", specifier = ">=2.0.0" },
-    { name = "pandas-stubs", marker = "extra == 'dev'", specifier = ">=2.0.0" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.5.0" },
-    { name = "pydantic", specifier = ">=2.0.0,<3.0.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.5.0" },
-    { name = "python-dotenv", marker = "extra == 'runners'", specifier = ">=1.0.0" },
-    { name = "python-semantic-release", marker = "extra == 'dev'", specifier = ">=9.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
-    { name = "scikit-learn", marker = "extra == 'toxicity'", specifier = ">=1.3.0,<1.8" },
-    { name = "scipy", specifier = ">=1.14.1" },
-    { name = "sentence-transformers", marker = "extra == 'toxicity'", specifier = ">=5.0.0" },
-    { name = "sphinx", marker = "extra == 'dev'", specifier = ">=7.0.0" },
-    { name = "sphinx-rtd-theme", marker = "extra == 'dev'", specifier = ">=2.0.0" },
-    { name = "torch", marker = "extra == 'bias'", specifier = ">=2.0.0" },
-    { name = "torch", marker = "extra == 'toxicity'", specifier = ">=2.0.0" },
-    { name = "tqdm", specifier = ">=4.65.0" },
-    { name = "transformers", specifier = ">=4.35.0" },
-    { name = "types-tqdm", marker = "extra == 'dev'", specifier = ">=4.66.0" },
-    { name = "umap-learn", marker = "extra == 'toxicity'", specifier = ">=0.5.6,<0.6.0" },
-]
-provides-extras = ["context", "conversational", "bestof", "humanity", "toxicity", "bias", "metrics", "runners", "generators", "generators-alquimia", "cloud", "all", "dev"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "commitizen", specifier = ">=4.0.0" },
-    { name = "ipykernel", specifier = ">=6.0.0" },
-    { name = "jupyter", specifier = ">=1.0.0" },
-    { name = "mypy", specifier = ">=1.8.0" },
-    { name = "notebook", specifier = ">=7.0.0" },
-    { name = "pandas-stubs", specifier = ">=2.0.0" },
-    { name = "pre-commit", specifier = ">=3.5.0" },
-    { name = "pytest", specifier = ">=8.0.0" },
-    { name = "pytest-asyncio", specifier = ">=0.23.0" },
-    { name = "pytest-cov", specifier = ">=5.0.0" },
-    { name = "pytest-xdist", specifier = ">=3.5.0" },
-    { name = "python-semantic-release", specifier = ">=9.0.0" },
-    { name = "ruff", specifier = ">=0.8.0" },
-    { name = "sphinx", specifier = ">=7.0.0" },
-    { name = "sphinx-rtd-theme", specifier = ">=2.0.0" },
-    { name = "types-tqdm", specifier = ">=4.66.0" },
 ]
 
 [[package]]
@@ -4376,11 +4376,11 @@ wheels = [
 
 [[package]]
 name = "urllib3"
-version = "2.6.2"
+version = "2.6.3"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/1e/24/a2a2ed9addd907787d7aa0355ba36a6cadf1768b934c652ea78acbd59dcd/urllib3-2.6.2.tar.gz", hash = "sha256:016f9c98bb7e98085cb2b4b17b87d2c702975664e4f060c6532e64d1c1a5e797", size = 432930, upload-time = "2025-12-11T15:56:40.252Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c7/24/5f1b3bdffd70275f6661c76461e25f024d5a38a46f04aaca912426a2b1d3/urllib3-2.6.3.tar.gz", hash = "sha256:1b62b6884944a57dbe321509ab94fd4d3b307075e0c2eae991ac71ee15ad38ed", size = 435556, upload-time = "2026-01-07T16:24:43.925Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6d/b9/4095b668ea3678bf6a0af005527f39de12fb026516fb3df17495a733b7f8/urllib3-2.6.2-py3-none-any.whl", hash = "sha256:ec21cddfe7724fc7cb4ba4bea7aa8e2ef36f607a4bab81aa6ce42a13dc3f03dd", size = 131182, upload-time = "2025-12-11T15:56:38.584Z" },
+    { url = "https://files.pythonhosted.org/packages/39/08/aaaad47bc4e9dc8c725e68f9d04865dbcb2052843ff09c97b08904852d84/urllib3-2.6.3-py3-none-any.whl", hash = "sha256:bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4", size = 131584, upload-time = "2026-01-07T16:24:42.685Z" },
 ]
 
 [[package]]
