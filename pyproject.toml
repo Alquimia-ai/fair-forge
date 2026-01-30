@@ -414,9 +414,12 @@ major_version_zero = true
 version_toml = ["pyproject.toml:project.version"]
 version_variables = []
 build_command = "uv build"
-branch = "develop"
 commit_message = "chore(release): v{version}"
 tag_format = "v{version}"
+
+[tool.semantic_release.branches.develop]
+match = "develop"
+prerelease = false
 
 [tool.semantic_release.changelog]
 exclude_commit_patterns = [
