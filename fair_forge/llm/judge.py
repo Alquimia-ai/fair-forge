@@ -8,6 +8,8 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel
 
+from fair_forge.utils.logging import VerboseLogger
+
 T = TypeVar("T", bound=BaseModel)
 
 
@@ -35,12 +37,15 @@ class Judge:
         use_structured_output: bool = False,
         bos_json_clause: str = "```json",
         eos_json_clause: str = "```",
+        verbose: bool = False,
     ):
         self.model = model
         self.use_structured_output = use_structured_output
         self.bos_json_clause = bos_json_clause
         self.eos_json_clause = eos_json_clause
+        self.verbose = verbose
         self.chat_history: list[tuple[str, str]] = []
+        self.logger = VerboseLogger(verbose=verbose)
 
     def check(
         self,
@@ -104,22 +109,47 @@ Do not include any additional text after the JSON.
         output_schema: type[T],
     ) -> tuple[str, T | None]:
         """Use with_structured_output for schema validation via API."""
-        # Clean up model_kwargs to remove use_structured_output if present
-        # This prevents it from being passed to the underlying API
-        model = self.model
-        if hasattr(model, "model_kwargs") and isinstance(model.model_kwargs, dict):
-            # Create a copy to avoid modifying the original
-            cleaned_kwargs = {k: v for k, v in model.model_kwargs.items() if k != "use_structured_output"}
-            if len(cleaned_kwargs) != len(model.model_kwargs):
-                # Only create a new model instance if we actually removed something
-                model = model.__class__(**{**model.dict(), "model_kwargs": cleaned_kwargs})
-
-        structured_model = model.with_structured_output(output_schema)
+        structured_model = self.model.with_structured_output(
+            output_schema,
+            include_raw=True,
+        )
         self.chat_history.append(("human", query))
         prompt = ChatPromptTemplate.from_messages([("system", system_prompt), *self.chat_history])
         chain = prompt | structured_model
-        result = chain.invoke(data)
-        return "", result
+
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                result = chain.invoke(data)
+
+                # Extract parsed result
+                parsed = result.get("parsed") if isinstance(result, dict) else result
+
+                # Retry if model returned invalid JSON (None result)
+                if parsed is None and attempt < max_retries - 1:
+                    self.logger.warning(f"Retry {attempt + 1}/{max_retries} - model returned invalid JSON")
+                    continue
+
+                break
+            except Exception as e:
+                if "400" in str(e) and attempt < max_retries - 1:
+                    self.logger.warning(f"Retry {attempt + 1}/{max_retries} after 400 error")
+                    continue
+                raise
+
+        reasoning = ""
+
+        # Extract reasoning from content_blocks if available
+        raw_response = result.get("raw") if isinstance(result, dict) else None
+        if raw_response is not None:
+            content_blocks = getattr(raw_response, "content_blocks", None)
+            if content_blocks and isinstance(content_blocks, list):
+                reasoning_steps = [
+                    b for b in content_blocks if isinstance(b, dict) and b.get("type") == "reasoning"
+                ]
+                reasoning = " ".join(step.get("reasoning", "") for step in reasoning_steps)
+
+        return reasoning, parsed
 
     def _check_regex(
         self,
@@ -141,7 +171,6 @@ Do not include any additional text after the JSON.
         response = chain.invoke(data)
         content = str(response.content)
 
-        # Extract reasoning from LangChain's native support
         reasoning = response.additional_kwargs.get("reasoning_content", "")
 
         json_data = self._extract_json(content)
