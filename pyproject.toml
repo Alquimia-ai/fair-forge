@@ -414,7 +414,7 @@ major_version_zero = true
 version_toml = ["pyproject.toml:project.version"]
 version_variables = []
 build_command = "uv build"
-branch = "main"
+branch = "develop"
 commit_message = "chore(release): v{version}"
 tag_format = "v{version}"
 
