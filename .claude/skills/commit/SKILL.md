@@ -64,3 +64,4 @@ For breaking changes, add exclamation mark after scope: `feat(schemas)!: rename 
 - Keep description under 72 characters
 - Lowercase description
 - No period at end
+- NEVER add "Co-Authored-By" or any similar attribution line to commits
