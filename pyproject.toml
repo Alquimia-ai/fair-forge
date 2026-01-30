@@ -45,8 +45,8 @@ classifiers = [
 
 # Core dependencies - minimal required for basic functionality
 dependencies = [
-    # LLM Integration (base interface only)
-    "langchain-core>=0.3.0,<1.0.0",
+    # LLM Integration (requires 1.2+ for strict structured output support)
+    "langchain>=1.2",
     # Data Validation & Utilities
     "pydantic>=2.0.0,<3.0.0",
     "tqdm>=4.65.0",
