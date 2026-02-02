@@ -192,6 +192,7 @@ class TestContextMetric:
             use_structured_output=False,
             bos_json_clause="[",
             eos_json_clause="]",
+            verbose=False,
         )
 
     @patch("fair_forge.metrics.context.Judge")

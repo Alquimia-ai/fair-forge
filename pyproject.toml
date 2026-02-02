@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "alquimia-fair-forge"
-version = "0.1.2"
+version = "1.1.0"
 description = "Alquimia Fair Forge library - Performance measurement for AI models and assistants"
 readme = "README.md"
 license = {text = "MIT"}
@@ -45,8 +45,8 @@ classifiers = [
 
 # Core dependencies - minimal required for basic functionality
 dependencies = [
-    # LLM Integration (base interface only)
-    "langchain-core>=0.3.0,<1.0.0",
+    # LLM Integration (requires 1.2+ for strict structured output support)
+    "langchain>=1.2",
     # Data Validation & Utilities
     "pydantic>=2.0.0,<3.0.0",
     "tqdm>=4.65.0",
@@ -414,9 +414,12 @@ major_version_zero = true
 version_toml = ["pyproject.toml:project.version"]
 version_variables = []
 build_command = "uv build"
-branch = "main"
 commit_message = "chore(release): v{version}"
 tag_format = "v{version}"
+
+[tool.semantic_release.branches.develop]
+match = "develop"
+prerelease = false
 
 [tool.semantic_release.changelog]
 exclude_commit_patterns = [
