@@ -52,6 +52,7 @@ class Context(FairForge):
             use_structured_output=self.use_structured_output,
             bos_json_clause=self.bos_json_clause,
             eos_json_clause=self.eos_json_clause,
+            verbose=self.verbose,
         )
         for interaction in batch:
             self.logger.debug(f"QA ID: {interaction.qa_id}")
@@ -79,12 +80,13 @@ class Context(FairForge):
             if result is None:
                 raise ValueError(f"[FAIR FORGE/CONTEXT] No valid response from judge for QA ID: {interaction.qa_id}")
 
-            if self.use_structured_output:
-                insight = result.insight
-                score = result.score
-            else:
+            # Handle both Pydantic model and dict results
+            if isinstance(result, dict):
                 insight = result["insight"]
                 score = result["score"]
+            else:
+                insight = result.insight
+                score = result.score
 
             metric = ContextMetric(
                 context_insight=insight,
@@ -96,4 +98,5 @@ class Context(FairForge):
             )
             self.logger.debug(f"Context insight: {metric.context_insight}")
             self.logger.debug(f"Context awareness: {metric.context_awareness}")
+            self.logger.debug(f"Context thinkings: {metric.context_thinkings}")
             self.metrics.append(metric)

@@ -5,14 +5,186 @@ description: Deploy Fair Forge as serverless functions
 
 # AWS Lambda Deployment
 
-Deploy Fair Forge generators and runners as AWS Lambda functions for serverless execution.
+Deploy Fair Forge generators, runners, and metrics as AWS Lambda functions for serverless execution.
 
 ## Available Lambda Functions
 
 | Function | Purpose | Endpoint |
 |----------|---------|----------|
+| **BestOf** | Tournament-style AI assistant comparison | `POST /run` |
 | **Generators** | Generate test datasets from context | `POST /run` |
 | **Runners** | Execute tests against AI systems | `POST /run` |
+
+## BestOf Metric Lambda
+
+Run tournament-style comparisons between multiple AI assistants to determine which performs best.
+
+### How It Works
+
+1. Submit datasets from multiple assistants (same questions, different responses)
+2. The LLM judge evaluates head-to-head matchups
+3. Winners advance through elimination rounds
+4. Returns the tournament winner with detailed contest results
+
+### Supported LLM Providers
+
+| Provider | class_path |
+|----------|-----------|
+| Groq | `langchain_groq.chat_models.ChatGroq` |
+| OpenAI | `langchain_openai.chat_models.ChatOpenAI` |
+| Google Gemini | `langchain_google_genai.chat_models.ChatGoogleGenerativeAI` |
+| Ollama | `langchain_ollama.chat_models.ChatOllama` |
+
+### Request Format
+
+```json
+{
+  "connector": {
+    "class_path": "langchain_groq.chat_models.ChatGroq",
+    "params": {
+      "model": "qwen/qwen3-32b",
+      "api_key": "your-api-key",
+      "temperature": 0.0
+    }
+  },
+  "datasets": [
+    {
+      "session_id": "comparison_session",
+      "assistant_id": "assistant_a",
+      "language": "english",
+      "context": "System context...",
+      "conversation": [
+        {
+          "qa_id": "q1",
+          "query": "User question",
+          "assistant": "Assistant A response",
+          "ground_truth_assistant": "Expected response (optional)"
+        }
+      ]
+    },
+    {
+      "session_id": "comparison_session",
+      "assistant_id": "assistant_b",
+      "language": "english",
+      "context": "System context...",
+      "conversation": [
+        {
+          "qa_id": "q1",
+          "query": "User question",
+          "assistant": "Assistant B response",
+          "ground_truth_assistant": "Expected response (optional)"
+        }
+      ]
+    }
+  ],
+  "config": {
+    "criteria": "Overall response quality",
+    "use_structured_output": true
+  }
+}
+```
+
+### Configuration Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `criteria` | `str` | `"Overall response quality"` | Evaluation criteria for judging |
+| `use_structured_output` | `bool` | `true` | Use LangChain structured output |
+| `verbose` | `bool` | `false` | Enable verbose logging |
+
+### Example: Compare Two Assistants
+
+```bash
+curl -s -X POST "https://your-lambda-url/run" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "connector": {
+      "class_path": "langchain_groq.chat_models.ChatGroq",
+      "params": {
+        "model": "qwen/qwen3-32b",
+        "api_key": "your-groq-api-key",
+        "temperature": 0.0
+      }
+    },
+    "datasets": [
+      {
+        "session_id": "comparison",
+        "assistant_id": "gpt4_responses",
+        "language": "english",
+        "context": "",
+        "conversation": [
+          {
+            "qa_id": "q1",
+            "query": "What are the benefits of renewable energy?",
+            "assistant": "Renewable energy offers numerous benefits including reduced greenhouse gas emissions, energy independence, job creation, and long-term cost savings."
+          },
+          {
+            "qa_id": "q2",
+            "query": "Explain machine learning simply.",
+            "assistant": "Machine learning is a type of AI where computers learn patterns from data rather than following explicit programming rules."
+          }
+        ]
+      },
+      {
+        "session_id": "comparison",
+        "assistant_id": "claude_responses",
+        "language": "english",
+        "context": "",
+        "conversation": [
+          {
+            "qa_id": "q1",
+            "query": "What are the benefits of renewable energy?",
+            "assistant": "Clean energy good. Sun power help planet."
+          },
+          {
+            "qa_id": "q2",
+            "query": "Explain machine learning simply.",
+            "assistant": "Computer learns things from data."
+          }
+        ]
+      }
+    ],
+    "config": {
+      "criteria": "Response quality, clarity, completeness, and accuracy"
+    }
+  }'
+```
+
+### Response Format
+
+```json
+{
+  "success": true,
+  "winner": "gpt4_responses",
+  "contestants": ["gpt4_responses", "claude_responses"],
+  "total_rounds": 1,
+  "contests": [
+    {
+      "round": 1,
+      "left": "gpt4_responses",
+      "right": "claude_responses",
+      "winner": "gpt4_responses",
+      "confidence": 0.95,
+      "verdict": "Assistant A provides more comprehensive and well-structured responses",
+      "reasoning": "Detailed analysis of the comparison..."
+    }
+  ]
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `winner` | `str` | The assistant_id of the tournament winner |
+| `contestants` | `list` | All assistant_ids that participated |
+| `total_rounds` | `int` | Number of tournament rounds |
+| `contests` | `list` | Details of each head-to-head matchup |
+| `contests[].confidence` | `float` | Judge's confidence in decision (0-1) |
+| `contests[].verdict` | `str` | Brief summary of the decision |
+| `contests[].reasoning` | `str` | Detailed reasoning for the decision |
+
+---
 
 ## Generators Lambda
 
@@ -282,6 +454,21 @@ curl -s -X POST "https://your-lambda-url/run" \
 - Docker installed
 - AWS ECR repository access
 
+### Deploy BestOf Metric
+
+```bash
+cd examples/bestof/aws-lambda
+
+# Deploy
+./scripts/deploy.sh bestof us-east-2
+
+# Update (rebuild and redeploy)
+./scripts/update.sh bestof us-east-2
+
+# Cleanup (remove all resources)
+./scripts/cleanup.sh bestof us-east-2
+```
+
 ### Deploy Generators
 
 ```bash
@@ -315,6 +502,9 @@ cd examples/runners/aws-lambda
 ### View Logs
 
 ```bash
+# BestOf logs
+aws logs tail "/aws/lambda/fair-forge-bestof" --follow --region us-east-2
+
 # Generators logs
 aws logs tail "/aws/lambda/fair-forge-generators" --follow --region us-east-2
 
@@ -378,7 +568,10 @@ for summary in results["summaries"]:
 
 ## Next Steps
 
-<CardGroup cols={2}>
+<CardGroup cols={3}>
+  <Card title="BestOf Metric" icon="trophy" href="/metrics/best-of">
+    Learn about tournament-style evaluation
+  </Card>
   <Card title="Generators" icon="wand-magic-sparkles" href="/generators/overview">
     Learn about test generation
   </Card>
