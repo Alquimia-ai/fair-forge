@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.1.0 (2026-02-02)
+
+### Documentation
+
+- Add BestOf Lambda deployment documentation
+  ([`0da3de8`](https://github.com/Alquimia-ai/fair-forge/commit/0da3de8ec57d272498880acbd271bf6b8add66f5))
+
+### Features
+
+- **metrics**: Add AWS Lambda deployment for BestOf metric
+  ([`bf87be3`](https://github.com/Alquimia-ai/fair-forge/commit/bf87be3ee729052c07eb9582699cc156c0707682))
+
+
 ## v1.0.1 (2026-01-30)
 
 ### Bug Fixes
