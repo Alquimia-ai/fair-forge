@@ -65,6 +65,7 @@ dependencies = [
 context = []
 conversational = []
 bestof = []
+agentic = []
 
 # Data-based metrics
 humanity = [
@@ -90,7 +91,7 @@ bias = [
 
 # All metrics
 metrics = [
-    "alquimia-fair-forge[context,conversational,bestof,humanity,toxicity,bias]",
+    "alquimia-fair-forge[context,conversational,bestof,agentic,humanity,toxicity,bias]",
 ]
 
 # Runners module

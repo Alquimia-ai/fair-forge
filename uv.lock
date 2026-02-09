@@ -292,7 +292,7 @@ requires-dist = [
     { name = "aiosseclient", marker = "extra == 'runners'", specifier = ">=0.1.8" },
     { name = "alquimia-client", marker = "extra == 'generators-alquimia'", specifier = ">=0.1.0" },
     { name = "alquimia-client", marker = "extra == 'runners'", specifier = ">=0.1.0" },
-    { name = "alquimia-fair-forge", extras = ["context", "conversational", "bestof", "humanity", "toxicity", "bias"], marker = "extra == 'metrics'" },
+    { name = "alquimia-fair-forge", extras = ["context", "conversational", "bestof", "agentic", "humanity", "toxicity", "bias"], marker = "extra == 'metrics'" },
     { name = "alquimia-fair-forge", extras = ["metrics", "runners", "generators", "generators-alquimia", "cloud"], marker = "extra == 'all'" },
     { name = "boto3", marker = "extra == 'cloud'", specifier = ">=1.28.0" },
     { name = "commitizen", marker = "extra == 'dev'", specifier = ">=4.0.0" },
@@ -334,7 +334,7 @@ requires-dist = [
     { name = "types-tqdm", marker = "extra == 'dev'", specifier = ">=4.66.0" },
     { name = "umap-learn", marker = "extra == 'toxicity'", specifier = ">=0.5.6,<0.6.0" },
 ]
-provides-extras = ["context", "conversational", "bestof", "humanity", "toxicity", "bias", "metrics", "runners", "generators", "generators-alquimia", "cloud", "all", "dev"]
+provides-extras = ["context", "conversational", "bestof", "agentic", "humanity", "toxicity", "bias", "metrics", "runners", "generators", "generators-alquimia", "cloud", "all", "dev"]
 
 [package.metadata.requires-dev]
 dev = [
