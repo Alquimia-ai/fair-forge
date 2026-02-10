@@ -29,6 +29,7 @@ def pytest_configure(config):
 
 
 from tests.fixtures.mock_data import (
+    create_agentic_dataset,
     create_bestof_dataset,
     create_bias_dataset,
     create_context_dataset,
@@ -39,6 +40,7 @@ from tests.fixtures.mock_data import (
     create_toxicity_dataset,
 )
 from tests.fixtures.mock_retriever import (
+    AgenticDatasetRetriever,
     BestOfDatasetRetriever,
     BiasDatasetRetriever,
     ContextDatasetRetriever,
@@ -101,6 +103,12 @@ def bestof_dataset() -> Dataset:
 
 
 @pytest.fixture
+def agentic_dataset() -> list[Dataset]:
+    """Fixture providing an agentic testing dataset."""
+    return create_agentic_dataset()
+
+
+@pytest.fixture
 def mock_retriever() -> type[MockRetriever]:
     """Fixture providing MockRetriever class."""
     return MockRetriever
@@ -158,6 +166,12 @@ def context_dataset_retriever() -> type[ContextDatasetRetriever]:
 def bestof_dataset_retriever() -> type[BestOfDatasetRetriever]:
     """Fixture providing BestOfDatasetRetriever class."""
     return BestOfDatasetRetriever
+
+
+@pytest.fixture
+def agentic_dataset_retriever() -> type[AgenticDatasetRetriever]:
+    """Fixture providing AgenticDatasetRetriever class."""
+    return AgenticDatasetRetriever
 
 
 @pytest.fixture

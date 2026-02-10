@@ -9,14 +9,9 @@ class ToolCorrectnessScore(BaseModel):
     """
     Evaluation scores for tool usage correctness.
 
-    Attributes:
-        tool_selection_correct: Score (0.0-1.0) for selecting correct tools
-        parameter_accuracy: Score (0.0-1.0) for parameter correctness
-        sequence_correct: Score (0.0-1.0) for tool call order
-        result_utilization: Score (0.0-1.0) for using tool results
-        overall_correctness: Weighted average of all scores
-        is_correct: Whether overall score meets threshold
-        reasoning: Optional explanation from the judge
+    Evaluates four aspects: tool selection (correct tools chosen), parameter accuracy
+    (correct parameters passed), sequence (correct order if required), and utilization
+    (tool results used in final answer). Overall score is weighted average.
     """
 
     tool_selection_correct: float = Field(ge=0.0, le=1.0)
@@ -32,15 +27,9 @@ class AgenticMetric(BaseMetric):
     """
     Metric for evaluating agentic responses with pass@K and tool correctness.
 
-    Attributes:
-        qa_id: Unique identifier for the question
-        k: Number of responses evaluated
-        threshold: Similarity threshold for answer correctness
-        correctness_scores: List of correctness scores for each response
-        pass_at_k: True if at least one response is correct
-        pass_pow_k: True if all K responses are correct
-        correct_indices: Indices of correct responses
-        tool_correctness: Optional tool usage evaluation
+    pass@K: At least one of K responses is correct (similarity >= threshold).
+    pass^K: All K responses are correct.
+    tool_correctness: Optional evaluation of tool usage quality.
     """
 
     qa_id: str

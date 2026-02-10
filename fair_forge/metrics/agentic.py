@@ -1,6 +1,5 @@
 """Agentic metric for evaluating agent responses with pass@K and tool correctness."""
 
-import json
 from collections import defaultdict
 from typing import Any
 
@@ -20,16 +19,6 @@ class AnswerCorrectnessOutput(BaseModel):
     reasoning: str = Field(description="Brief explanation of the evaluation")
 
 
-class ToolCorrectnessOutput(BaseModel):
-    """Structured output for tool correctness evaluation."""
-
-    tool_selection_correct: float = Field(ge=0.0, le=1.0, description="Tool selection score")
-    parameter_accuracy: float = Field(ge=0.0, le=1.0, description="Parameter accuracy score")
-    sequence_correct: float = Field(ge=0.0, le=1.0, description="Sequence correctness score")
-    result_utilization: float = Field(ge=0.0, le=1.0, description="Result utilization score")
-    reasoning: str = Field(description="Explanation of the evaluation")
-
-
 class Agentic(FairForge):
     """
     Agentic metric for evaluating AI agent responses.
@@ -39,7 +28,7 @@ class Agentic(FairForge):
     - pass^K: All K responses are correct
     - Tool Correctness: Evaluates correct tool usage (selection, parameters, sequence, utilization)
 
-    Uses an LLM judge for evaluation.
+    Uses an LLM judge for answer correctness, and direct dictionary comparison for tool correctness.
 
     Args:
         retriever: Retriever class for loading datasets
@@ -79,7 +68,6 @@ class Agentic(FairForge):
         self.threshold = threshold
         self.tool_threshold = tool_threshold
 
-        # Tool correctness weights (default: equal weight 0.25 each)
         if tool_weights is None:
             tool_weights = {
                 "selection": 0.25,
@@ -100,23 +88,12 @@ class Agentic(FairForge):
         batch: list[Batch],
         language: str | None = "english",
     ):
-        """Process batch - actual processing happens in _process()."""
+        """Process batch - actual evaluation happens in _process() by grouping qa_ids."""
         for interaction in batch:
             self.logger.debug(f"QA ID: {interaction.qa_id}, Assistant: {assistant_id}")
 
     def _evaluate_answer_correctness(self, judge: Judge, query: str, answer: str, ground_truth: str) -> float:
-        """
-        Use LLM judge to evaluate if an answer is correct.
-
-        Args:
-            judge: Judge instance for evaluation
-            query: The question asked
-            answer: The agent's answer
-            ground_truth: The expected correct answer
-
-        Returns:
-            float: Correctness score between 0.0 (incorrect) and 1.0 (perfect)
-        """
+        """Evaluate answer correctness using LLM judge. Returns score 0.0-1.0."""
         system_prompt = """You are a STRICT evaluator. Your task is to determine if an agent's answer is correct compared to the ground truth.
 
 **Question:** {query}
@@ -167,7 +144,6 @@ Examples:
                 self.logger.error("No valid response from judge for answer correctness")
                 return 0.0
 
-            # Handle both Pydantic model and dict results
             if isinstance(result, dict):
                 return float(result.get("correctness_score", 0.0))
             return float(result.correctness_score)
@@ -177,152 +153,136 @@ Examples:
             return 0.0
 
     def _evaluate_tool_correctness(
-        self, judge: Judge, agentic: dict[str, Any], ground_truth_agentic: dict[str, Any]
+        self, agentic: dict[str, Any], ground_truth_agentic: dict[str, Any]
     ) -> ToolCorrectnessScore:
-        """
-        Use LLM judge to evaluate correct tool usage.
-
-        Args:
-            judge: Judge instance for evaluation
-            agentic: Dict with 'tools_used' and 'final_answer_uses_tools'
-            ground_truth_agentic: Dict with 'expected_tools' and 'tool_sequence_matters'
-
-        Returns:
-            ToolCorrectnessScore with individual and overall scores
-        """
+        """Evaluate tool usage correctness by comparing selection, parameters, sequence, and utilization."""
         tools_used = agentic.get("tools_used", [])
         final_answer_uses_tools = agentic.get("final_answer_uses_tools", False)
         expected_tools = ground_truth_agentic.get("expected_tools", [])
         sequence_matters = ground_truth_agentic.get("tool_sequence_matters", True)
 
-        system_prompt = """You are a STRICT evaluator of AI agent tool usage. Evaluate how correctly an agent used tools.
+        reasoning_parts = []
 
-**Tools Used by Agent:**
-{tools_used_json}
+        used_tool_names = {tool.get("tool_name") for tool in tools_used}
+        expected_tool_names = {tool.get("tool_name") for tool in expected_tools}
 
-**Final Answer Uses Tools:** {final_answer_uses_tools}
+        if expected_tool_names == used_tool_names:
+            tool_selection = 1.0
+            reasoning_parts.append("✓ Tool selection: correct")
+        elif used_tool_names.issubset(expected_tool_names):
+            tool_selection = len(used_tool_names) / len(expected_tool_names)
+            missing = expected_tool_names - used_tool_names
+            reasoning_parts.append(f"⚠ Tool selection: missing {missing}")
+        elif expected_tool_names.issubset(used_tool_names):
+            tool_selection = len(expected_tool_names) / len(used_tool_names)
+            extra = used_tool_names - expected_tool_names
+            reasoning_parts.append(f"⚠ Tool selection: extra tools {extra}")
+        else:
+            overlap = len(used_tool_names.intersection(expected_tool_names))
+            total = len(used_tool_names.union(expected_tool_names))
+            tool_selection = overlap / total if total > 0 else 0.0
+            reasoning_parts.append(f"✗ Tool selection: used {used_tool_names}, expected {expected_tool_names}")
 
-**Expected Tools:**
-{expected_tools_json}
+        used_tools_map: dict[str, list] = defaultdict(list)
+        expected_tools_map: dict[str, list] = defaultdict(list)
 
-**Sequence Matters:** {sequence_matters}
+        for tool in tools_used:
+            used_tools_map[tool.get("tool_name")].append(tool)
+        for tool in expected_tools:
+            expected_tools_map[tool.get("tool_name")].append(tool)
 
-Evaluate the following aspects with STRICT criteria (each scored 0.0 to 1.0):
+        param_matches = []
+        for tool_name in expected_tool_names:
+            if tool_name not in used_tools_map:
+                param_matches.append(0.0)
+                continue
 
-1. **tool_selection_correct**:
-   - Did the agent select the correct tools (by tool_name)?
-   - 1.0 = all correct tools, 0.0 = wrong tools
+            used_list = used_tools_map[tool_name]
+            expected_list = expected_tools_map[tool_name]
 
-2. **parameter_accuracy**:
-   - Were the parameters correct for each tool?
-   - Compare parameter values EXACTLY
-   - 1.0 = all parameters perfect, 0.0 = wrong parameters
+            for exp_tool in expected_list:
+                exp_params = exp_tool.get("parameters", {})
+                used_tool = used_list[0] if used_list else {}
+                used_params = used_tool.get("parameters", {})
 
-3. **sequence_correct**:
-   - Were tools called in the correct order?
-   - If sequence_matters=True: Compare tool_step for EACH tool
-   - For each tool_name, check if its tool_step matches expected
-   - Example: calculator at step 1 when expected at step 2 = WRONG ORDER
-   - 1.0 = ALL tool_steps match, 0.0 = wrong order
-   - If sequence_matters=False: Always return 1.0
+                if exp_params == used_params:
+                    param_matches.append(1.0)
+                else:
+                    all_keys = set(exp_params.keys()).union(used_params.keys())
+                    matching = sum(1 for k in all_keys if exp_params.get(k) == used_params.get(k))
+                    param_matches.append(matching / len(all_keys) if all_keys else 0.0)
 
-4. **result_utilization**:
-   - Did the agent use the tool results properly?
-   - Check if final_answer_uses_tools=True
-   - 1.0 = excellent use, 0.0 = didn't use
+        parameter_accuracy = sum(param_matches) / len(param_matches) if param_matches else 0.0
 
-CRITICAL FOR SEQUENCE:
-- Compare each tool's tool_step with its expected tool_step
-- "calculator" at step 1 when expected at step 2 = WRONG (0.0)
-- "web_search" at step 2 when expected at step 1 = WRONG (0.0)
-- Swapped steps = COMPLETELY WRONG ORDER (0.0)
-"""
+        if parameter_accuracy == 1.0:
+            reasoning_parts.append("✓ Parameters: correct")
+        elif parameter_accuracy > 0.7:
+            reasoning_parts.append(f"⚠ Parameters: mostly correct ({parameter_accuracy:.2f})")
+        else:
+            reasoning_parts.append(f"✗ Parameters: incorrect ({parameter_accuracy:.2f})")
 
-        data = {
-            "tools_used_json": json.dumps(tools_used, indent=2),
-            "final_answer_uses_tools": final_answer_uses_tools,
-            "expected_tools_json": json.dumps(expected_tools, indent=2),
-            "sequence_matters": sequence_matters,
-        }
+        if not sequence_matters:
+            sequence_correct = 1.0
+            reasoning_parts.append("✓ Sequence: not required")
+        else:
+            sequence_matches = []
+            for tool_name in expected_tool_names:
+                if tool_name not in used_tools_map:
+                    sequence_matches.append(0.0)
+                    continue
 
-        try:
-            _reasoning, result = judge.check(
-                system_prompt, "Evaluate the tool usage correctness.", data, output_schema=ToolCorrectnessOutput
-            )
+                used_list = used_tools_map[tool_name]
+                expected_list = expected_tools_map[tool_name]
 
-            if result is None:
-                self.logger.error("No valid response from judge for tool correctness")
-                return ToolCorrectnessScore(
-                    tool_selection_correct=0.0,
-                    parameter_accuracy=0.0,
-                    sequence_correct=0.0,
-                    result_utilization=0.0,
-                    overall_correctness=0.0,
-                    is_correct=False,
-                    reasoning="Error: No valid response from judge",
-                )
+                for i, exp_tool in enumerate(expected_list):
+                    exp_step = exp_tool.get("step")
+                    used_tool = used_list[i] if i < len(used_list) else None
+                    used_step = used_tool.get("step") if used_tool else None
 
-            # Handle both Pydantic model and dict results
-            if isinstance(result, dict):
-                tool_selection = result.get("tool_selection_correct", 0.0)
-                parameter_acc = result.get("parameter_accuracy", 0.0)
-                sequence = result.get("sequence_correct", 0.0)
-                utilization = result.get("result_utilization", 0.0)
-                reason = result.get("reasoning", "")
+                    if exp_step == used_step:
+                        sequence_matches.append(1.0)
+                    else:
+                        sequence_matches.append(0.0)
+
+            sequence_correct = sum(sequence_matches) / len(sequence_matches) if sequence_matches else 0.0
+
+            if sequence_correct == 1.0:
+                reasoning_parts.append("✓ Sequence: correct")
             else:
-                tool_selection = result.tool_selection_correct
-                parameter_acc = result.parameter_accuracy
-                sequence = result.sequence_correct
-                utilization = result.result_utilization
-                reason = result.reasoning
+                reasoning_parts.append(f"✗ Sequence: incorrect ({sequence_correct:.2f})")
 
-            # If sequence doesn't matter, don't penalize
-            if not sequence_matters:
-                sequence = 1.0
+        if final_answer_uses_tools:
+            result_utilization = 1.0
+            reasoning_parts.append("✓ Utilization: tools used in answer")
+        else:
+            result_utilization = 0.0
+            reasoning_parts.append("✗ Utilization: tools not used in answer")
 
-            # Calculate overall (weighted average)
-            overall = (
-                self.tool_weights["selection"] * tool_selection
-                + self.tool_weights["parameters"] * parameter_acc
-                + self.tool_weights["sequence"] * sequence
-                + self.tool_weights["utilization"] * utilization
-            )
+        overall = (
+            self.tool_weights["selection"] * tool_selection
+            + self.tool_weights["parameters"] * parameter_accuracy
+            + self.tool_weights["sequence"] * sequence_correct
+            + self.tool_weights["utilization"] * result_utilization
+        )
 
-            # Determine if correct based on threshold
-            is_correct = overall >= self.tool_threshold
+        is_correct = overall >= self.tool_threshold
 
-            return ToolCorrectnessScore(
-                tool_selection_correct=tool_selection,
-                parameter_accuracy=parameter_acc,
-                sequence_correct=sequence,
-                result_utilization=utilization,
-                overall_correctness=overall,
-                is_correct=is_correct,
-                reasoning=reason,
-            )
+        reasoning = "; ".join(reasoning_parts)
 
-        except Exception:
-            self.logger.exception("Error evaluating tool correctness")
-            return ToolCorrectnessScore(
-                tool_selection_correct=0.0,
-                parameter_accuracy=0.0,
-                sequence_correct=0.0,
-                result_utilization=0.0,
-                overall_correctness=0.0,
-                is_correct=False,
-                reasoning="Error during evaluation",
-            )
+        return ToolCorrectnessScore(
+            tool_selection_correct=tool_selection,
+            parameter_accuracy=parameter_accuracy,
+            sequence_correct=sequence_correct,
+            result_utilization=result_utilization,
+            overall_correctness=overall,
+            is_correct=is_correct,
+            reasoning=reasoning,
+        )
 
     def _process(self) -> list[AgenticMetric]:
-        """
-        Process datasets grouped by qa_id to evaluate K responses per question.
-
-        Override base processing to group multiple responses (different assistant_ids)
-        for the same qa_id, then evaluate pass@K, pass^K, and tool correctness.
-        """
+        """Group responses by qa_id and evaluate pass@K, pass^K, and tool correctness."""
         self.logger.info("[Agentic] Grouping datasets by qa_id for pass@K evaluation")
 
-        # Initialize judge
         judge = Judge(
             model=self.model,
             use_structured_output=self.use_structured_output,
@@ -331,7 +291,6 @@ CRITICAL FOR SEQUENCE:
             verbose=self.verbose,
         )
 
-        # Group datasets by qa_id (each qa_id has K responses from different assistants)
         qa_groups: dict[str, list] = defaultdict(list)
         for dataset in self.dataset:
             for batch in dataset.conversation:
@@ -349,16 +308,13 @@ CRITICAL FOR SEQUENCE:
 
         self.logger.info(f"[Agentic] Found {len(qa_groups)} unique qa_ids")
 
-        # Process each qa_id group
         for qa_id, responses in qa_groups.items():
             k = len(responses)
             self.logger.info(f"[Agentic] Evaluating qa_id={qa_id} with K={k} responses")
 
-            # Get ground truth from first response (should be same for all)
             ground_truth = responses[0]["ground_truth"]
             ground_truth_agentic = responses[0].get("ground_truth_agentic")
 
-            # Evaluate correctness of each response
             correctness_scores = []
             correct_indices = []
 
@@ -377,32 +333,28 @@ CRITICAL FOR SEQUENCE:
                 else:
                     self.logger.debug(f"    Score: {score:.3f} ❌ INCORRECT")
 
-            # Calculate pass@K and pass^K
-            pass_at_k = len(correct_indices) > 0  # At least one correct
-            pass_pow_k = len(correct_indices) == k  # All correct
+            pass_at_k = len(correct_indices) > 0
+            pass_pow_k = len(correct_indices) == k
 
             self.logger.info(f"  pass@{k}: {pass_at_k}, pass^{k}: {pass_pow_k} ({len(correct_indices)}/{k} correct)")
 
-            # Evaluate tool correctness (if applicable)
             tool_correctness = None
             if ground_truth_agentic:
-                # Evaluate the first correct response (or first if none correct)
                 response_to_eval = responses[correct_indices[0]] if correct_indices else responses[0]
 
                 if response_to_eval.get("agentic"):
                     self.logger.debug("  Evaluating tool correctness...")
                     tool_correctness = self._evaluate_tool_correctness(
-                        judge=judge, agentic=response_to_eval["agentic"], ground_truth_agentic=ground_truth_agentic
+                        agentic=response_to_eval["agentic"], ground_truth_agentic=ground_truth_agentic
                     )
                     self.logger.debug(
                         f"    Overall: {tool_correctness.overall_correctness:.3f}, "
                         f"Correct: {tool_correctness.is_correct}"
                     )
 
-            # Create metric result
             metric = AgenticMetric(
                 session_id=responses[0]["session_id"],
-                assistant_id=responses[0]["assistant_id"],  # Use first assistant as reference
+                assistant_id=responses[0]["assistant_id"],
                 qa_id=qa_id,
                 k=k,
                 threshold=self.threshold,
