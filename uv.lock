@@ -224,6 +224,7 @@ all = [
     { name = "scikit-learn" },
     { name = "sentence-transformers" },
     { name = "torch" },
+    { name = "transformers" },
     { name = "umap-learn" },
 ]
 bias = [
@@ -256,6 +257,7 @@ dev = [
 explainability = [
     { name = "interpreto" },
     { name = "torch" },
+    { name = "transformers" },
 ]
 generators-alquimia = [
     { name = "alquimia-client" },
@@ -363,6 +365,7 @@ requires-dist = [
     { name = "torch", marker = "extra == 'toxicity'", specifier = ">=2.0.0" },
     { name = "tqdm", specifier = ">=4.65.0" },
     { name = "transformers", specifier = ">=4.35.0" },
+    { name = "transformers", marker = "extra == 'explainability'", specifier = ">=4.35.0" },
     { name = "types-tqdm", marker = "extra == 'dev'", specifier = ">=4.66.0" },
     { name = "umap-learn", marker = "extra == 'toxicity'", specifier = ">=0.5.6,<0.6.0" },
     { name = "virtualenv", marker = "extra == 'dev'", specifier = ">=20.36.1" },

@@ -61,16 +61,20 @@ metrics = Toxicity.run(MyRetriever, verbose=True)
 
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from fair_forge.explainability import AttributionExplainer, AttributionMethod
+from fair_forge.explainability import AttributionExplainer, Lime
 
 model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-0.6B")
 tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
 
+# Format prompt according to your model (user responsibility)
+messages = [{"role": "user", "content": "What is gravity?"}]
+prompt = tokenizer.apply_chat_template(messages, tokenize=False)
+
 explainer = AttributionExplainer(model, tokenizer)
 result = explainer.explain(
-    messages=[{"role": "user", "content": "What is gravity?"}],
+    prompt=prompt,
     target="Gravity is the force of attraction between objects.",
-    method=AttributionMethod.LIME,
+    method=Lime,  # Pass the method class directly
 )
 
 # Get most important words

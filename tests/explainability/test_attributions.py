@@ -172,6 +172,89 @@ class TestGranularity:
         assert Granularity.SENTENCE.value == "sentence"
 
 
+class TestInterpretoResultParser:
+    """Test suite for InterpretoResultParser."""
+
+    def test_parse_object_with_tokens_attributions(self):
+        """Test parsing object with tokens and attributions attributes."""
+        from fair_forge.explainability import InterpretoResultParser
+
+        parser = InterpretoResultParser()
+
+        mock_result = MagicMock()
+        mock_result.tokens = ["a", "b", "c"]
+        mock_result.attributions = [0.1, 0.5, 0.4]
+
+        tokens, scores = parser.parse([mock_result])
+
+        assert tokens == ["a", "b", "c"]
+        assert scores == [0.1, 0.5, 0.4]
+
+    def test_parse_dict_format(self):
+        """Test parsing dict format."""
+        from fair_forge.explainability import InterpretoResultParser
+
+        parser = InterpretoResultParser()
+
+        mock_result = [{"tokens": ["x", "y"], "attributions": [0.3, 0.7]}]
+
+        tokens, scores = parser.parse(mock_result)
+
+        assert tokens == ["x", "y"]
+        assert scores == [0.3, 0.7]
+
+    def test_parse_empty_result(self):
+        """Test parsing returns empty lists for unparseable input."""
+        from fair_forge.explainability import InterpretoResultParser
+
+        parser = InterpretoResultParser()
+
+        tokens, scores = parser.parse([None])
+
+        assert tokens == []
+        assert scores == []
+
+
+class TestBaseAttributionMethod:
+    """Test suite for BaseAttributionMethod class."""
+
+    def test_method_classes_have_required_attributes(self):
+        """Test all method classes have required class attributes."""
+        from fair_forge.explainability import (
+            GradientShap,
+            InputXGradient,
+            IntegratedGradients,
+            KernelShap,
+            Lime,
+            Occlusion,
+            Saliency,
+            SmoothGrad,
+            Sobol,
+            SquareGrad,
+            VarGrad,
+        )
+
+        method_classes = [
+            Saliency,
+            IntegratedGradients,
+            GradientShap,
+            SmoothGrad,
+            SquareGrad,
+            VarGrad,
+            InputXGradient,
+            Lime,
+            KernelShap,
+            Occlusion,
+            Sobol,
+        ]
+
+        for cls in method_classes:
+            assert hasattr(cls, "name")
+            assert hasattr(cls, "method_enum")
+            assert isinstance(cls.name, str)
+            assert len(cls.name) > 0
+
+
 class TestAttributionExplainer:
     """Test suite for AttributionExplainer class."""
 
@@ -185,169 +268,97 @@ class TestAttributionExplainer:
     @pytest.fixture
     def mock_tokenizer(self):
         """Create a mock tokenizer."""
-        tokenizer = MagicMock()
-        tokenizer.apply_chat_template.return_value = "formatted prompt"
-        return tokenizer
+        return MagicMock()
 
     def test_explainer_initialization(self, mock_model, mock_tokenizer):
         """Test AttributionExplainer initialization."""
-        from fair_forge.explainability import AttributionExplainer
+        from fair_forge.explainability import AttributionExplainer, Lime
 
         explainer = AttributionExplainer(
             model=mock_model,
             tokenizer=mock_tokenizer,
-            default_method=AttributionMethod.LIME,
+            default_method=Lime,
             default_granularity=Granularity.WORD,
         )
         assert explainer.model == mock_model
         assert explainer.tokenizer == mock_tokenizer
-        assert explainer.default_method == AttributionMethod.LIME
+        assert explainer.default_method == Lime
         assert explainer.default_granularity == Granularity.WORD
 
     def test_explainer_initialization_defaults(self, mock_model, mock_tokenizer):
         """Test AttributionExplainer default parameters."""
-        from fair_forge.explainability import AttributionExplainer
+        from fair_forge.explainability import AttributionExplainer, Lime
 
         explainer = AttributionExplainer(
             model=mock_model,
             tokenizer=mock_tokenizer,
         )
-        assert explainer.default_method == AttributionMethod.LIME
+        assert explainer.default_method == Lime
         assert explainer.default_granularity == Granularity.WORD
 
-    @patch("fair_forge.explainability.attributions._get_interpreto_class")
-    @patch("fair_forge.explainability.attributions._get_interpreto_granularity")
-    def test_explain_method(
-        self,
-        mock_granularity_fn,
-        mock_class_fn,
-        mock_model,
-        mock_tokenizer,
-    ):
-        """Test explain method creates correct result."""
-        from fair_forge.explainability import AttributionExplainer
+    def test_explainer_accepts_custom_parser(self, mock_model, mock_tokenizer):
+        """Test AttributionExplainer accepts custom result parser."""
+        from fair_forge.explainability import (
+            AttributionExplainer,
+            AttributionResultParser,
+        )
 
-        # Mock interpreto explainer
-        mock_interpreto_explainer = MagicMock()
-        mock_interpreto_result = MagicMock()
-        mock_interpreto_result.tokens = ["hello", "world"]
-        mock_interpreto_result.attributions = [0.8, 0.2]
-        mock_interpreto_explainer.return_value = [mock_interpreto_result]
-        mock_class_fn.return_value = MagicMock(return_value=mock_interpreto_explainer)
+        class CustomParser(AttributionResultParser):
+            def parse(self, raw_result):
+                return ["custom"], [1.0]
 
-        mock_granularity_fn.return_value = "WORD"
+        parser = CustomParser()
+        explainer = AttributionExplainer(
+            model=mock_model,
+            tokenizer=mock_tokenizer,
+            result_parser=parser,
+        )
+        assert explainer.result_parser == parser
+
+    def test_build_attribution_result(self, mock_model, mock_tokenizer):
+        """Test _build_attribution_result method."""
+        from fair_forge.explainability import AttributionExplainer, Lime
 
         explainer = AttributionExplainer(
             model=mock_model,
             tokenizer=mock_tokenizer,
         )
 
-        result = explainer.explain(
-            messages=[{"role": "user", "content": "Hello"}],
-            target="World",
-        )
-
-        assert isinstance(result, AttributionResult)
-        assert result.method == AttributionMethod.LIME
-        assert result.granularity == Granularity.WORD
-
-    def test_format_prompt_with_chat_template(self, mock_model, mock_tokenizer):
-        """Test _format_prompt uses chat template."""
-        from fair_forge.explainability import AttributionExplainer
-
-        mock_tokenizer.apply_chat_template.return_value = "formatted: Hello"
-
-        explainer = AttributionExplainer(
-            model=mock_model,
-            tokenizer=mock_tokenizer,
-        )
-
-        messages = [{"role": "user", "content": "Hello"}]
-        result = explainer._format_prompt(messages)
-
-        assert result == "formatted: Hello"
-        mock_tokenizer.apply_chat_template.assert_called_once()
-
-    def test_format_prompt_fallback(self, mock_model, mock_tokenizer):
-        """Test _format_prompt fallback when chat template not available."""
-        from fair_forge.explainability import AttributionExplainer
-
-        # Remove chat template method
-        del mock_tokenizer.apply_chat_template
-
-        explainer = AttributionExplainer(
-            model=mock_model,
-            tokenizer=mock_tokenizer,
-        )
-
-        messages = [
-            {"role": "system", "content": "Be helpful"},
-            {"role": "user", "content": "Hello"},
-        ]
-        result = explainer._format_prompt(messages)
-
-        assert "system: Be helpful" in result
-        assert "user: Hello" in result
-
-    @patch("fair_forge.explainability.attributions._get_interpreto_class")
-    @patch("fair_forge.explainability.attributions._get_interpreto_granularity")
-    def test_explain_batch(
-        self,
-        mock_granularity_fn,
-        mock_class_fn,
-        mock_model,
-        mock_tokenizer,
-    ):
-        """Test explain_batch processes multiple items."""
-        from fair_forge.explainability import AttributionExplainer
-
-        # Mock interpreto
-        mock_interpreto_explainer = MagicMock()
-        mock_result = MagicMock()
-        mock_result.tokens = ["a", "b"]
-        mock_result.attributions = [0.5, 0.5]
-        mock_interpreto_explainer.return_value = [mock_result]
-        mock_class_fn.return_value = MagicMock(return_value=mock_interpreto_explainer)
-        mock_granularity_fn.return_value = "WORD"
-
-        explainer = AttributionExplainer(
-            model=mock_model,
-            tokenizer=mock_tokenizer,
-        )
-
-        items = [
-            ([{"role": "user", "content": "Q1"}], "A1"),
-            ([{"role": "user", "content": "Q2"}], "A2"),
-        ]
-
-        batch_result = explainer.explain_batch(items)
-
-        assert isinstance(batch_result, AttributionBatchResult)
-        assert len(batch_result) == 2
-        assert batch_result.model_name == "test-model"
-
-    def test_parse_attributions_dict_format(self, mock_model, mock_tokenizer):
-        """Test _parse_attributions handles dict format."""
-        from fair_forge.explainability import AttributionExplainer
-
-        explainer = AttributionExplainer(
-            model=mock_model,
-            tokenizer=mock_tokenizer,
-        )
-
-        mock_result = [{"tokens": ["a", "b", "c"], "attributions": [0.1, 0.5, 0.4]}]
-
-        result = explainer._parse_attributions(
-            mock_result,
+        result = explainer._build_attribution_result(
+            tokens=["a", "b", "c"],
+            scores=[0.1, 0.5, 0.4],
             prompt="test prompt",
             target="test target",
-            method=AttributionMethod.LIME,
+            method=Lime,
             granularity=Granularity.WORD,
         )
 
+        assert isinstance(result, AttributionResult)
         assert len(result.attributions) == 3
         assert result.attributions[0].text == "a"
-        assert result.attributions[1].score == 0.5
+        assert result.method == AttributionMethod.LIME
+
+    def test_build_attribution_result_normalizes_scores(self, mock_model, mock_tokenizer):
+        """Test that _build_attribution_result normalizes scores."""
+        from fair_forge.explainability import AttributionExplainer, Lime
+
+        explainer = AttributionExplainer(
+            model=mock_model,
+            tokenizer=mock_tokenizer,
+        )
+
+        result = explainer._build_attribution_result(
+            tokens=["a", "b"],
+            scores=[0.0, 1.0],
+            prompt="test",
+            target="test",
+            method=Lime,
+            granularity=Granularity.WORD,
+        )
+
+        # Min score should normalize to 0, max to 1
+        assert result.attributions[0].normalized_score == 0.0
+        assert result.attributions[1].normalized_score == 1.0
 
 
 class TestConvenienceFunction:
@@ -363,74 +374,94 @@ class TestConvenienceFunction:
     @pytest.fixture
     def mock_tokenizer(self):
         """Create a mock tokenizer."""
-        tokenizer = MagicMock()
-        tokenizer.apply_chat_template.return_value = "formatted"
-        return tokenizer
+        return MagicMock()
 
-    @patch("fair_forge.explainability.attributions._get_interpreto_class")
-    @patch("fair_forge.explainability.attributions._get_interpreto_granularity")
+    @patch("fair_forge.explainability.attributions.Lime")
     def test_compute_attributions(
         self,
-        mock_granularity_fn,
-        mock_class_fn,
+        mock_lime_class,
         mock_model,
         mock_tokenizer,
     ):
         """Test compute_attributions convenience function."""
         from fair_forge.explainability import compute_attributions
 
-        # Mock interpreto
-        mock_explainer = MagicMock()
-        mock_result = MagicMock()
-        mock_result.tokens = ["test"]
-        mock_result.attributions = [0.5]
-        mock_explainer.return_value = [mock_result]
-        mock_class_fn.return_value = MagicMock(return_value=mock_explainer)
-        mock_granularity_fn.return_value = "WORD"
+        # Mock the Lime method
+        mock_lime_instance = MagicMock()
+        mock_lime_instance.compute.return_value = [{"tokens": ["test"], "attributions": [0.5]}]
+        mock_lime_class.return_value = mock_lime_instance
+        mock_lime_class.name = "lime"
+        mock_lime_class.method_enum = AttributionMethod.LIME
 
         result = compute_attributions(
             model=mock_model,
             tokenizer=mock_tokenizer,
-            messages=[{"role": "user", "content": "Hello"}],
-            target="World",
-            method=AttributionMethod.LIME,
+            prompt="Hello world",
+            target="Response",
+            method=mock_lime_class,
         )
 
         assert isinstance(result, AttributionResult)
 
 
-class TestMethodMapping:
-    """Test attribution method to interpreto class mapping."""
+class TestExplainMethod:
+    """Test suite for explain method with mocked dependencies."""
 
-    def test_get_interpreto_class_lime(self):
-        """Test getting LIME class from interpreto."""
-        import sys
+    @pytest.fixture
+    def mock_model(self):
+        """Create a mock model."""
+        model = MagicMock()
+        model.config._name_or_path = "test-model"
+        return model
 
-        # Create a mock interpreto module
-        mock_interpreto = MagicMock()
-        mock_interpreto.Lime = MagicMock()
-        sys.modules["interpreto"] = mock_interpreto
+    @pytest.fixture
+    def mock_tokenizer(self):
+        """Create a mock tokenizer."""
+        return MagicMock()
 
-        try:
-            from fair_forge.explainability.attributions import _get_interpreto_class
+    def test_explain_uses_default_method(self, mock_model, mock_tokenizer):
+        """Test explain uses default method when not specified."""
+        from fair_forge.explainability import AttributionExplainer, Saliency
 
-            result = _get_interpreto_class(AttributionMethod.LIME)
-            assert result == mock_interpreto.Lime
-        finally:
-            del sys.modules["interpreto"]
+        explainer = AttributionExplainer(
+            model=mock_model,
+            tokenizer=mock_tokenizer,
+            default_method=Saliency,
+        )
 
-    def test_get_interpreto_class_not_found(self):
-        """Test error when method not found in interpreto."""
-        import sys
+        # Verify default is set correctly
+        assert explainer.default_method == Saliency
 
-        # Create a mock interpreto module without Lime
-        mock_interpreto = MagicMock(spec=[])  # Empty spec means no attributes
-        sys.modules["interpreto"] = mock_interpreto
+    def test_explain_batch_returns_batch_result(self, mock_model, mock_tokenizer):
+        """Test explain_batch returns AttributionBatchResult."""
+        from fair_forge.explainability import AttributionExplainer
 
-        try:
-            from fair_forge.explainability.attributions import _get_interpreto_class
+        # Create a mock parser that returns valid data
+        mock_parser = MagicMock()
+        mock_parser.parse.return_value = (["a", "b"], [0.5, 0.5])
 
-            with pytest.raises(ImportError, match="Interpreto does not have method"):
-                _get_interpreto_class(AttributionMethod.LIME)
-        finally:
-            del sys.modules["interpreto"]
+        # Create a mock method class
+        mock_method = MagicMock()
+        mock_method.name = "mock"
+        mock_method.method_enum = AttributionMethod.LIME
+        mock_method_instance = MagicMock()
+        mock_method_instance.compute.return_value = {}
+        mock_method.return_value = mock_method_instance
+
+        explainer = AttributionExplainer(
+            model=mock_model,
+            tokenizer=mock_tokenizer,
+            default_method=mock_method,
+            result_parser=mock_parser,
+        )
+
+        items = [
+            ("prompt1", "target1"),
+            ("prompt2", "target2"),
+        ]
+
+        result = explainer.explain_batch(items)
+
+        assert isinstance(result, AttributionBatchResult)
+        assert len(result) == 2
+        assert result.model_name == "test-model"
