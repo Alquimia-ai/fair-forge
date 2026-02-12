@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -176,7 +176,7 @@ wheels = [
 
 [[package]]
 name = "alquimia-fair-forge"
-version = "1.1.0"
+version = "1.2.0b1"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },

@@ -26,7 +26,7 @@ class TestAgenticMetric:
         assert agentic.bos_json_clause == "```json"
         assert agentic.eos_json_clause == "```"
         assert agentic.threshold == 0.7
-        assert agentic.tool_threshold == 0.75
+        assert agentic.tool_threshold == 1.0
         assert agentic.tool_weights == {
             "selection": 0.25,
             "parameters": 0.25,
@@ -365,10 +365,11 @@ class TestAgenticMetric:
 
         metric = metrics[0]
 
-        assert metric.tool_correctness is not None
-        assert isinstance(metric.tool_correctness, ToolCorrectnessScore)
-        assert metric.tool_correctness.overall_correctness >= 0.0
-        assert metric.tool_correctness.overall_correctness <= 1.0
+        assert metric.tool_correctness_scores is not None
+        assert len(metric.tool_correctness_scores) > 0
+        assert isinstance(metric.tool_correctness_scores[0], ToolCorrectnessScore)
+        assert metric.tool_correctness_scores[0].overall_correctness >= 0.0
+        assert metric.tool_correctness_scores[0].overall_correctness <= 1.0
 
     @patch("fair_forge.metrics.agentic.Judge")
     def test_answer_judge_returns_none(self, mock_judge_class, mock_model):

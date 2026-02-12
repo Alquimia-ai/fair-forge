@@ -13,7 +13,11 @@ This metric evaluates:
 
 - **pass@K**: At least one of K responses is correct (similarity ≥ threshold)
 - **pass^K**: All K responses are correct
-- **Tool Correctness**: Evaluates tool selection, parameter accuracy, execution sequence, and result utilization
+- **Tool Correctness**: Evaluates tool selection, parameter accuracy, execution sequence, and result utilization **for each of K responses**
+
+<Note>
+**Important:** The metric evaluates tool correctness for **ALL K responses**, not just one. This allows you to identify which responses had correct tool usage and which didn't. The default `tool_threshold=1.0` requires perfect tool usage (100% correct).
+</Note>
 
 ## Installation
 
@@ -41,7 +45,7 @@ metrics = Agentic.run(
     AgenticRetriever,
     model=judge_model,
     threshold=0.7,
-    tool_threshold=0.75,
+    tool_threshold=1.0,
     verbose=True,
 )
 
@@ -49,8 +53,12 @@ metrics = Agentic.run(
 for metric in metrics:
     print(f"pass@{metric.k}: {metric.pass_at_k}")
     print(f"pass^{metric.k}: {metric.pass_pow_k}")
-    if metric.tool_correctness:
-        print(f"Tool correctness: {metric.tool_correctness.overall_correctness:.2f}")
+
+    # Tool correctness scores for each of K responses
+    if metric.tool_correctness_scores:
+        for i, tc in enumerate(metric.tool_correctness_scores):
+            if tc:
+                print(f"Response {i+1} tool correctness: {tc.overall_correctness:.2f}")
 ```
 
 ## Parameters
@@ -67,7 +75,7 @@ for metric in metrics:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `threshold` | `float` | `0.7` | Answer correctness threshold (0.6-0.9) |
-| `tool_threshold` | `float` | `0.75` | Tool correctness threshold (0.6-0.9) |
+| `tool_threshold` | `float` | `1.0` | Tool correctness threshold (0.6-1.0) - requires perfect tool usage |
 | `tool_weights` | `dict[str, float]` | `0.25` each | Weights for tool aspects (selection, parameters, sequence, utilization) |
 | `use_structured_output` | `bool` | `False` | Use LangChain structured output |
 | `bos_json_clause` | `str` | `"```json"` | JSON block start marker |
@@ -178,13 +186,13 @@ class AgenticMetric(BaseMetric):
     session_id: str
     assistant_id: str
     qa_id: str
-    k: int                          # Number of responses evaluated
-    threshold: float                # Answer correctness threshold
-    correctness_scores: list[float] # Individual scores for each response
-    pass_at_k: bool                 # At least one correct
-    pass_pow_k: bool                # All correct
-    correct_indices: list[int]      # Indices of correct responses
-    tool_correctness: ToolCorrectnessScore | None  # Optional tool evaluation
+    k: int                                        # Number of responses evaluated
+    threshold: float                              # Answer correctness threshold
+    correctness_scores: list[float]               # Individual scores for each response
+    pass_at_k: bool                               # At least one correct
+    pass_pow_k: bool                              # All correct
+    correct_indices: list[int]                    # Indices of correct responses
+    tool_correctness_scores: list[ToolCorrectnessScore | None]  # Tool evaluation for each K response
 ```
 
 ### ToolCorrectnessScore
@@ -213,13 +221,18 @@ class ToolCorrectnessScore(BaseModel):
 
 ### Tool Correctness Scores
 
+<Note>
+**Default threshold: 1.0** - By default, tool correctness requires perfect execution (100% correct). You can lower this with the `tool_threshold` parameter if you want to allow minor deviations.
+</Note>
+
 | Score Range | Interpretation |
 |-------------|----------------|
-| 0.9 - 1.0 | Excellent - Perfect tool usage |
-| 0.75 - 0.9 | Good - Minor issues |
-| 0.6 - 0.75 | Moderate - Several issues |
-| 0.4 - 0.6 | Poor - Significant problems |
-| 0.0 - 0.4 | Very Poor - Incorrect tool usage |
+| **1.0** | **Perfect - All aspects correct (default threshold)** |
+| 0.9 - 0.99 | Excellent - Near perfect with tiny issues |
+| 0.75 - 0.89 | Good - Minor issues |
+| 0.6 - 0.74 | Moderate - Several issues |
+| 0.4 - 0.59 | Poor - Significant problems |
+| 0.0 - 0.39 | Very Poor - Incorrect tool usage |
 
 ### Tool Aspects
 
@@ -331,7 +344,7 @@ metrics = Agentic.run(
     MathAgentRetriever,
     model=judge,
     threshold=0.7,
-    tool_threshold=0.75,
+    tool_threshold=1.0,
     verbose=True,
 )
 
@@ -347,22 +360,34 @@ for metric in metrics:
     print(f"Correct responses: {len(metric.correct_indices)}/{metric.k}")
     print(f"Individual scores: {[f'{s:.2f}' for s in metric.correctness_scores]}")
 
-    if metric.tool_correctness:
-        tc = metric.tool_correctness
-        print(f"\nTool Correctness:")
-        print(f"  Selection: {tc.tool_selection_correct:.2f}")
-        print(f"  Parameters: {tc.parameter_accuracy:.2f}")
-        print(f"  Sequence: {tc.sequence_correct:.2f}")
-        print(f"  Utilization: {tc.result_utilization:.2f}")
-        print(f"  Overall: {tc.overall_correctness:.2f} {'✓' if tc.is_correct else '✗'}")
-        print(f"  Reasoning: {tc.reasoning}")
+    # Tool correctness for each of K responses
+    if metric.tool_correctness_scores:
+        print(f"\nTool Correctness (K={metric.k} responses):")
+        for i, tc in enumerate(metric.tool_correctness_scores, 1):
+            if tc:
+                print(f"\n  Response {i}:")
+                print(f"    Selection:    {tc.tool_selection_correct:.2f}")
+                print(f"    Parameters:   {tc.parameter_accuracy:.2f}")
+                print(f"    Sequence:     {tc.sequence_correct:.2f}")
+                print(f"    Utilization:  {tc.result_utilization:.2f}")
+                print(f"    Overall:      {tc.overall_correctness:.2f} {'✓' if tc.is_correct else '✗'}")
+                if tc.reasoning:
+                    print(f"    Reasoning:    {tc.reasoning}")
+            else:
+                print(f"\n  Response {i}: No tools used")
 
 # Calculate aggregate statistics
 total_pass_at_k = sum(m.pass_at_k for m in metrics)
 total_pass_pow_k = sum(m.pass_pow_k for m in metrics)
-avg_tool_correctness = sum(
-    m.tool_correctness.overall_correctness for m in metrics if m.tool_correctness
-) / len([m for m in metrics if m.tool_correctness])
+
+# Average tool correctness across all responses
+all_tool_scores = [
+    tc.overall_correctness
+    for m in metrics
+    for tc in m.tool_correctness_scores
+    if tc is not None
+]
+avg_tool_correctness = sum(all_tool_scores) / len(all_tool_scores) if all_tool_scores else 0.0
 
 print(f"\n{'=' * 60}")
 print(f"Aggregate Statistics:")
@@ -413,6 +438,47 @@ model = ChatOllama(
 )
 ```
 </CodeGroup>
+
+## Understanding Tool Correctness for K Responses
+
+The metric evaluates tool correctness **independently for each of K responses**. This helps identify:
+- Which responses had correct tool usage
+- Common patterns in tool mistakes
+- Whether better answers correlate with better tool usage
+
+### Example with K=3
+
+```python
+# Assume we have K=3 responses for "What is 5 + 7?"
+# Response 1: Uses calculator with correct parameters → Overall: 1.0 ✓
+# Response 2: Uses calculator with WRONG parameters (a=5, b=8) → Overall: 0.75 ✗
+# Response 3: Doesn't use tools at all → tool_correctness_scores[2] = None
+
+metrics = Agentic.run(AgenticRetriever, model=judge_model, tool_threshold=1.0)
+
+for metric in metrics:
+    # metric.tool_correctness_scores = [ToolCorrectnessScore(...), ToolCorrectnessScore(...), None]
+    print(f"Response 1 tool score: {metric.tool_correctness_scores[0].overall_correctness}")  # 1.0
+    print(f"Response 2 tool score: {metric.tool_correctness_scores[1].overall_correctness}")  # 0.75
+    print(f"Response 3 tool score: {metric.tool_correctness_scores[2]}")  # None
+```
+
+### Why tool_threshold=1.0 by Default?
+
+Tool usage is **deterministic** - either the agent called the right tool with right parameters or it didn't. Unlike answer correctness (which can be subjective), tool correctness should be strict:
+
+- **1.0 (Perfect)**: Agent used exactly the right tools, parameters, sequence, and utilized results
+- **<1.0 (Imperfect)**: Something was wrong - wrong tool, wrong params, wrong order, or didn't use results
+
+If you want to allow **small deviations** (e.g., extra parameters that don't affect the result), lower the threshold:
+
+```python
+metrics = Agentic.run(
+    AgenticRetriever,
+    model=judge_model,
+    tool_threshold=0.9,  # Allow 10% deviation
+)
+```
 
 ## Custom Tool Weights
 
@@ -493,13 +559,28 @@ metrics = Agentic.run(
   </Accordion>
 
   <Accordion title="Tool Correctness Always Fails">
-    **Cause**: `ground_truth_agentic` expectations don't match actual tool usage.
+    **Cause**: Default `tool_threshold=1.0` requires perfect tool usage, or `ground_truth_agentic` expectations don't match actual tool usage.
 
     **Solution**:
-    - Verify tool names match exactly
-    - Check parameter structure (keys and values)
+    - **Lower the threshold** if you want to allow small deviations: `tool_threshold=0.9`
+    - Verify tool names match exactly (case-sensitive)
+    - Check parameter structure (keys and values must match exactly)
     - Confirm step numbers if sequence matters
     - Set `tool_sequence_matters: False` if order doesn't matter
+    - Check each response's tool score individually: `metric.tool_correctness_scores[i]`
+  </Accordion>
+
+  <Accordion title="Some Responses Have None for Tool Correctness">
+    **Cause**: Not all K responses used tools, which is expected behavior.
+
+    **Solution**:
+    - This is normal - `tool_correctness_scores[i]` will be `None` if response didn't use tools
+    - Check if tools were needed: `batch.agentic.get('tools_used', [])`
+    - Filter out None values when calculating averages:
+      ```python
+      valid_scores = [tc for tc in metric.tool_correctness_scores if tc is not None]
+      avg = sum(tc.overall_correctness for tc in valid_scores) / len(valid_scores)
+      ```
   </Accordion>
 
   <Accordion title="Multiple Datasets with Same qa_id Not Grouping">

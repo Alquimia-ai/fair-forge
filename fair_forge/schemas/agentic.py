@@ -39,4 +39,4 @@ class AgenticMetric(BaseMetric):
     pass_at_k: bool
     pass_pow_k: bool
     correct_indices: list[int]
-    tool_correctness: ToolCorrectnessScore | None = None
+    tool_correctness_scores: list[ToolCorrectnessScore | None] = []
