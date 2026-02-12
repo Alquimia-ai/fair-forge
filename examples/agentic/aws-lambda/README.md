@@ -255,15 +255,27 @@ curl -s -X POST "<INVOKE_URL>/run" \
       "pass_pow_k": false,
       "correctness_scores": [0.85, 0.92, 0.65],
       "correct_indices": [0, 1],
-      "tool_correctness": {
-        "tool_selection_correct": 1.0,
-        "parameter_accuracy": 1.0,
-        "sequence_correct": 1.0,
-        "result_utilization": 1.0,
-        "overall_correctness": 1.0,
-        "is_correct": true,
-        "reasoning": "All tools used correctly"
-      }
+      "tool_correctness_scores": [
+        {
+          "tool_selection_correct": 1.0,
+          "parameter_accuracy": 1.0,
+          "sequence_correct": 1.0,
+          "result_utilization": 1.0,
+          "overall_correctness": 1.0,
+          "is_correct": true,
+          "reasoning": "All tools used correctly"
+        },
+        {
+          "tool_selection_correct": 1.0,
+          "parameter_accuracy": 0.5,
+          "sequence_correct": 1.0,
+          "result_utilization": 1.0,
+          "overall_correctness": 0.875,
+          "is_correct": false,
+          "reasoning": "Incorrect parameter values"
+        },
+        null
+      ]
     }
   ],
   "count": 1,
@@ -288,14 +300,14 @@ curl -s -X POST "<INVOKE_URL>/run" \
 | `metrics[].pass_pow_k` | boolean | All responses are correct |
 | `metrics[].correctness_scores` | array | Correctness scores for each response (0.0-1.0) |
 | `metrics[].correct_indices` | array | Indices of correct responses (score >= threshold) |
-| `metrics[].tool_correctness` | object | Tool usage evaluation (if ground_truth_agentic provided) |
-| `metrics[].tool_correctness.tool_selection_correct` | float | Tool selection score (0.0-1.0) |
-| `metrics[].tool_correctness.parameter_accuracy` | float | Parameter accuracy score (0.0-1.0) |
-| `metrics[].tool_correctness.sequence_correct` | float | Sequence correctness score (0.0-1.0) |
-| `metrics[].tool_correctness.result_utilization` | float | Result utilization score (0.0-1.0) |
-| `metrics[].tool_correctness.overall_correctness` | float | Weighted average of all components |
-| `metrics[].tool_correctness.is_correct` | boolean | Overall correctness >= tool_threshold |
-| `metrics[].tool_correctness.reasoning` | string | Optional explanation |
+| `metrics[].tool_correctness_scores` | array | Tool usage evaluation for each of K responses (if ground_truth_agentic provided) |
+| `metrics[].tool_correctness_scores[].tool_selection_correct` | float | Tool selection score (0.0-1.0) |
+| `metrics[].tool_correctness_scores[].parameter_accuracy` | float | Parameter accuracy score (0.0-1.0) |
+| `metrics[].tool_correctness_scores[].sequence_correct` | float | Sequence correctness score (0.0-1.0) |
+| `metrics[].tool_correctness_scores[].result_utilization` | float | Result utilization score (0.0-1.0) |
+| `metrics[].tool_correctness_scores[].overall_correctness` | float | Weighted average of all components |
+| `metrics[].tool_correctness_scores[].is_correct` | boolean | Overall correctness >= tool_threshold |
+| `metrics[].tool_correctness_scores[].reasoning` | string | Optional explanation |
 | `count` | integer | Total number of qa_ids evaluated |
 | `summary.total_qa_ids` | integer | Total questions evaluated |
 | `summary.pass_at_k_count` | integer | Number of questions with pass@K=true |

@@ -55,7 +55,7 @@ class Agentic(FairForge):
         bos_json_clause: str = "```json",
         eos_json_clause: str = "```",
         threshold: float = 0.7,
-        tool_threshold: float = 0.75,
+        tool_threshold: float = 1.0,
         tool_weights: dict[str, float] | None = None,
         **kwargs,
     ):
@@ -338,19 +338,24 @@ Examples:
 
             self.logger.info(f"  pass@{k}: {pass_at_k}, pass^{k}: {pass_pow_k} ({len(correct_indices)}/{k} correct)")
 
-            tool_correctness = None
+            # Evaluate tool correctness for ALL K responses
+            tool_correctness_scores = []
             if ground_truth_agentic:
-                response_to_eval = responses[correct_indices[0]] if correct_indices else responses[0]
-
-                if response_to_eval.get("agentic"):
-                    self.logger.debug("  Evaluating tool correctness...")
-                    tool_correctness = self._evaluate_tool_correctness(
-                        agentic=response_to_eval["agentic"], ground_truth_agentic=ground_truth_agentic
-                    )
-                    self.logger.debug(
-                        f"    Overall: {tool_correctness.overall_correctness:.3f}, "
-                        f"Correct: {tool_correctness.is_correct}"
-                    )
+                self.logger.debug("  Evaluating tool correctness for all responses...")
+                for i, response in enumerate(responses):
+                    if response.get("agentic") and response["agentic"].get("tools_used"):
+                        tool_correctness = self._evaluate_tool_correctness(
+                            agentic=response["agentic"], ground_truth_agentic=ground_truth_agentic
+                        )
+                        tool_correctness_scores.append(tool_correctness)
+                        self.logger.debug(
+                            f"    Response {i+1}/{k} ({response['assistant_id']}): "
+                            f"Overall={tool_correctness.overall_correctness:.3f}, "
+                            f"Correct={tool_correctness.is_correct}"
+                        )
+                    else:
+                        tool_correctness_scores.append(None)
+                        self.logger.debug(f"    Response {i+1}/{k} ({response['assistant_id']}): No tools used")
 
             metric = AgenticMetric(
                 session_id=responses[0]["session_id"],
@@ -362,7 +367,7 @@ Examples:
                 pass_at_k=pass_at_k,
                 pass_pow_k=pass_pow_k,
                 correct_indices=correct_indices,
-                tool_correctness=tool_correctness,
+                tool_correctness_scores=tool_correctness_scores,
             )
 
             self.metrics.append(metric)

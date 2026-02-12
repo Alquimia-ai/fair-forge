@@ -226,16 +226,21 @@ def run(payload: dict) -> dict[str, Any]:
             "correct_indices": metric.correct_indices,
         }
 
-        if metric.tool_correctness:
-            result["tool_correctness"] = {
-                "tool_selection_correct": metric.tool_correctness.tool_selection_correct,
-                "parameter_accuracy": metric.tool_correctness.parameter_accuracy,
-                "sequence_correct": metric.tool_correctness.sequence_correct,
-                "result_utilization": metric.tool_correctness.result_utilization,
-                "overall_correctness": metric.tool_correctness.overall_correctness,
-                "is_correct": metric.tool_correctness.is_correct,
-                "reasoning": metric.tool_correctness.reasoning,
-            }
+        if metric.tool_correctness_scores:
+            result["tool_correctness_scores"] = [
+                {
+                    "tool_selection_correct": tc.tool_selection_correct,
+                    "parameter_accuracy": tc.parameter_accuracy,
+                    "sequence_correct": tc.sequence_correct,
+                    "result_utilization": tc.result_utilization,
+                    "overall_correctness": tc.overall_correctness,
+                    "is_correct": tc.is_correct,
+                    "reasoning": tc.reasoning,
+                }
+                if tc
+                else None
+                for tc in metric.tool_correctness_scores
+            ]
 
         results.append(result)
 
