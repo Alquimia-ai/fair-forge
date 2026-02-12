@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.2.0-b.2 (2026-02-12)
+
+### Bug Fixes
+
+- **agentic**: Evaluate tool correctness for all K responses
+  ([`8fc4868`](https://github.com/Alquimia-ai/fair-forge/commit/8fc4868340bf096b08e9707290046df93f9eece3))
+
+### Documentation
+
+- **agentic**: Update documentation for tool_correctness_scores list
+  ([`e7993b7`](https://github.com/Alquimia-ai/fair-forge/commit/e7993b72698da0c030809262298c4fe4e76f0bcf))
+
+
 ## v1.2.0-b.1 (2026-02-12)
 
 ### Build System
