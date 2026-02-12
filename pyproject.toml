@@ -90,6 +90,12 @@ bias = [
     "torch>=2.0.0",
 ]
 
+# Explainability module
+explainability = [
+    "interpreto>=0.1.0",
+    "torch>=2.0.0",
+]
+
 # All metrics
 metrics = [
     "alquimia-fair-forge[context,conversational,bestof,agentic,humanity,toxicity,bias]",
@@ -119,7 +125,7 @@ cloud = [
 
 # Everything
 all = [
-    "alquimia-fair-forge[metrics,runners,generators,generators-alquimia,cloud]",
+    "alquimia-fair-forge[metrics,runners,generators,generators-alquimia,cloud,explainability]",
 ]
 
 # Development tools
@@ -338,6 +344,7 @@ module = [
     "lakefs.*",
     "boto3.*",
     "alquimia_client.*",
+    "interpreto.*",
 ]
 ignore_missing_imports = true
 
