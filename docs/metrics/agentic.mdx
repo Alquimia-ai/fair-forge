@@ -1,0 +1,527 @@
+---
+title: Agentic
+description: Evaluate AI agent responses with pass@K metrics and tool correctness
+---
+
+# Agentic Metric
+
+The Agentic metric evaluates AI agent performance by measuring both answer correctness across multiple generations and the quality of tool usage.
+
+## Overview
+
+This metric evaluates:
+
+- **pass@K**: At least one of K responses is correct (similarity ≥ threshold)
+- **pass^K**: All K responses are correct
+- **Tool Correctness**: Evaluates tool selection, parameter accuracy, execution sequence, and result utilization
+
+## Installation
+
+```bash
+uv pip install "alquimia-fair-forge[agentic]"
+uv pip install langchain-groq  # Or your preferred LLM provider
+```
+
+## Basic Usage
+
+```python
+from fair_forge.metrics.agentic import Agentic
+from langchain_groq import ChatGroq
+from your_retriever import AgenticRetriever
+
+# Initialize the judge model
+judge_model = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    api_key="your-api-key",
+    temperature=0.0,
+)
+
+# Run evaluation
+metrics = Agentic.run(
+    AgenticRetriever,
+    model=judge_model,
+    threshold=0.7,
+    tool_threshold=0.75,
+    verbose=True,
+)
+
+# Access results
+for metric in metrics:
+    print(f"pass@{metric.k}: {metric.pass_at_k}")
+    print(f"pass^{metric.k}: {metric.pass_pow_k}")
+    if metric.tool_correctness:
+        print(f"Tool correctness: {metric.tool_correctness.overall_correctness:.2f}")
+```
+
+## Parameters
+
+### Required Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `retriever` | `Type[Retriever]` | Data source class returning multiple responses per question |
+| `model` | `BaseChatModel` | LangChain-compatible model for LLM-as-judge evaluation |
+
+### Optional Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `threshold` | `float` | `0.7` | Answer correctness threshold (0.6-0.9) |
+| `tool_threshold` | `float` | `0.75` | Tool correctness threshold (0.6-0.9) |
+| `tool_weights` | `dict[str, float]` | `0.25` each | Weights for tool aspects (selection, parameters, sequence, utilization) |
+| `use_structured_output` | `bool` | `False` | Use LangChain structured output |
+| `bos_json_clause` | `str` | `"```json"` | JSON block start marker |
+| `eos_json_clause` | `str` | `"```"` | JSON block end marker |
+| `verbose` | `bool` | `False` | Enable verbose logging |
+
+## Data Requirements
+
+The Agentic metric requires **multiple responses** (K) for the **same question** with different `assistant_id` values:
+
+```python
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Dataset, Batch
+
+class AgenticRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        # Question to evaluate
+        question = "What is the capital of France?"
+        ground_truth = "Paris"
+
+        # K=3 different responses to the same question
+        responses = [
+            "Paris",
+            "The capital of France is Paris.",
+            "Poris",  # Typo - will score lower
+        ]
+
+        datasets = []
+        for i, response in enumerate(responses):
+            batch = Batch(
+                qa_id="q1",  # Same qa_id for all K responses
+                query=question,
+                assistant=response,
+                ground_truth_assistant=ground_truth,
+                agentic={
+                    "tools_used": [
+                        {
+                            "tool_name": "web_search",
+                            "parameters": {"query": "capital of France"},
+                            "result": "Paris",
+                            "step": 1
+                        }
+                    ],
+                    "final_answer_uses_tools": True
+                },
+                ground_truth_agentic={
+                    "expected_tools": [
+                        {
+                            "tool_name": "web_search",
+                            "parameters": {"query": "capital of France"},
+                            "step": 1
+                        }
+                    ],
+                    "tool_sequence_matters": True
+                }
+            )
+
+            datasets.append(Dataset(
+                session_id=f"eval-{i}",
+                assistant_id=f"agent_{i}",  # Different assistant_id per response
+                language="english",
+                context="",
+                conversation=[batch],
+            ))
+
+        return datasets
+```
+
+### Agentic Data Structure
+
+The `Batch` schema includes optional `agentic` and `ground_truth_agentic` fields for tool evaluation:
+
+**`agentic`** (actual tool usage):
+```python
+{
+    "tools_used": [
+        {
+            "tool_name": "calculator",
+            "parameters": {"operation": "add", "a": 5, "b": 7},
+            "result": 12,
+            "step": 1
+        }
+    ],
+    "final_answer_uses_tools": True  # Did agent use tool results in final answer?
+}
+```
+
+**`ground_truth_agentic`** (expected tool usage):
+```python
+{
+    "expected_tools": [
+        {
+            "tool_name": "calculator",
+            "parameters": {"operation": "add", "a": 5, "b": 7},
+            "step": 1
+        }
+    ],
+    "tool_sequence_matters": True  # Does order matter?
+}
+```
+
+## Output Schema
+
+### AgenticMetric
+
+```python
+class AgenticMetric(BaseMetric):
+    session_id: str
+    assistant_id: str
+    qa_id: str
+    k: int                          # Number of responses evaluated
+    threshold: float                # Answer correctness threshold
+    correctness_scores: list[float] # Individual scores for each response
+    pass_at_k: bool                 # At least one correct
+    pass_pow_k: bool                # All correct
+    correct_indices: list[int]      # Indices of correct responses
+    tool_correctness: ToolCorrectnessScore | None  # Optional tool evaluation
+```
+
+### ToolCorrectnessScore
+
+```python
+class ToolCorrectnessScore(BaseModel):
+    tool_selection_correct: float   # 0-1: Correct tools chosen
+    parameter_accuracy: float       # 0-1: Correct parameters passed
+    sequence_correct: float         # 0-1: Correct order (if required)
+    result_utilization: float       # 0-1: Tool results used in answer
+    overall_correctness: float      # Weighted average
+    is_correct: bool                # overall >= tool_threshold
+    reasoning: str | None           # Explanation
+```
+
+## Interpretation
+
+### pass@K Metrics
+
+| Metric | Description | Use Case |
+|--------|-------------|----------|
+| **pass@1** | Single response correct | Standard evaluation |
+| **pass@3** | At least 1 of 3 correct | Reliability with retries |
+| **pass@5** | At least 1 of 5 correct | High-stakes scenarios |
+| **pass^K** | All K responses correct | Consistency evaluation |
+
+### Tool Correctness Scores
+
+| Score Range | Interpretation |
+|-------------|----------------|
+| 0.9 - 1.0 | Excellent - Perfect tool usage |
+| 0.75 - 0.9 | Good - Minor issues |
+| 0.6 - 0.75 | Moderate - Several issues |
+| 0.4 - 0.6 | Poor - Significant problems |
+| 0.0 - 0.4 | Very Poor - Incorrect tool usage |
+
+### Tool Aspects
+
+- **Selection** (25%): Are the right tools chosen?
+- **Parameters** (25%): Are parameters correct?
+- **Sequence** (25%): Is execution order correct?
+- **Utilization** (25%): Are tool results used in final answer?
+
+## Complete Example
+
+```python
+import os
+from fair_forge.metrics.agentic import Agentic
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Dataset, Batch
+from langchain_groq import ChatGroq
+
+class MathAgentRetriever(Retriever):
+    """Retriever with K=3 responses to math questions."""
+
+    def load_dataset(self) -> list[Dataset]:
+        questions = [
+            {
+                "qa_id": "q1",
+                "query": "What is 15 + 27?",
+                "ground_truth": "42",
+                "responses": [
+                    "42",
+                    "The answer is 42",
+                    "43",  # Wrong answer
+                ],
+                "ground_truth_agentic": {
+                    "expected_tools": [
+                        {
+                            "tool_name": "calculator",
+                            "parameters": {"operation": "add", "a": 15, "b": 27},
+                            "step": 1
+                        }
+                    ],
+                    "tool_sequence_matters": True
+                }
+            },
+            {
+                "qa_id": "q2",
+                "query": "What is 100 - 35?",
+                "ground_truth": "65",
+                "responses": [
+                    "65",
+                    "65",
+                    "65",  # All correct
+                ],
+                "ground_truth_agentic": {
+                    "expected_tools": [
+                        {
+                            "tool_name": "calculator",
+                            "parameters": {"operation": "subtract", "a": 100, "b": 35},
+                            "step": 1
+                        }
+                    ],
+                    "tool_sequence_matters": True
+                }
+            }
+        ]
+
+        datasets = []
+        for question in questions:
+            for i, response in enumerate(question["responses"]):
+                # Simulate tool usage
+                agentic_data = {
+                    "tools_used": [
+                        {
+                            "tool_name": "calculator",
+                            "parameters": question["ground_truth_agentic"]["expected_tools"][0]["parameters"],
+                            "result": int(response) if response.isdigit() else 0,
+                            "step": 1
+                        }
+                    ],
+                    "final_answer_uses_tools": True
+                }
+
+                batch = Batch(
+                    qa_id=question["qa_id"],
+                    query=question["query"],
+                    assistant=response,
+                    ground_truth_assistant=question["ground_truth"],
+                    agentic=agentic_data,
+                    ground_truth_agentic=question["ground_truth_agentic"]
+                )
+
+                datasets.append(Dataset(
+                    session_id=f"{question['qa_id']}-{i}",
+                    assistant_id=f"agent_{i}",
+                    language="english",
+                    context="",
+                    conversation=[batch],
+                ))
+
+        return datasets
+
+# Initialize judge
+judge = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    api_key=os.getenv("GROQ_API_KEY"),
+    temperature=0.0,
+)
+
+# Run evaluation
+metrics = Agentic.run(
+    MathAgentRetriever,
+    model=judge,
+    threshold=0.7,
+    tool_threshold=0.75,
+    verbose=True,
+)
+
+# Analyze results
+print("Agentic Evaluation Results")
+print("=" * 60)
+
+for metric in metrics:
+    print(f"\nQuestion ID: {metric.qa_id}")
+    print(f"K (responses evaluated): {metric.k}")
+    print(f"pass@{metric.k}: {metric.pass_at_k}")
+    print(f"pass^{metric.k}: {metric.pass_pow_k}")
+    print(f"Correct responses: {len(metric.correct_indices)}/{metric.k}")
+    print(f"Individual scores: {[f'{s:.2f}' for s in metric.correctness_scores]}")
+
+    if metric.tool_correctness:
+        tc = metric.tool_correctness
+        print(f"\nTool Correctness:")
+        print(f"  Selection: {tc.tool_selection_correct:.2f}")
+        print(f"  Parameters: {tc.parameter_accuracy:.2f}")
+        print(f"  Sequence: {tc.sequence_correct:.2f}")
+        print(f"  Utilization: {tc.result_utilization:.2f}")
+        print(f"  Overall: {tc.overall_correctness:.2f} {'✓' if tc.is_correct else '✗'}")
+        print(f"  Reasoning: {tc.reasoning}")
+
+# Calculate aggregate statistics
+total_pass_at_k = sum(m.pass_at_k for m in metrics)
+total_pass_pow_k = sum(m.pass_pow_k for m in metrics)
+avg_tool_correctness = sum(
+    m.tool_correctness.overall_correctness for m in metrics if m.tool_correctness
+) / len([m for m in metrics if m.tool_correctness])
+
+print(f"\n{'=' * 60}")
+print(f"Aggregate Statistics:")
+print(f"  pass@K rate: {total_pass_at_k}/{len(metrics)} ({total_pass_at_k/len(metrics):.1%})")
+print(f"  pass^K rate: {total_pass_pow_k}/{len(metrics)} ({total_pass_pow_k/len(metrics):.1%})")
+print(f"  Avg tool correctness: {avg_tool_correctness:.2f}")
+```
+
+## LLM Provider Options
+
+<CodeGroup>
+```python Groq
+from langchain_groq import ChatGroq
+
+model = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    api_key="your-api-key",
+    temperature=0.0,
+)
+```
+
+```python OpenAI
+from langchain_openai import ChatOpenAI
+
+model = ChatOpenAI(
+    model="gpt-4o",
+    api_key="your-api-key",
+    temperature=0.0,
+)
+```
+
+```python Anthropic Claude
+from langchain_anthropic import ChatAnthropic
+
+model = ChatAnthropic(
+    model="claude-3-5-sonnet-20241022",
+    api_key="your-api-key",
+    temperature=0.0,
+)
+```
+
+```python Ollama (Local)
+from langchain_ollama import ChatOllama
+
+model = ChatOllama(
+    model="llama3.1:70b",
+    temperature=0.0,
+)
+```
+</CodeGroup>
+
+## Custom Tool Weights
+
+Adjust weights based on your use case:
+
+```python
+# Emphasize tool selection and utilization
+weights = {
+    "selection": 0.4,      # Tool choice is critical
+    "parameters": 0.2,     # Parameters less important
+    "sequence": 0.1,       # Order doesn't matter much
+    "utilization": 0.3,    # Using results is important
+}
+
+metrics = Agentic.run(
+    AgenticRetriever,
+    model=judge_model,
+    tool_weights=weights,
+)
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Agent Reliability" icon="shield-check">
+    Measure consistency across multiple agent runs with pass@K metrics
+  </Card>
+  <Card title="Tool Usage Quality" icon="wrench">
+    Evaluate if agents correctly select and use available tools
+  </Card>
+  <Card title="Code Generation" icon="code">
+    Test code generation with K samples (pass@1, pass@5, pass@10)
+  </Card>
+  <Card title="Multi-Turn Tasks" icon="messages">
+    Assess agentic behavior in complex multi-step workflows
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Choose Appropriate K Values">
+    - **K=1**: Standard single-response evaluation
+    - **K=3-5**: Balance between reliability and cost
+    - **K=10+**: High-stakes scenarios (code generation, medical advice)
+  </Accordion>
+
+  <Accordion title="Set Meaningful Thresholds">
+    - **Strict (0.8-0.9)**: Factual accuracy matters (medical, legal)
+    - **Moderate (0.7)**: General purpose (recommended default)
+    - **Lenient (0.6)**: Creative or subjective tasks
+  </Accordion>
+
+  <Accordion title="Define Clear Tool Expectations">
+    Provide complete `ground_truth_agentic` with:
+    - Expected tool names
+    - Required parameters
+    - Whether sequence matters
+    - Whether tool results should influence final answer
+  </Accordion>
+
+  <Accordion title="Use Strong Judge Models">
+    Larger models (GPT-4, Claude-3, Llama-3-70B+) provide more reliable correctness evaluations.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Judge Returns Low Scores for Correct Answers">
+    **Cause**: Judge model may be too strict or ground truth is ambiguous.
+
+    **Solution**:
+    - Lower the `threshold` parameter (try 0.6-0.65)
+    - Use a more capable judge model
+    - Ensure ground truth is clear and unambiguous
+    - Check verbose logs to see judge reasoning
+  </Accordion>
+
+  <Accordion title="Tool Correctness Always Fails">
+    **Cause**: `ground_truth_agentic` expectations don't match actual tool usage.
+
+    **Solution**:
+    - Verify tool names match exactly
+    - Check parameter structure (keys and values)
+    - Confirm step numbers if sequence matters
+    - Set `tool_sequence_matters: False` if order doesn't matter
+  </Accordion>
+
+  <Accordion title="Multiple Datasets with Same qa_id Not Grouping">
+    **Cause**: Datasets may have different `qa_id` values.
+
+    **Solution**:
+    - Ensure all K responses have **identical** `qa_id`
+    - Use different `assistant_id` for each response
+    - Check logs with `verbose=True` to see grouping
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="BestOf Metric" icon="trophy" href="/metrics/best-of">
+    Compare multiple agents in tournament-style evaluation
+  </Card>
+  <Card title="Runners" icon="play" href="/runners/overview">
+    Execute agentic tests against AI systems
+  </Card>
+  <Card title="AWS Lambda" icon="aws" href="/examples/aws-lambda">
+    Deploy Agentic as serverless function
+  </Card>
+</CardGroup>

@@ -226,3 +226,87 @@ def create_multiple_datasets() -> list[Dataset]:
         create_sample_dataset(session_id="session_002", assistant_id="assistant_001"),
         create_sample_dataset(session_id="session_003", assistant_id="assistant_002"),
     ]
+
+
+def create_agentic_dataset() -> list[Dataset]:
+    """Create datasets for Agentic metric testing with K responses per question."""
+    return [
+        Dataset(
+            session_id="agentic_session",
+            assistant_id="assistant_a",
+            language="english",
+            context="Testing agentic responses with tool usage",
+            conversation=[
+                create_sample_batch(
+                    qa_id="qa_001",
+                    query="What is 5 + 7?",
+                    assistant="The sum of 5 and 7 is 12.",
+                    ground_truth_assistant="12",
+                    agentic={
+                        "tools_used": [
+                            {"tool_name": "calculator", "parameters": {"a": 5, "b": 7}, "result": 12, "step": 1}
+                        ],
+                        "final_answer_uses_tools": True,
+                    },
+                    ground_truth_agentic={
+                        "expected_tools": [
+                            {"tool_name": "calculator", "parameters": {"a": 5, "b": 7}, "step": 1}
+                        ],
+                        "tool_sequence_matters": True,
+                    },
+                ),
+            ],
+        ),
+        Dataset(
+            session_id="agentic_session",
+            assistant_id="assistant_b",
+            language="english",
+            context="Testing agentic responses with tool usage",
+            conversation=[
+                create_sample_batch(
+                    qa_id="qa_001",
+                    query="What is 5 + 7?",
+                    assistant="It's 12.",
+                    ground_truth_assistant="12",
+                    agentic={
+                        "tools_used": [
+                            {"tool_name": "calculator", "parameters": {"a": 5, "b": 7}, "result": 12, "step": 1}
+                        ],
+                        "final_answer_uses_tools": True,
+                    },
+                    ground_truth_agentic={
+                        "expected_tools": [
+                            {"tool_name": "calculator", "parameters": {"a": 5, "b": 7}, "step": 1}
+                        ],
+                        "tool_sequence_matters": True,
+                    },
+                ),
+            ],
+        ),
+        Dataset(
+            session_id="agentic_session",
+            assistant_id="assistant_c",
+            language="english",
+            context="Testing agentic responses with tool usage",
+            conversation=[
+                create_sample_batch(
+                    qa_id="qa_001",
+                    query="What is 5 + 7?",
+                    assistant="The answer is 13.",
+                    ground_truth_assistant="12",
+                    agentic={
+                        "tools_used": [
+                            {"tool_name": "calculator", "parameters": {"a": 5, "b": 7}, "result": 13, "step": 1}
+                        ],
+                        "final_answer_uses_tools": True,
+                    },
+                    ground_truth_agentic={
+                        "expected_tools": [
+                            {"tool_name": "calculator", "parameters": {"a": 5, "b": 7}, "step": 1}
+                        ],
+                        "tool_sequence_matters": True,
+                    },
+                ),
+            ],
+        ),
+    ]

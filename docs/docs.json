@@ -53,7 +53,8 @@
               "metrics/context",
               "metrics/conversational",
               "metrics/humanity",
-              "metrics/best-of"
+              "metrics/best-of",
+              "metrics/agentic"
             ]
           },
           {

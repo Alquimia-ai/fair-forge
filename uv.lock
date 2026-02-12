@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -181,6 +181,7 @@ source = { editable = "." }
 dependencies = [
     { name = "jinja2" },
     { name = "langchain" },
+    { name = "langchain-core" },
     { name = "loguru" },
     { name = "pydantic" },
     { name = "scipy" },
@@ -218,6 +219,7 @@ dev = [
     { name = "ipykernel" },
     { name = "jupyter" },
     { name = "mypy" },
+    { name = "nbconvert" },
     { name = "notebook" },
     { name = "pandas-stubs" },
     { name = "pre-commit" },
@@ -230,6 +232,7 @@ dev = [
     { name = "sphinx" },
     { name = "sphinx-rtd-theme" },
     { name = "types-tqdm" },
+    { name = "virtualenv" },
 ]
 generators-alquimia = [
     { name = "alquimia-client" },
@@ -273,6 +276,7 @@ dev = [
     { name = "ipykernel" },
     { name = "jupyter" },
     { name = "mypy" },
+    { name = "nbconvert" },
     { name = "notebook" },
     { name = "pandas-stubs" },
     { name = "pre-commit" },
@@ -285,6 +289,7 @@ dev = [
     { name = "sphinx" },
     { name = "sphinx-rtd-theme" },
     { name = "types-tqdm" },
+    { name = "virtualenv" },
 ]
 
 [package.metadata]
@@ -292,7 +297,7 @@ requires-dist = [
     { name = "aiosseclient", marker = "extra == 'runners'", specifier = ">=0.1.8" },
     { name = "alquimia-client", marker = "extra == 'generators-alquimia'", specifier = ">=0.1.0" },
     { name = "alquimia-client", marker = "extra == 'runners'", specifier = ">=0.1.0" },
-    { name = "alquimia-fair-forge", extras = ["context", "conversational", "bestof", "humanity", "toxicity", "bias"], marker = "extra == 'metrics'" },
+    { name = "alquimia-fair-forge", extras = ["context", "conversational", "bestof", "agentic", "humanity", "toxicity", "bias"], marker = "extra == 'metrics'" },
     { name = "alquimia-fair-forge", extras = ["metrics", "runners", "generators", "generators-alquimia", "cloud"], marker = "extra == 'all'" },
     { name = "boto3", marker = "extra == 'cloud'", specifier = ">=1.28.0" },
     { name = "commitizen", marker = "extra == 'dev'", specifier = ">=4.0.0" },
@@ -303,8 +308,10 @@ requires-dist = [
     { name = "jupyter", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "lakefs", marker = "extra == 'cloud'", specifier = ">=0.14.0" },
     { name = "langchain", specifier = ">=1.2" },
+    { name = "langchain-core", specifier = ">=1.2.11" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8.0" },
+    { name = "nbconvert", marker = "extra == 'dev'", specifier = ">=7.17.0" },
     { name = "nltk", marker = "extra == 'toxicity'", specifier = ">=3.8.0" },
     { name = "notebook", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "numba", marker = "extra == 'toxicity'", specifier = ">=0.57.0" },
@@ -333,8 +340,9 @@ requires-dist = [
     { name = "transformers", specifier = ">=4.35.0" },
     { name = "types-tqdm", marker = "extra == 'dev'", specifier = ">=4.66.0" },
     { name = "umap-learn", marker = "extra == 'toxicity'", specifier = ">=0.5.6,<0.6.0" },
+    { name = "virtualenv", marker = "extra == 'dev'", specifier = ">=20.36.1" },
 ]
-provides-extras = ["context", "conversational", "bestof", "humanity", "toxicity", "bias", "metrics", "runners", "generators", "generators-alquimia", "cloud", "all", "dev"]
+provides-extras = ["context", "conversational", "bestof", "agentic", "humanity", "toxicity", "bias", "metrics", "runners", "generators", "generators-alquimia", "cloud", "all", "dev"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -342,6 +350,7 @@ dev = [
     { name = "ipykernel", specifier = ">=6.0.0" },
     { name = "jupyter", specifier = ">=1.0.0" },
     { name = "mypy", specifier = ">=1.8.0" },
+    { name = "nbconvert", specifier = ">=7.17.0" },
     { name = "notebook", specifier = ">=7.0.0" },
     { name = "pandas-stubs", specifier = ">=2.0.0" },
     { name = "pre-commit", specifier = ">=3.5.0" },
@@ -354,6 +363,7 @@ dev = [
     { name = "sphinx", specifier = ">=7.0.0" },
     { name = "sphinx-rtd-theme", specifier = ">=2.0.0" },
     { name = "types-tqdm", specifier = ">=4.66.0" },
+    { name = "virtualenv", specifier = ">=20.36.1" },
 ]
 
 [[package]]
@@ -1729,7 +1739,7 @@ wheels = [
 
 [[package]]
 name = "langchain-core"
-version = "1.2.7"
+version = "1.2.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jsonpatch" },
@@ -1741,9 +1751,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "uuid-utils" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a2/0e/664d8d81b3493e09cbab72448d2f9d693d1fa5aa2bcc488602203a9b6da0/langchain_core-1.2.7.tar.gz", hash = "sha256:e1460639f96c352b4a41c375f25aeb8d16ffc1769499fb1c20503aad59305ced", size = 837039, upload-time = "2026-01-09T17:44:25.505Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/12/17/1943cedfc118e04b8128e4c3e1dbf0fa0ea58eefddbb6198cfd699d19f01/langchain_core-1.2.11.tar.gz", hash = "sha256:f164bb36602dd74a3a50c1334fca75309ad5ed95767acdfdbb9fa95ce28a1e01", size = 831211, upload-time = "2026-02-10T20:35:28.35Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6e/6f/34a9fba14d191a67f7e2ee3dbce3e9b86d2fa7310e2c7f2c713583481bd2/langchain_core-1.2.7-py3-none-any.whl", hash = "sha256:452f4fef7a3d883357b22600788d37e3d8854ef29da345b7ac7099f33c31828b", size = 490232, upload-time = "2026-01-09T17:44:24.236Z" },
+    { url = "https://files.pythonhosted.org/packages/10/30/1f80e3fc674353cad975ed5294353d42512535d2094ef032c06454c2c873/langchain_core-1.2.11-py3-none-any.whl", hash = "sha256:ae11ceb8dda60d0b9d09e763116e592f1683327c17be5b715f350fd29aee65d3", size = 500062, upload-time = "2026-02-10T20:35:26.698Z" },
 ]
 
 [[package]]
@@ -2237,7 +2247,7 @@ wheels = [
 
 [[package]]
 name = "nbconvert"
-version = "7.16.6"
+version = "7.17.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -2255,9 +2265,9 @@ dependencies = [
     { name = "pygments" },
     { name = "traitlets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a3/59/f28e15fc47ffb73af68a8d9b47367a8630d76e97ae85ad18271b9db96fdf/nbconvert-7.16.6.tar.gz", hash = "sha256:576a7e37c6480da7b8465eefa66c17844243816ce1ccc372633c6b71c3c0f582", size = 857715, upload-time = "2025-01-28T09:29:14.724Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/38/47/81f886b699450d0569f7bc551df2b1673d18df7ff25cc0c21ca36ed8a5ff/nbconvert-7.17.0.tar.gz", hash = "sha256:1b2696f1b5be12309f6c7d707c24af604b87dfaf6d950794c7b07acab96dda78", size = 862855, upload-time = "2026-01-29T16:37:48.478Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cc/9a/cd673b2f773a12c992f41309ef81b99da1690426bd2f96957a7ade0d3ed7/nbconvert-7.16.6-py3-none-any.whl", hash = "sha256:1375a7b67e0c2883678c48e506dc320febb57685e5ee67faa51b18a90f3a712b", size = 258525, upload-time = "2025-01-28T09:29:12.551Z" },
+    { url = "https://files.pythonhosted.org/packages/0d/4b/8d5f796a792f8a25f6925a96032f098789f448571eb92011df1ae59e8ea8/nbconvert-7.17.0-py3-none-any.whl", hash = "sha256:4f99a63b337b9a23504347afdab24a11faa7d86b405e5c8f9881cd313336d518", size = 261510, upload-time = "2026-01-29T16:37:46.322Z" },
 ]
 
 [[package]]
