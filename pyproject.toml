@@ -47,6 +47,7 @@ classifiers = [
 dependencies = [
     # LLM Integration (requires 1.2+ for strict structured output support)
     "langchain>=1.2",
+    "langchain-core>=1.2.11",
     # Data Validation & Utilities
     "pydantic>=2.0.0,<3.0.0",
     "tqdm>=4.65.0",
@@ -133,6 +134,7 @@ dev = [
     "ruff>=0.8.0",
     "mypy>=1.8.0",
     "pre-commit>=3.5.0",
+    "virtualenv>=20.36.1",
 
     # Release management
     "commitizen>=4.0.0",
@@ -150,6 +152,7 @@ dev = [
     "ipykernel>=6.0.0",
     "jupyter>=1.0.0",
     "notebook>=7.0.0",
+    "nbconvert>=7.17.0",
 ]
 
 [project.urls]
@@ -171,6 +174,7 @@ dev = [
     "ruff>=0.8.0",
     "mypy>=1.8.0",
     "pre-commit>=3.5.0",
+    "virtualenv>=20.36.1",
 
     # Release management
     "commitizen>=4.0.0",
@@ -188,6 +192,7 @@ dev = [
     "ipykernel>=6.0.0",
     "jupyter>=1.0.0",
     "notebook>=7.0.0",
+    "nbconvert>=7.17.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -418,9 +423,19 @@ build_command = "uv build"
 commit_message = "chore(release): v{version}"
 tag_format = "v{version}"
 
+[tool.semantic_release.branches.main]
+match = "main"
+prerelease = false
+
 [tool.semantic_release.branches.develop]
 match = "develop"
-prerelease = false
+prerelease = true
+prerelease_token = "b"
+
+[tool.semantic_release.branches.feature]
+match = "feat/.*"
+prerelease = true
+prerelease_token = "a"
 
 [tool.semantic_release.changelog]
 exclude_commit_patterns = [
