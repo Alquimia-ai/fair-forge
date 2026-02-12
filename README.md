@@ -1,7 +1,7 @@
 # Fair Forge
 
 <p align="center">
-  <img src="https://www.alquimia.ai/logo-alquimia.svg" width="800" alt="Alquimia AI">
+  <img src="https://cdn.prod.website-files.com/68f2b0d5efa00a8133ee0b23/698275cf13a9d1263497724f_Alquimia%20Logo.svg" width="800" alt="Alquimia AI">
 </p>
 
 <p align="center">
