@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.2.0-b.3 (2026-02-13)
+
+### Features
+
+- **explainability**: Add module with token attribution analysis
+  ([`e5ac0ab`](https://github.com/Alquimia-ai/fair-forge/commit/e5ac0abb640659f2e7a087cea8bca36bf6019148))
+
+
 ## v1.2.0-b.2 (2026-02-12)
 
 ### Bug Fixes
