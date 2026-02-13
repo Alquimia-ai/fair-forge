@@ -2,6 +2,49 @@
 
 <!-- version list -->
 
+## v1.2.0-b.4 (2026-02-13)
+
+### Bug Fixes
+
+- **docs**: Use mintlify validate instead of npx validation package
+  ([`35c8a39`](https://github.com/Alquimia-ai/fair-forge/commit/35c8a3981e1437b2d2241c5257b26df7ea689186))
+
+### Build System
+
+- Exclude experiments and examples from ruff
+  ([`0f24b7b`](https://github.com/Alquimia-ai/fair-forge/commit/0f24b7b14c01d4fb867bbcdc843dc4a493aee83a))
+
+### Chores
+
+- Add .ruff_cache to gitignore
+  ([`427ca60`](https://github.com/Alquimia-ai/fair-forge/commit/427ca6045b38bb7f4234c04decb41128bb4f4d68))
+
+- New fair-forge version
+  ([`3d9133a`](https://github.com/Alquimia-ai/fair-forge/commit/3d9133a7d38e76b3d36b252f8559ffa8a871e1f9))
+
+- Remove legacy setup.py and MANIFEST.in
+  ([`76aa482`](https://github.com/Alquimia-ai/fair-forge/commit/76aa4823b7372a7b4a7091a8f38c78acc7a7aa43))
+
+### Continuous Integration
+
+- **docs**: Add mintlify validation workflow
+  ([`5552ab5`](https://github.com/Alquimia-ai/fair-forge/commit/5552ab5343326a76681cd10d90815402b18ed1b8))
+
+### Documentation
+
+- Add contributing section and remove explainability from readme
+  ([`9f82b65`](https://github.com/Alquimia-ai/fair-forge/commit/9f82b6561d73d6a5c05c38fe8ed51c6844fa8869))
+
+- Add SOLID, design patterns, and code smells guidelines to CLAUDE.md
+  ([`06d1287`](https://github.com/Alquimia-ai/fair-forge/commit/06d12872134e7c2d62ec4142164b4f4ed157ed51))
+
+- Replace uv pip install with uv add across all pages
+  ([`cf62292`](https://github.com/Alquimia-ai/fair-forge/commit/cf62292c2e892f5e8ece3fb29077ff8f817fd9cd))
+
+- Switch to aspen theme and add navigation group icons
+  ([`741c3dc`](https://github.com/Alquimia-ai/fair-forge/commit/741c3dc4d352e48be81ca75b6c4b6c3db64c7a8f))
+
+
 ## v1.2.0-b.3 (2026-02-13)
 
 ### Features
