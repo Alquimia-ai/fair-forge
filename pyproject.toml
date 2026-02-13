@@ -237,6 +237,8 @@ extend-exclude = [
     "build",
     "dist",
     "*.egg-info",
+    "fair_forge/experiments",
+    "examples",
 ]
 
 [tool.ruff.lint]
