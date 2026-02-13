@@ -1,0 +1,70 @@
+---
+title: Fair Forge
+description: Performance-measurement library for evaluating AI models and assistants
+mode: custom
+---
+
+<div id="landing-page" className="landing-hero">
+<div className="landing-badge">by Alquimia AI</div>
+
+  <h1 className="landing-title">Measure what matters</h1>
+
+  <p className="landing-subtitle">
+    A comprehensive performance-measurement library for evaluating fairness, toxicity, bias, and conversational quality of AI systems.
+  </p>
+
+  <div className="landing-buttons">
+    <a className="landing-btn-primary" href="/quickstart">Get Started →</a>
+    <a className="landing-btn-secondary" href="/introduction">Documentation</a>
+  </div>
+</div>
+
+<div className="landing-features">
+  <div className="landing-features-grid">
+    <div className="landing-feature">
+      <div className="landing-feature-title">Toxicity Analysis</div>
+      <div className="landing-feature-desc">Detect toxic language patterns with demographic profiling and group fairness scoring.</div>
+    </div>
+    <div className="landing-feature">
+      <div className="landing-feature-title">Bias Detection</div>
+      <div className="landing-feature-desc">Measure bias across protected attributes using IBM Granite and LlamaGuard guardians.</div>
+    </div>
+    <div className="landing-feature">
+      <div className="landing-feature-title">Conversational Quality</div>
+      <div className="landing-feature-desc">Evaluate dialogue using Grice's Maxims for relevance, clarity, and truthfulness.</div>
+    </div>
+    <div className="landing-feature">
+      <div className="landing-feature-title">Test Generation</div>
+      <div className="landing-feature-desc">Generate synthetic test datasets from your documentation with pluggable strategies.</div>
+    </div>
+    <div className="landing-feature">
+      <div className="landing-feature-title">Model Comparison</div>
+      <div className="landing-feature-desc">Run tournament-style evaluations between multiple assistants with LLM-as-judge.</div>
+    </div>
+    <div className="landing-feature">
+      <div className="landing-feature-title">Explainability</div>
+      <div className="landing-feature-desc">Understand model decisions with token-level attribution and attention analysis.</div>
+    </div>
+  </div>
+</div>
+
+<div className="landing-code">
+  <h2 className="landing-section-title">Simple by design</h2>
+  <p className="landing-section-desc">Evaluate any AI system in a few lines of code.</p>
+</div>
+
+<div className="landing-code-wrapper">
+
+```python
+from fair_forge.metrics.humanity import Humanity
+
+metrics = Humanity.run(MyRetriever)
+```
+
+</div>
+
+<div className="landing-cta">
+  <h2 className="landing-cta-title">Ready to evaluate your AI?</h2>
+  <p className="landing-cta-desc">Install Fair Forge and start measuring in minutes.</p>
+  <a className="landing-btn-primary" href="/installation">Install Fair Forge →</a>
+</div>
