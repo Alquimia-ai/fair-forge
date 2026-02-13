@@ -22,8 +22,8 @@ This metric evaluates:
 ## Installation
 
 ```bash
-uv pip install "alquimia-fair-forge[agentic]"
-uv pip install langchain-groq  # Or your preferred LLM provider
+uv add "alquimia-fair-forge[agentic]"
+uv add langchain-groq  # Or your preferred LLM provider
 ```
 
 ## Basic Usage
@@ -468,7 +468,7 @@ for metric in metrics:
 Tool usage is **deterministic** - either the agent called the right tool with right parameters or it didn't. Unlike answer correctness (which can be subjective), tool correctness should be strict:
 
 - **1.0 (Perfect)**: Agent used exactly the right tools, parameters, sequence, and utilized results
-- **<1.0 (Imperfect)**: Something was wrong - wrong tool, wrong params, wrong order, or didn't use results
+- **&lt;1.0 (Imperfect)**: Something was wrong - wrong tool, wrong params, wrong order, or didn't use results
 
 If you want to allow **small deviations** (e.g., extra parameters that don't affect the result), lower the threshold:
 

@@ -16,7 +16,7 @@ Fair Forge uses a modular dependency system, allowing you to install only the co
 
 <CodeGroup>
 ```bash uv (Recommended)
-uv pip install alquimia-fair-forge
+uv add alquimia-fair-forge
 ```
 
 ```bash pip
@@ -60,22 +60,22 @@ Fair Forge provides optional dependency groups for each metric and feature:
 <CodeGroup>
 ```bash Single Metric
 # Install with toxicity metric support
-uv pip install "alquimia-fair-forge[toxicity]"
+uv add "alquimia-fair-forge[toxicity]"
 ```
 
 ```bash Multiple Metrics
 # Install multiple metrics
-uv pip install "alquimia-fair-forge[toxicity,bias,context]"
+uv add "alquimia-fair-forge[toxicity,bias,context]"
 ```
 
 ```bash Full Installation
 # Install everything
-uv pip install "alquimia-fair-forge[all]"
+uv add "alquimia-fair-forge[all]"
 ```
 
 ```bash Generators + Runners
 # Install for test generation and execution
-uv pip install "alquimia-fair-forge[generators,runners]"
+uv add "alquimia-fair-forge[generators,runners]"
 ```
 </CodeGroup>
 
@@ -85,23 +85,23 @@ Several metrics require LangChain-compatible chat models. Install your preferred
 
 <CodeGroup>
 ```bash Groq (Fast & Free Tier)
-uv pip install langchain-groq
+uv add langchain-groq
 ```
 
 ```bash OpenAI
-uv pip install langchain-openai
+uv add langchain-openai
 ```
 
 ```bash Google Gemini
-uv pip install langchain-google-genai
+uv add langchain-google-genai
 ```
 
 ```bash Anthropic
-uv pip install langchain-anthropic
+uv add langchain-anthropic
 ```
 
 ```bash Ollama (Local)
-uv pip install langchain-ollama
+uv add langchain-ollama
 ```
 </CodeGroup>
 
@@ -150,22 +150,22 @@ print("Installation successful!")
   <Accordion title="ImportError: No module named 'sentence_transformers'">
     Install the toxicity extras:
     ```bash
-    uv pip install "alquimia-fair-forge[toxicity]"
+    uv add "alquimia-fair-forge[toxicity]"
     ```
   </Accordion>
 
   <Accordion title="ImportError: No module named 'langchain_groq'">
     Install your preferred LLM provider:
     ```bash
-    uv pip install langchain-groq
+    uv add langchain-groq
     ```
   </Accordion>
 
   <Accordion title="CUDA/GPU issues with sentence-transformers">
     For CPU-only installation:
     ```bash
-    uv pip install torch --index-url https://download.pytorch.org/whl/cpu
-    uv pip install "alquimia-fair-forge[toxicity]"
+    uv add torch --index-url https://download.pytorch.org/whl/cpu
+    uv add "alquimia-fair-forge[toxicity]"
     ```
   </Accordion>
 

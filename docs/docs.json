@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "name": "Fair Forge",
-  "theme": "mint",
+  "theme": "aspen",
   "logo": {
     "dark": "/logo/dark.svg",
     "light": "/logo/light.svg"
@@ -11,6 +11,16 @@
     "primary": "#884393",
     "light": "#54c2e9",
     "dark": "#6a3473"
+  },
+  "fonts": {
+    "heading": {
+      "family": "Geist",
+      "weight": 700
+    },
+    "body": {
+      "family": "Geist",
+      "weight": 400
+    }
   },
   "topbarLinks": [
     {
@@ -23,12 +33,16 @@
     "url": "/quickstart"
   },
   "navigation": {
+    "pages": [
+      "index"
+    ],
     "tabs": [
       {
         "tab": "Documentation",
         "groups": [
           {
             "group": "Getting Started",
+            "icon": "rocket",
             "pages": [
               "introduction",
               "quickstart",
@@ -37,6 +51,7 @@
           },
           {
             "group": "Core Concepts",
+            "icon": "puzzle-piece",
             "pages": [
               "core-concepts/architecture",
               "core-concepts/retriever",
@@ -46,6 +61,7 @@
           },
           {
             "group": "Metrics",
+            "icon": "gauge",
             "pages": [
               "metrics/overview",
               "metrics/toxicity",
@@ -59,6 +75,7 @@
           },
           {
             "group": "Generators",
+            "icon": "wand-magic-sparkles",
             "pages": [
               "generators/overview",
               "generators/base-generator",
@@ -68,6 +85,7 @@
           },
           {
             "group": "Runners",
+            "icon": "play",
             "pages": [
               "runners/overview",
               "runners/alquimia-runner",
@@ -76,6 +94,7 @@
           },
           {
             "group": "Storage",
+            "icon": "hard-drive",
             "pages": [
               "storage/overview",
               "storage/local-storage",
@@ -84,6 +103,7 @@
           },
           {
             "group": "Explainability",
+            "icon": "lightbulb",
             "pages": [
               "explainability/overview",
               "explainability/attributions"
