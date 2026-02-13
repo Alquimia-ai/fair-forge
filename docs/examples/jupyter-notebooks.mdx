@@ -36,7 +36,7 @@ Demonstrates toxicity detection with DIDT framework:
 
 ```bash
 cd toxicity/jupyter
-uv pip install "$(ls ../../dist/*.whl)[toxicity]" matplotlib
+uv add "$(ls ../../dist/*.whl)[toxicity]" matplotlib
 jupyter lab toxicity.ipynb
 ```
 
@@ -80,7 +80,7 @@ Demonstrates bias detection across protected attributes:
 
 ```bash
 cd bias/jupyter
-uv pip install "$(ls ../../dist/*.whl)[bias]" matplotlib
+uv add "$(ls ../../dist/*.whl)[bias]" matplotlib
 jupyter lab bias.ipynb
 ```
 
@@ -118,7 +118,7 @@ Demonstrates context alignment evaluation:
 
 ```bash
 cd context/jupyter
-uv pip install "$(ls ../../dist/*.whl)[context]" langchain-groq
+uv add "$(ls ../../dist/*.whl)[context]" langchain-groq
 jupyter lab context.ipynb
 ```
 
@@ -154,7 +154,7 @@ Demonstrates dialogue quality evaluation:
 
 ```bash
 cd conversational/jupyter
-uv pip install "$(ls ../../dist/*.whl)[conversational]" langchain-groq matplotlib
+uv add "$(ls ../../dist/*.whl)[conversational]" langchain-groq matplotlib
 jupyter lab conversational.ipynb
 ```
 
@@ -186,7 +186,7 @@ Demonstrates emotional analysis:
 
 ```bash
 cd humanity/jupyter
-uv pip install "$(ls ../../dist/*.whl)[humanity]" matplotlib
+uv add "$(ls ../../dist/*.whl)[humanity]" matplotlib
 jupyter lab humanity.ipynb
 ```
 
@@ -218,7 +218,7 @@ Demonstrates tournament comparison:
 
 ```bash
 cd bestof/jupyter
-uv pip install "$(ls ../../dist/*.whl)[bestof]" langchain-groq matplotlib
+uv add "$(ls ../../dist/*.whl)[bestof]" langchain-groq matplotlib
 jupyter lab bestof.ipynb
 ```
 
@@ -255,7 +255,7 @@ Demonstrates synthetic dataset generation:
 
 ```bash
 cd generators/jupyter
-uv pip install "$(ls ../../dist/*.whl)[generators]" langchain-groq
+uv add "$(ls ../../dist/*.whl)[generators]" langchain-groq
 jupyter lab generators_groq.ipynb
 ```
 
@@ -289,7 +289,7 @@ Demonstrates test execution:
 
 ```bash
 cd runners/jupyter
-uv pip install "$(ls ../../dist/*.whl)[runners]"
+uv add "$(ls ../../dist/*.whl)[runners]"
 jupyter lab runners.ipynb
 ```
 
