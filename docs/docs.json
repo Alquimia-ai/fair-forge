@@ -81,6 +81,13 @@
               "storage/local-storage",
               "storage/lakefs-storage"
             ]
+          },
+          {
+            "group": "Explainability",
+            "pages": [
+              "explainability/overview",
+              "explainability/attributions"
+            ]
           }
         ]
       },

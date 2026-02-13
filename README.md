@@ -30,6 +30,7 @@ Fair Forge provides comprehensive metrics for evaluating AI systems:
 - **Conversational** - Evaluate dialogue quality using Grice's maxims
 - **Humanity** - Measure how natural responses are through emotional analysis
 - **BestOf** - Tournament-style comparison to find the best response
+- **Explainability** - Compute token attributions to understand model decisions
 
 ## Quick Start
 
@@ -40,6 +41,7 @@ pip install alquimia-fair-forge
 # Or install specific modules
 pip install "alquimia-fair-forge[toxicity]"
 pip install "alquimia-fair-forge[bias]"
+pip install "alquimia-fair-forge[explainability]"
 pip install "alquimia-fair-forge[all]"
 ```
 
@@ -53,6 +55,31 @@ class MyRetriever(Retriever):
         pass
 
 metrics = Toxicity.run(MyRetriever, verbose=True)
+```
+
+### Explainability
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from fair_forge.explainability import AttributionExplainer, Lime
+
+model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-0.6B")
+tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
+
+# Format prompt according to your model (user responsibility)
+messages = [{"role": "user", "content": "What is gravity?"}]
+prompt = tokenizer.apply_chat_template(messages, tokenize=False)
+
+explainer = AttributionExplainer(model, tokenizer)
+result = explainer.explain(
+    prompt=prompt,
+    target="Gravity is the force of attraction between objects.",
+    method=Lime,  # Pass the method class directly
+)
+
+# Get most important words
+for attr in result.get_top_k(5):
+    print(f"'{attr.text}': {attr.score:.4f}")
 ```
 
 ## Documentation
