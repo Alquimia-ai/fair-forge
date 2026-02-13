@@ -30,7 +30,7 @@ Fair Forge provides comprehensive metrics for evaluating AI systems:
 - **Conversational** - Evaluate dialogue quality using Grice's maxims
 - **Humanity** - Measure how natural responses are through emotional analysis
 - **BestOf** - Tournament-style comparison to find the best response
-- **Explainability** - Compute token attributions to understand model decisions
+- **Agentic** - Evaluate autonomous agent behavior and tool usage
 
 ## Quick Start
 
@@ -41,7 +41,6 @@ pip install alquimia-fair-forge
 # Or install specific modules
 pip install "alquimia-fair-forge[toxicity]"
 pip install "alquimia-fair-forge[bias]"
-pip install "alquimia-fair-forge[explainability]"
 pip install "alquimia-fair-forge[all]"
 ```
 
@@ -57,36 +56,70 @@ class MyRetriever(Retriever):
 metrics = Toxicity.run(MyRetriever, verbose=True)
 ```
 
-### Explainability
-
-```python
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from fair_forge.explainability import AttributionExplainer, Lime
-
-model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-0.6B")
-tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
-
-# Format prompt according to your model (user responsibility)
-messages = [{"role": "user", "content": "What is gravity?"}]
-prompt = tokenizer.apply_chat_template(messages, tokenize=False)
-
-explainer = AttributionExplainer(model, tokenizer)
-result = explainer.explain(
-    prompt=prompt,
-    target="Gravity is the force of attraction between objects.",
-    method=Lime,  # Pass the method class directly
-)
-
-# Get most important words
-for attr in result.get_top_k(5):
-    print(f"'{attr.text}': {attr.score:.4f}")
-```
-
 ## Documentation
 
 For complete documentation, guides, and API reference visit:
 
 **[https://fairforge.alquimia.ai](https://fairforge.alquimia.ai)**
+
+## Contributing
+
+### Setup
+
+```bash
+# Clone and install dependencies
+git clone https://github.com/Alquimia-ai/fair-forge.git
+cd fair-forge
+uv sync
+
+# Install pre-commit hooks (required)
+uv run pre-commit install --hook-type pre-commit --hook-type commit-msg
+```
+
+### Pre-commit Hooks
+
+This project uses [pre-commit](https://pre-commit.com/) to enforce code quality and commit conventions. The following hooks run automatically:
+
+| Hook | Stage | Purpose |
+|------|-------|---------|
+| `trailing-whitespace` | pre-commit | Remove trailing whitespace |
+| `end-of-file-fixer` | pre-commit | Ensure files end with a newline |
+| `check-yaml` / `check-toml` | pre-commit | Validate config files |
+| `check-added-large-files` | pre-commit | Block files >1MB |
+| `detect-private-key` | pre-commit | Prevent accidental secret commits |
+| `ruff` | pre-commit | Lint and auto-fix Python code |
+| `ruff-format` | pre-commit | Format Python code |
+| `commitizen` | commit-msg | Enforce [Conventional Commits](https://www.conventionalcommits.org/) format |
+
+### Commit Convention
+
+All commits **must** follow the [Conventional Commits](https://www.conventionalcommits.org/) specification, enforced by [commitizen](https://commitizen-tools.github.io/commitizen/):
+
+```
+type(scope): description
+```
+
+**Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`
+
+**Scopes:** `metrics`, `runners`, `generators`, `storage`, `schemas`, `core`, `llm`, `guardians`, `deps`
+
+Examples:
+```
+feat(metrics): add agentic evaluation metric
+fix(toxicity): handle empty batches
+docs: update installation guide
+test(runners): add integration tests
+```
+
+### Claude Code Skills
+
+This project includes [Claude Code](https://claude.ai/code) skills to automate common workflows. If you use Claude Code as your development tool, the following skills are available:
+
+| Skill | Command | Description |
+|-------|---------|-------------|
+| **Commit** | `/commit` | Analyzes staged changes and generates a properly formatted Conventional Commit message |
+| **Docs** | `/docs [type] [name]` | Generates Mintlify MDX documentation for new modules (e.g., `/docs metric agentic`) |
+| **Lambda** | `/fair-forge-lambda` | Scaffolds AWS Lambda deployment boilerplate for Fair-Forge modules |
 
 ## License
 
