@@ -1,0 +1,438 @@
+---
+title: Attributions
+description: Compute and interpret token attributions for language models
+---
+
+# Token Attributions
+
+This guide covers how to compute, interpret, and visualize token attributions using Fair Forge's explainability module.
+
+## Installation
+
+```bash
+pip install "alquimia-fair-forge[explainability]"
+```
+
+This installs:
+- `interpreto` - Attribution computation library
+- `torch` - PyTorch for model inference
+- `transformers` - HuggingFace model support
+
+## Basic Usage
+
+### Step 1: Load Your Model
+
+```python
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# Disable autocast for attribution compatibility
+torch.set_autocast_enabled(False)
+
+model = AutoModelForCausalLM.from_pretrained(
+    "Qwen/Qwen3-0.6B",
+    torch_dtype=torch.float16,
+)
+tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
+```
+
+### Step 2: Format Your Prompt
+
+<Warning>
+You must format prompts according to your model's requirements. The explainability module does not handle prompt formatting to avoid coupling with specific LLM formats.
+</Warning>
+
+```python
+messages = [
+    {"role": "system", "content": "Answer concisely."},
+    {"role": "user", "content": "What is photosynthesis?"}
+]
+
+# Use the tokenizer's chat template
+prompt = tokenizer.apply_chat_template(
+    messages,
+    tokenize=False,
+    add_generation_prompt=True
+)
+```
+
+### Step 3: Create Explainer and Compute
+
+```python
+from fair_forge.explainability import AttributionExplainer, Lime, Granularity
+
+explainer = AttributionExplainer(
+    model=model,
+    tokenizer=tokenizer,
+    default_method=Lime,
+    default_granularity=Granularity.WORD,
+    verbose=True,
+)
+
+result = explainer.explain(
+    prompt=prompt,
+    target="Photosynthesis is the process plants use to convert sunlight into energy.",
+)
+```
+
+### Step 4: Analyze Results
+
+```python
+# Get top contributing words
+print("Top 10 Most Important Words:")
+for attr in result.get_top_k(10):
+    print(f"  '{attr.text}': {attr.score:+.4f}")
+
+# Access all attributions
+for attr in result.attributions:
+    print(f"Position {attr.position}: '{attr.text}' = {attr.score:.4f}")
+```
+
+## Configuration Options
+
+### AttributionExplainer Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `model` | `PreTrainedModel` | Required | HuggingFace model |
+| `tokenizer` | `PreTrainedTokenizer` | Required | HuggingFace tokenizer |
+| `default_method` | `type[BaseAttributionMethod]` | `Lime` | Default attribution method class |
+| `default_granularity` | `Granularity` | `WORD` | Default granularity level |
+| `result_parser` | `AttributionResultParser` | `InterpretoResultParser` | Custom result parser |
+| `verbose` | `bool` | `False` | Enable verbose logging |
+
+### explain() Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `prompt` | `str` | Required | Pre-formatted input prompt |
+| `target` | `str` | Required | Model output to explain |
+| `method` | `type[BaseAttributionMethod]` | Instance default | Attribution method class |
+| `granularity` | `Granularity` | Instance default | Granularity level |
+| `max_length` | `int` | `512` | Maximum sequence length |
+
+## Granularity Levels
+
+Choose the appropriate granularity for your use case:
+
+<Tabs>
+  <Tab title="Token">
+    ```python
+    from fair_forge.explainability import Granularity
+
+    result = explainer.explain(
+        prompt=prompt,
+        target=target,
+        granularity=Granularity.TOKEN,
+    )
+    ```
+
+    **Use when:** You need fine-grained analysis of individual tokens, debugging tokenization issues.
+
+    **Example output:** `['▁What', '▁is', '▁grav', 'ity', '?']`
+  </Tab>
+
+  <Tab title="Word">
+    ```python
+    result = explainer.explain(
+        prompt=prompt,
+        target=target,
+        granularity=Granularity.WORD,  # Default
+    )
+    ```
+
+    **Use when:** You want human-readable attributions. Recommended for most use cases.
+
+    **Example output:** `['What', 'is', 'gravity', '?']`
+  </Tab>
+
+  <Tab title="Sentence">
+    ```python
+    result = explainer.explain(
+        prompt=prompt,
+        target=target,
+        granularity=Granularity.SENTENCE,
+    )
+    ```
+
+    **Use when:** Analyzing which sentences in a long context matter most.
+
+    **Example output:** `['What is gravity?', 'Please explain simply.']`
+  </Tab>
+</Tabs>
+
+## Attribution Methods
+
+### Using Different Methods
+
+Pass the method class directly to `explain()`:
+
+```python
+from fair_forge.explainability import (
+    Lime, Occlusion, Saliency, IntegratedGradients
+)
+
+# LIME (perturbation-based, recommended default)
+result_lime = explainer.explain(prompt=prompt, target=target, method=Lime)
+
+# Occlusion (perturbation-based)
+result_occ = explainer.explain(prompt=prompt, target=target, method=Occlusion)
+
+# Saliency (gradient-based, faster)
+result_sal = explainer.explain(prompt=prompt, target=target, method=Saliency)
+
+# Integrated Gradients (gradient-based, more accurate)
+result_ig = explainer.explain(prompt=prompt, target=target, method=IntegratedGradients)
+```
+
+### Method Comparison
+
+| Method | Speed | Accuracy | Best For |
+|--------|-------|----------|----------|
+| `Lime` | Medium | High | General use, model-agnostic |
+| `Occlusion` | Slow | High | When you need robustness |
+| `Saliency` | Fast | Medium | Quick debugging |
+| `IntegratedGradients` | Medium | High | Detailed analysis |
+| `KernelShap` | Slow | Very High | When accuracy is critical |
+
+## Batch Processing
+
+Process multiple prompt/target pairs efficiently:
+
+```python
+# Prepare batch (prompts must be pre-formatted)
+items = [
+    (
+        tokenizer.apply_chat_template(
+            [{"role": "user", "content": "What is AI?"}],
+            tokenize=False, add_generation_prompt=True
+        ),
+        "AI is artificial intelligence."
+    ),
+    (
+        tokenizer.apply_chat_template(
+            [{"role": "user", "content": "What is ML?"}],
+            tokenize=False, add_generation_prompt=True
+        ),
+        "ML is machine learning, a subset of AI."
+    ),
+]
+
+# Process batch
+batch_results = explainer.explain_batch(items)
+
+print(f"Processed {len(batch_results)} items")
+print(f"Total time: {batch_results.total_compute_time_seconds:.2f}s")
+
+for i, result in enumerate(batch_results):
+    print(f"\nItem {i+1}: Top words = {[a.text for a in result.get_top_k(3)]}")
+```
+
+## Output Schema
+
+### AttributionResult
+
+```python
+class AttributionResult(BaseModel):
+    prompt: str                      # Input prompt
+    target: str                      # Target output
+    method: AttributionMethod        # Method used
+    granularity: Granularity         # Granularity level
+    attributions: list[TokenAttribution]  # Token scores
+    metadata: dict[str, Any]         # Compute time, etc.
+```
+
+### TokenAttribution
+
+```python
+class TokenAttribution(BaseModel):
+    text: str              # Token/word/sentence text
+    score: float           # Attribution score (can be negative)
+    position: int          # Position in sequence
+    normalized_score: float | None  # Score normalized to [0, 1]
+```
+
+### Useful Methods
+
+```python
+# Get top K most important tokens
+top_tokens = result.get_top_k(10)
+
+# Get all attributions sorted by importance
+sorted_attrs = result.top_attributions
+
+# Export for visualization
+viz_data = result.to_dict_for_visualization()
+# Returns: {"tokens": [...], "scores": [...], "normalized_scores": [...]}
+
+# Export as dict (JSON-serializable)
+result_dict = result.model_dump()
+```
+
+## Visualization
+
+### In Jupyter Notebooks
+
+```python
+# Display interactive visualization
+explainer.visualize(result)
+```
+
+### Get HTML for Custom Display
+
+```python
+# Get HTML string
+html = explainer.visualize(result, return_html=True)
+
+# Use in web apps, save to file, etc.
+with open("attribution.html", "w") as f:
+    f.write(html)
+```
+
+## Custom Result Parsers
+
+Implement custom parsers for different attribution libraries:
+
+```python
+from fair_forge.explainability import (
+    AttributionExplainer,
+    AttributionResultParser,
+)
+
+class MyCustomParser(AttributionResultParser):
+    def parse(self, raw_result) -> tuple[list[str], list[float]]:
+        # Extract tokens and scores from your custom format
+        tokens = raw_result["words"]
+        scores = raw_result["importance"]
+        return tokens, scores
+
+# Use custom parser
+explainer = AttributionExplainer(
+    model=model,
+    tokenizer=tokenizer,
+    result_parser=MyCustomParser(),
+)
+```
+
+## Convenience Function
+
+For one-off computations without creating an explainer:
+
+```python
+from fair_forge.explainability import compute_attributions, Lime
+
+result = compute_attributions(
+    model=model,
+    tokenizer=tokenizer,
+    prompt=prompt,
+    target=target,
+    method=Lime,
+    granularity=Granularity.WORD,
+)
+```
+
+## Interpreting Results
+
+### Positive vs Negative Scores
+
+- **Positive scores**: Token increases likelihood of the target output
+- **Negative scores**: Token decreases likelihood of the target output
+- **Near-zero scores**: Token has minimal impact
+
+### Normalized Scores
+
+Normalized scores map to `[0, 1]` range for easier comparison:
+- `1.0` = Maximum positive contribution
+- `0.5` = Neutral (when all scores are equal)
+- `0.0` = Maximum negative contribution
+
+### Example Analysis
+
+```python
+print("Analysis of attribution results:")
+print("=" * 50)
+
+# Positive contributors
+positive = [a for a in result.attributions if a.score > 0]
+print(f"\nPositive contributors ({len(positive)} tokens):")
+for attr in sorted(positive, key=lambda x: x.score, reverse=True)[:5]:
+    print(f"  '{attr.text}': +{attr.score:.4f}")
+
+# Negative contributors
+negative = [a for a in result.attributions if a.score < 0]
+print(f"\nNegative contributors ({len(negative)} tokens):")
+for attr in sorted(negative, key=lambda x: x.score)[:5]:
+    print(f"  '{attr.text}': {attr.score:.4f}")
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use float16 for Models">
+    Attribution methods work better with float16 precision:
+    ```python
+    model = AutoModelForCausalLM.from_pretrained(
+        "model-name",
+        torch_dtype=torch.float16,
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Disable Autocast">
+    Some attribution methods conflict with autocast:
+    ```python
+    torch.set_autocast_enabled(False)
+    ```
+  </Accordion>
+
+  <Accordion title="Start with LIME">
+    LIME is a good default - it's model-agnostic and provides reliable results. Switch to gradient methods if you need speed.
+  </Accordion>
+
+  <Accordion title="Use Word Granularity">
+    Word-level attributions are most interpretable. Use token-level only for debugging tokenization issues.
+  </Accordion>
+
+  <Accordion title="Compare Multiple Methods">
+    Different methods may highlight different aspects. Compare results from 2-3 methods for important analyses.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="CUDA Out of Memory">
+    Reduce `max_length` or use a smaller model:
+    ```python
+    result = explainer.explain(prompt=prompt, target=target, max_length=256)
+    ```
+  </Accordion>
+
+  <Accordion title="Empty Attributions">
+    Check that your prompt and target are not empty and that the model can process them:
+    ```python
+    # Verify tokenization works
+    tokens = tokenizer(prompt, return_tensors="pt")
+    print(f"Prompt has {tokens.input_ids.shape[1]} tokens")
+    ```
+  </Accordion>
+
+  <Accordion title="Slow Computation">
+    Switch to faster gradient-based methods:
+    ```python
+    from fair_forge.explainability import Saliency
+    result = explainer.explain(prompt=prompt, target=target, method=Saliency)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Explainability Overview" icon="lightbulb" href="/explainability/overview">
+    Learn about the module design and available methods
+  </Card>
+  <Card title="Example Notebook" icon="book" href="/examples/jupyter-notebooks">
+    See working examples in Jupyter
+  </Card>
+</CardGroup>

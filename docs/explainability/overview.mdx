@@ -1,0 +1,122 @@
+---
+title: Overview
+description: Understand model decisions with token attribution analysis
+---
+
+# Explainability
+
+The Explainability module helps you understand **why** your language model produces specific outputs by computing token attributions.
+
+## What is Token Attribution?
+
+Token attribution answers the question: **"Which parts of the input influenced the model's output the most?"**
+
+By analyzing how each input token contributes to the generated response, you can:
+
+- **Debug unexpected behavior** - Find which tokens cause problematic outputs
+- **Validate model reasoning** - Ensure the model focuses on relevant parts of the input
+- **Improve prompts** - Identify which instructions have the most impact
+- **Build trust** - Provide explanations for model decisions
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Multiple Methods" icon="layer-group">
+    11 attribution methods including LIME, Integrated Gradients, SHAP, and more
+  </Card>
+  <Card title="Flexible Granularity" icon="text">
+    Analyze at token, word, or sentence level
+  </Card>
+  <Card title="Extensible Design" icon="puzzle-piece">
+    Class-based architecture for easy customization and future migrations
+  </Card>
+  <Card title="HuggingFace Compatible" icon="face-smile">
+    Works with any HuggingFace causal language model
+  </Card>
+</CardGroup>
+
+## Available Attribution Methods
+
+### Gradient-Based Methods
+
+Fast methods that require differentiable models:
+
+| Method | Class | Description |
+|--------|-------|-------------|
+| Saliency | `Saliency` | Basic gradient magnitude (Simonyan et al., 2013) |
+| Integrated Gradients | `IntegratedGradients` | Path-integrated gradients (Sundararajan et al., 2017) |
+| GradientSHAP | `GradientShap` | SHAP with gradient sampling (Lundberg & Lee, 2017) |
+| SmoothGrad | `SmoothGrad` | Noise-averaged gradients (Smilkov et al., 2017) |
+| SquareGrad | `SquareGrad` | Squared gradient values (Hooker et al., 2019) |
+| VarGrad | `VarGrad` | Gradient variance (Richter et al., 2020) |
+| Input x Gradient | `InputXGradient` | Input-weighted gradients (Simonyan et al., 2013) |
+
+### Perturbation-Based Methods
+
+Model-agnostic methods that work with any model:
+
+| Method | Class | Description |
+|--------|-------|-------------|
+| LIME | `Lime` | Local interpretable explanations (Ribeiro et al., 2013) |
+| KernelSHAP | `KernelShap` | Kernel-based SHAP values (Lundberg & Lee, 2017) |
+| Occlusion | `Occlusion` | Token removal impact (Zeiler & Fergus, 2014) |
+| Sobol | `Sobol` | Sobol sensitivity indices (Fel et al., 2021) |
+
+## Quick Example
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from fair_forge.explainability import AttributionExplainer, Lime, Granularity
+
+# Load model
+model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen3-0.6B")
+tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3-0.6B")
+
+# Format prompt (user responsibility - varies by model)
+messages = [{"role": "user", "content": "What is gravity?"}]
+prompt = tokenizer.apply_chat_template(messages, tokenize=False)
+
+# Compute attributions
+explainer = AttributionExplainer(model, tokenizer)
+result = explainer.explain(
+    prompt=prompt,
+    target="Gravity is the force of attraction between objects.",
+    method=Lime,
+)
+
+# Show most important words
+for attr in result.get_top_k(5):
+    print(f"'{attr.text}': {attr.score:.4f}")
+```
+
+## Design Philosophy
+
+The explainability module follows these principles:
+
+<AccordionGroup>
+  <Accordion title="Separation of Concerns">
+    The module focuses solely on attribution computation. Users are responsible for formatting prompts according to their model's requirements, avoiding coupling with specific LLM formats.
+  </Accordion>
+
+  <Accordion title="Class-Based Methods">
+    Attribution methods are implemented as classes (not string enums) for:
+    - Easy extension with custom methods
+    - Future migration to custom implementations
+    - Clear separation between method implementations
+  </Accordion>
+
+  <Accordion title="Parser Interface">
+    A pluggable parser interface allows supporting different attribution libraries beyond interpreto.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Attributions Guide" icon="chart-bar" href="/explainability/attributions">
+    Detailed guide on computing and interpreting attributions
+  </Card>
+  <Card title="Examples" icon="code" href="/examples/jupyter-notebooks">
+    See the explainability notebook with working examples
+  </Card>
+</CardGroup>
