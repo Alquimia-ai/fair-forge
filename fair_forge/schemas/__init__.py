@@ -10,6 +10,7 @@ from their modules to avoid loading unnecessary dependencies:
     from fair_forge.schemas.context import ContextMetric
     from fair_forge.schemas.best_of import BestOfMetric
     from fair_forge.schemas.generators import BaseGenerator, BaseContextLoader
+    from fair_forge.schemas.explainability import AttributionResult, AttributionMethod
 """
 
 from .common import Batch, Dataset, Logprobs
