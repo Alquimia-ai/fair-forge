@@ -5,18 +5,31 @@ description: Evaluate AI agent responses with pass@K metrics and tool correctnes
 
 # Agentic Metric
 
-The Agentic metric evaluates AI agent performance by measuring both answer correctness across multiple generations and the quality of tool usage.
+The Agentic metric evaluates AI agent performance by measuring complete conversation correctness. A conversation is correct only if ALL its interactions are correct.
 
 ## Overview
 
 This metric evaluates:
 
-- **pass@K**: At least one of K responses is correct (similarity ≥ threshold)
-- **pass^K**: All K responses are correct
-- **Tool Correctness**: Evaluates tool selection, parameter accuracy, execution sequence, and result utilization **for each of K responses**
+- **Conversation Correctness**: A conversation is correct only if ALL interactions are correct
+- **pass@K**: Probability of ≥1 correct conversation when attempting k conversations (0.0-1.0)
+- **pass^K**: Probability of all k conversations being correct (0.0-1.0)
+- **Tool Correctness**: Evaluates tool selection, parameter accuracy, execution sequence, and result utilization **per interaction**
+
+### Formulas
+
+```
+pass@k = 1 - C(n-c, k) / C(n, k)   # Probability of ≥1 correct conversation
+pass^k = (c/n)^k                    # Probability of all k conversations correct
+```
+
+Where:
+- **n** = total conversations evaluated
+- **c** = fully correct conversations (all interactions correct)
+- **k** = number of conversations to attempt (user-configurable)
 
 <Note>
-**Important:** The metric evaluates tool correctness for **ALL K responses**, not just one. This allows you to identify which responses had correct tool usage and which didn't. The default `tool_threshold=1.0` requires perfect tool usage (100% correct).
+**Important:** This metric evaluates **complete conversations** as units. Each Dataset represents one conversation with multiple interactions. A conversation is correct only if ALL its interactions are correct. Use `Agentic.aggregate_metrics()` to calculate pass@K and pass^K with your chosen K value. The default `tool_threshold=0.75` requires strong tool usage (75% correct).
 </Note>
 
 ## Installation
@@ -45,20 +58,27 @@ metrics = Agentic.run(
     AgenticRetriever,
     model=judge_model,
     threshold=0.7,
-    tool_threshold=1.0,
+    tool_threshold=0.75,
     verbose=True,
 )
 
-# Access results
+# Access per-conversation results
 for metric in metrics:
-    print(f"pass@{metric.k}: {metric.pass_at_k}")
-    print(f"pass^{metric.k}: {metric.pass_pow_k}")
+    print(f"Conversation {metric.session_id}:")
+    print(f"  Correct interactions: {metric.correct_interactions}/{metric.total_interactions}")
+    print(f"  Fully correct: {metric.is_fully_correct}")
 
-    # Tool correctness scores for each of K responses
+    # Tool correctness scores per interaction
     if metric.tool_correctness_scores:
         for i, tc in enumerate(metric.tool_correctness_scores):
             if tc:
-                print(f"Response {i+1} tool correctness: {tc.overall_correctness:.2f}")
+                print(f"  Interaction {i+1} tool correctness: {tc.overall_correctness:.2f}")
+
+# Aggregated metrics with chosen K (recommended for overall performance)
+agg = Agentic.aggregate_metrics(metrics, k=3)
+print(f"\npass@{agg['k']}: {agg['pass_at_k']:.3f} ({agg['pass_at_k']*100:.1f}%)")
+print(f"pass^{agg['k']}: {agg['pass_pow_k']:.3f} ({agg['pass_pow_k']*100:.1f}%)")
+print(f"Fully correct: {agg['fully_correct_conversations']}/{agg['total_conversations']}")
 ```
 
 ## Parameters
@@ -67,7 +87,7 @@ for metric in metrics:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `retriever` | `Type[Retriever]` | Data source class returning multiple responses per question |
+| `retriever` | `Type[Retriever]` | Data source class returning complete conversations (each Dataset = 1 conversation) |
 | `model` | `BaseChatModel` | LangChain-compatible model for LLM-as-judge evaluation |
 
 ### Optional Parameters
@@ -75,16 +95,33 @@ for metric in metrics:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `threshold` | `float` | `0.7` | Answer correctness threshold (0.6-0.9) |
-| `tool_threshold` | `float` | `1.0` | Tool correctness threshold (0.6-1.0) - requires perfect tool usage |
+| `tool_threshold` | `float` | `0.75` | Tool correctness threshold (0.6-1.0) |
 | `tool_weights` | `dict[str, float]` | `0.25` each | Weights for tool aspects (selection, parameters, sequence, utilization) |
 | `use_structured_output` | `bool` | `False` | Use LangChain structured output |
 | `bos_json_clause` | `str` | `"```json"` | JSON block start marker |
 | `eos_json_clause` | `str` | `"```"` | JSON block end marker |
 | `verbose` | `bool` | `False` | Enable verbose logging |
 
+### Aggregated Metrics Method
+
+```python
+@staticmethod
+def aggregate_metrics(
+    metrics: list[AgenticMetric],
+    k: int | None = None
+) -> dict[str, Any]
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `metrics` | `list[AgenticMetric]` | Required | List of per-conversation metrics from `Agentic.run()` |
+| `k` | `int \| None` | `3` | K value for pass@K calculations (number of conversations to attempt) |
+
+**Returns:** Dictionary with `total_conversations`, `fully_correct_conversations`, `conversation_success_rate`, `k`, `pass_at_k`, and `pass_pow_k`.
+
 ## Data Requirements
 
-The Agentic metric requires **multiple responses** (K) for the **same question** with different `assistant_id` values:
+The Agentic metric requires **complete conversations** where each Dataset represents one conversation. A conversation is correct only if ALL its interactions are correct:
 
 ```python
 from fair_forge.core.retriever import Retriever
@@ -92,56 +129,74 @@ from fair_forge.schemas.common import Dataset, Batch
 
 class AgenticRetriever(Retriever):
     def load_dataset(self) -> list[Dataset]:
-        # Question to evaluate
-        question = "What is the capital of France?"
-        ground_truth = "Paris"
-
-        # K=3 different responses to the same question
-        responses = [
-            "Paris",
-            "The capital of France is Paris.",
-            "Poris",  # Typo - will score lower
-        ]
-
-        datasets = []
-        for i, response in enumerate(responses):
-            batch = Batch(
-                qa_id="q1",  # Same qa_id for all K responses
-                query=question,
-                assistant=response,
-                ground_truth_assistant=ground_truth,
-                agentic={
-                    "tools_used": [
-                        {
-                            "tool_name": "web_search",
-                            "parameters": {"query": "capital of France"},
-                            "result": "Paris",
-                            "step": 1
-                        }
-                    ],
-                    "final_answer_uses_tools": True
-                },
-                ground_truth_agentic={
-                    "expected_tools": [
-                        {
-                            "tool_name": "web_search",
-                            "parameters": {"query": "capital of France"},
-                            "step": 1
-                        }
-                    ],
-                    "tool_sequence_matters": True
-                }
-            )
-
-            datasets.append(Dataset(
-                session_id=f"eval-{i}",
-                assistant_id=f"agent_{i}",  # Different assistant_id per response
+        # Each Dataset = 1 complete conversation
+        return [
+            # Conversation 1: Fully correct (all 3 interactions correct)
+            Dataset(
+                session_id="conversation_001",
+                assistant_id="agent_v1",
                 language="english",
-                context="",
-                conversation=[batch],
-            ))
-
-        return datasets
+                context="Math calculator conversation",
+                conversation=[
+                    Batch(
+                        qa_id="q1_interaction1",
+                        query="What is 5 + 3?",
+                        assistant="The result is 8.",
+                        ground_truth_assistant="8",
+                        agentic={
+                            "tools_used": [{
+                                "tool_name": "calculator",
+                                "parameters": {"a": 5, "b": 3},
+                                "result": 8,
+                                "step": 1
+                            }],
+                            "final_answer_uses_tools": True
+                        },
+                        ground_truth_agentic={
+                            "expected_tools": [{
+                                "tool_name": "calculator",
+                                "parameters": {"a": 5, "b": 3},
+                                "step": 1
+                            }],
+                            "tool_sequence_matters": False
+                        }
+                    ),
+                    Batch(
+                        qa_id="q1_interaction2",
+                        query="What is 10 * 2?",
+                        assistant="10 times 2 is 20.",
+                        ground_truth_assistant="20"
+                    ),
+                    Batch(
+                        qa_id="q1_interaction3",
+                        query="What is 100 / 4?",
+                        assistant="100 divided by 4 is 25.",
+                        ground_truth_assistant="25"
+                    ),
+                ],
+            ),
+            # Conversation 2: Partially correct (1/2 correct - FAIL)
+            Dataset(
+                session_id="conversation_002",
+                assistant_id="agent_v1",
+                language="english",
+                context="Simple Q&A",
+                conversation=[
+                    Batch(
+                        qa_id="q2_interaction1",
+                        query="What is the capital of France?",
+                        assistant="The capital of France is Paris.",
+                        ground_truth_assistant="Paris"
+                    ),
+                    Batch(
+                        qa_id="q2_interaction2",
+                        query="What is 2+2?",
+                        assistant="5",  # WRONG - conversation fails
+                        ground_truth_assistant="4"
+                    ),
+                ],
+            ),
+        ]
 ```
 
 ### Agentic Data Structure
@@ -183,16 +238,14 @@ The `Batch` schema includes optional `agentic` and `ground_truth_agentic` fields
 
 ```python
 class AgenticMetric(BaseMetric):
-    session_id: str
-    assistant_id: str
-    qa_id: str
-    k: int                                        # Number of responses evaluated
+    session_id: str                               # Unique conversation ID
+    total_interactions: int                       # Number of interactions in conversation
+    correct_interactions: int                     # Number of correct interactions
+    is_fully_correct: bool                        # True if ALL interactions correct
     threshold: float                              # Answer correctness threshold
-    correctness_scores: list[float]               # Individual scores for each response
-    pass_at_k: bool                               # At least one correct
-    pass_pow_k: bool                              # All correct
-    correct_indices: list[int]                    # Indices of correct responses
-    tool_correctness_scores: list[ToolCorrectnessScore | None]  # Tool evaluation for each K response
+    correctness_scores: list[float]               # Score per interaction
+    correct_indices: list[int]                    # Indices of correct interactions
+    tool_correctness_scores: list[ToolCorrectnessScore | None]  # Tool scores per interaction
 ```
 
 ### ToolCorrectnessScore
@@ -208,28 +261,75 @@ class ToolCorrectnessScore(BaseModel):
     reasoning: str | None           # Explanation
 ```
 
+## Aggregated Metrics
+
+For overall agent performance, use `aggregate_metrics()` with your chosen K value:
+
+```python
+# Calculate pass@K and pass^K with K=3
+agg = Agentic.aggregate_metrics(metrics, k=3)
+
+# Returns dict with:
+# {
+#     "total_conversations": 5,            # n = conversations evaluated
+#     "fully_correct_conversations": 3,    # c = fully correct (all interactions)
+#     "conversation_success_rate": 0.6,    # c/n = 3/5
+#     "k": 3,                              # K value for calculations
+#     "pass_at_k": 0.936,                  # Probability of ≥1 correct in 3 attempts
+#     "pass_pow_k": 0.216                  # Probability of all 3 correct
+# }
+
+# Try different K values
+for k in [1, 2, 3, 5]:
+    agg = Agentic.aggregate_metrics(metrics, k=k)
+    print(f"pass@{k}: {agg['pass_at_k']:.3f}")
+```
+
+### Conversation-Level Evaluation
+
+| Aspect | Description |
+|--------|-------------|
+| **Evaluation Unit** | Complete conversations (each Dataset = 1 conversation) |
+| **Success Criterion** | ALL interactions in conversation must be correct |
+| **n value** | Total conversations evaluated |
+| **c value** | Fully correct conversations |
+| **K parameter** | User-configurable (how many conversations to attempt) |
+
+<Note>
+**Key Insight:** This metric measures the agent's ability to maintain fully correct multi-turn conversations. A single incorrect interaction fails the entire conversation, making this a strict evaluation of consistency.
+</Note>
+
 ## Interpretation
 
-### pass@K Metrics
+### pass@K Metrics (Probabilistic)
 
-| Metric | Description | Use Case |
-|--------|-------------|----------|
-| **pass@1** | Single response correct | Standard evaluation |
-| **pass@3** | At least 1 of 3 correct | Reliability with retries |
-| **pass@5** | At least 1 of 5 correct | High-stakes scenarios |
-| **pass^K** | All K responses correct | Consistency evaluation |
+| Metric | Range | Interpretation |
+|--------|-------|----------------|
+| **pass@K** | 0.0-1.0 | Probability of ≥1 fully correct conversation when attempting k conversations |
+| **pass^K** | 0.0-1.0 | Probability of all k conversations being fully correct |
+
+**Examples:**
+- pass@3 = 0.92 → 92% chance of getting ≥1 fully correct conversation in 3 attempts
+- pass^3 = 0.15 → 15% chance of all 3 conversations being fully correct
+
+**Agent Quality Assessment:**
+| pass@K | pass^K | Assessment |
+|--------|--------|------------|
+| >0.95 | >0.70 | ✅ **Reliable** - High success and consistency |
+| >0.95 | <0.50 | ⚠️ **Inconsistent** - Can succeed but unreliable |
+| <0.70 | any | ❌ **Needs Improvement** - Low success rate |
 
 ### Tool Correctness Scores
 
 <Note>
-**Default threshold: 1.0** - By default, tool correctness requires perfect execution (100% correct). You can lower this with the `tool_threshold` parameter if you want to allow minor deviations.
+**Default threshold: 0.75** - By default, tool correctness requires 75% or higher. You can adjust this with the `tool_threshold` parameter based on your strictness requirements.
 </Note>
 
 | Score Range | Interpretation |
 |-------------|----------------|
-| **1.0** | **Perfect - All aspects correct (default threshold)** |
+| **1.0** | Perfect - All aspects correct |
 | 0.9 - 0.99 | Excellent - Near perfect with tiny issues |
-| 0.75 - 0.89 | Good - Minor issues |
+| **0.75 - 0.89** | **Good - Minor issues (default threshold)** |
 | 0.6 - 0.74 | Moderate - Several issues |
 | 0.4 - 0.59 | Poor - Significant problems |
 | 0.0 - 0.39 | Very Poor - Incorrect tool usage |
@@ -251,86 +351,98 @@ from fair_forge.schemas.common import Dataset, Batch
 from langchain_groq import ChatGroq
 
 class MathAgentRetriever(Retriever):
-    """Retriever with K=3 responses to math questions."""
+    """Retriever with complete math conversations."""
 
     def load_dataset(self) -> list[Dataset]:
-        questions = [
-            {
-                "qa_id": "q1",
-                "query": "What is 15 + 27?",
-                "ground_truth": "42",
-                "responses": [
-                    "42",
-                    "The answer is 42",
-                    "43",  # Wrong answer
-                ],
-                "ground_truth_agentic": {
-                    "expected_tools": [
-                        {
-                            "tool_name": "calculator",
-                            "parameters": {"operation": "add", "a": 15, "b": 27},
-                            "step": 1
+        # Each Dataset = 1 complete conversation
+        return [
+            # Conversation 1: Fully correct (all 3 interactions correct)
+            Dataset(
+                session_id="conversation_001",
+                assistant_id="agent_v1",
+                language="english",
+                context="Math calculator conversation",
+                conversation=[
+                    Batch(
+                        qa_id="q1_interaction1",
+                        query="What is 15 + 27?",
+                        assistant="42",
+                        ground_truth_assistant="42",
+                        agentic={
+                            "tools_used": [{
+                                "tool_name": "calculator",
+                                "parameters": {"operation": "add", "a": 15, "b": 27},
+                                "result": 42,
+                                "step": 1
+                            }],
+                            "final_answer_uses_tools": True
+                        },
+                        ground_truth_agentic={
+                            "expected_tools": [{
+                                "tool_name": "calculator",
+                                "parameters": {"operation": "add", "a": 15, "b": 27},
+                                "step": 1
+                            }],
+                            "tool_sequence_matters": False
                         }
-                    ],
-                    "tool_sequence_matters": True
-                }
-            },
-            {
-                "qa_id": "q2",
-                "query": "What is 100 - 35?",
-                "ground_truth": "65",
-                "responses": [
-                    "65",
-                    "65",
-                    "65",  # All correct
+                    ),
+                    Batch(
+                        qa_id="q1_interaction2",
+                        query="What is 100 - 35?",
+                        assistant="65",
+                        ground_truth_assistant="65"
+                    ),
+                    Batch(
+                        qa_id="q1_interaction3",
+                        query="What is 10 * 5?",
+                        assistant="50",
+                        ground_truth_assistant="50"
+                    ),
                 ],
-                "ground_truth_agentic": {
-                    "expected_tools": [
-                        {
-                            "tool_name": "calculator",
-                            "parameters": {"operation": "subtract", "a": 100, "b": 35},
-                            "step": 1
-                        }
-                    ],
-                    "tool_sequence_matters": True
-                }
-            }
+            ),
+            # Conversation 2: Partially correct (2/3 - FAIL)
+            Dataset(
+                session_id="conversation_002",
+                assistant_id="agent_v1",
+                language="english",
+                context="Math conversation with error",
+                conversation=[
+                    Batch(
+                        qa_id="q2_interaction1",
+                        query="What is 8 + 9?",
+                        assistant="17",
+                        ground_truth_assistant="17"
+                    ),
+                    Batch(
+                        qa_id="q2_interaction2",
+                        query="What is 5 * 5?",
+                        assistant="20",  # WRONG - should be 25
+                        ground_truth_assistant="25"
+                    ),
+                    Batch(
+                        qa_id="q2_interaction3",
+                        query="What is 16 / 2?",
+                        assistant="8",
+                        ground_truth_assistant="8"
+                    ),
+                ],
+            ),
+            # Conversation 3: Fully correct (single interaction)
+            Dataset(
+                session_id="conversation_003",
+                assistant_id="agent_v1",
+                language="english",
+                context="Simple math question",
+                conversation=[
+                    Batch(
+                        qa_id="q3_interaction1",
+                        query="What is 6 + 6?",
+                        assistant="12",
+                        ground_truth_assistant="12"
+                    ),
+                ],
+            ),
         ]
-
-        datasets = []
-        for question in questions:
-            for i, response in enumerate(question["responses"]):
-                # Simulate tool usage
-                agentic_data = {
-                    "tools_used": [
-                        {
-                            "tool_name": "calculator",
-                            "parameters": question["ground_truth_agentic"]["expected_tools"][0]["parameters"],
-                            "result": int(response) if response.isdigit() else 0,
-                            "step": 1
-                        }
-                    ],
-                    "final_answer_uses_tools": True
-                }
-
-                batch = Batch(
-                    qa_id=question["qa_id"],
-                    query=question["query"],
-                    assistant=response,
-                    ground_truth_assistant=question["ground_truth"],
-                    agentic=agentic_data,
-                    ground_truth_agentic=question["ground_truth_agentic"]
-                )
-
-                datasets.append(Dataset(
-                    session_id=f"{question['qa_id']}-{i}",
-                    assistant_id=f"agent_{i}",
-                    language="english",
-                    context="",
-                    conversation=[batch],
-                ))
-
-        return datasets
 
 # Initialize judge
 judge = ChatGroq(
@@ -344,28 +456,27 @@ metrics = Agentic.run(
     MathAgentRetriever,
     model=judge,
     threshold=0.7,
-    tool_threshold=1.0,
+    tool_threshold=0.75,
     verbose=True,
 )
 
-# Analyze results
+# Analyze per-conversation results
 print("Agentic Evaluation Results")
 print("=" * 60)
 
 for metric in metrics:
-    print(f"\nQuestion ID: {metric.qa_id}")
-    print(f"K (responses evaluated): {metric.k}")
-    print(f"pass@{metric.k}: {metric.pass_at_k}")
-    print(f"pass^{metric.k}: {metric.pass_pow_k}")
-    print(f"Correct responses: {len(metric.correct_indices)}/{metric.k}")
+    print(f"\nConversation: {metric.session_id}")
+    print(f"Total interactions: {metric.total_interactions}")
+    print(f"Correct interactions: {metric.correct_interactions}")
+    print(f"Fully correct: {'✅ YES' if metric.is_fully_correct else '❌ NO'}")
     print(f"Individual scores: {[f'{s:.2f}' for s in metric.correctness_scores]}")
 
-    # Tool correctness for each of K responses
+    # Tool correctness per interaction
     if metric.tool_correctness_scores:
-        print(f"\nTool Correctness (K={metric.k} responses):")
+        print(f"\nTool Correctness (per interaction):")
         for i, tc in enumerate(metric.tool_correctness_scores, 1):
             if tc:
-                print(f"\n  Response {i}:")
+                print(f"\n  Interaction {i}:")
                 print(f"    Selection:    {tc.tool_selection_correct:.2f}")
                 print(f"    Parameters:   {tc.parameter_accuracy:.2f}")
                 print(f"    Sequence:     {tc.sequence_correct:.2f}")
@@ -374,26 +485,44 @@ for metric in metrics:
                 if tc.reasoning:
                     print(f"    Reasoning:    {tc.reasoning}")
             else:
-                print(f"\n  Response {i}: No tools used")
+                print(f"\n  Interaction {i}: No tools used")
 
-# Calculate aggregate statistics
-total_pass_at_k = sum(m.pass_at_k for m in metrics)
-total_pass_pow_k = sum(m.pass_pow_k for m in metrics)
+# Calculate aggregated metrics with K=3 (recommended)
+agg = Agentic.aggregate_metrics(metrics, k=3)
 
-# Average tool correctness across all responses
+print(f"\n{'=' * 60}")
+print(f"Aggregated Metrics (K={agg['k']}):")
+print(f"  Total conversations (n): {agg['total_conversations']}")
+print(f"  Fully correct (c): {agg['fully_correct_conversations']}")
+print(f"  Success rate: {agg['conversation_success_rate']:.1%}")
+print(f"\n  pass@{agg['k']}: {agg['pass_at_k']:.3f} ({agg['pass_at_k']*100:.1f}%)")
+print(f"  pass^{agg['k']}: {agg['pass_pow_k']:.3f} ({agg['pass_pow_k']*100:.1f}%)")
+
+# Average tool correctness across all interactions
 all_tool_scores = [
     tc.overall_correctness
     for m in metrics
     for tc in m.tool_correctness_scores
     if tc is not None
 ]
-avg_tool_correctness = sum(all_tool_scores) / len(all_tool_scores) if all_tool_scores else 0.0
+if all_tool_scores:
+    avg_tool_correctness = sum(all_tool_scores) / len(all_tool_scores)
+    print(f"\n  Avg tool correctness: {avg_tool_correctness:.2f}")
 
+# Try different K values
 print(f"\n{'=' * 60}")
-print(f"Aggregate Statistics:")
-print(f"  pass@K rate: {total_pass_at_k}/{len(metrics)} ({total_pass_at_k/len(metrics):.1%})")
-print(f"  pass^K rate: {total_pass_pow_k}/{len(metrics)} ({total_pass_pow_k/len(metrics):.1%})")
-print(f"  Avg tool correctness: {avg_tool_correctness:.2f}")
+print("pass@K with different K values:")
+for k in [1, 2, 3, 5]:
+    agg_k = Agentic.aggregate_metrics(metrics, k=k)
+    print(f"  K={k}: pass@{k}={agg_k['pass_at_k']:.3f}, pass^{k}={agg_k['pass_pow_k']:.3f}")
+
+# Interpretation
+if agg['pass_at_k'] > 0.95 and agg['pass_pow_k'] < 0.5:
+    print("\n  ⚠️  High pass@k but low pass^k → Agent is INCONSISTENT")
+elif agg['pass_at_k'] > 0.95 and agg['pass_pow_k'] > 0.7:
+    print("\n  ✅ High pass@k and pass^k → Agent is RELIABLE")
+elif agg['pass_at_k'] < 0.7:
+    print("\n  ❌ Low pass@k → Agent needs IMPROVEMENT")
 ```
 
 ## LLM Provider Options
@@ -439,44 +568,46 @@ model = ChatOllama(
 ```
 </CodeGroup>
 
-## Understanding Tool Correctness for K Responses
+## Understanding Tool Correctness Per Interaction
 
-The metric evaluates tool correctness **independently for each of K responses**. This helps identify:
-- Which responses had correct tool usage
+The metric evaluates tool correctness **independently for each interaction** in a conversation. This helps identify:
+- Which interactions had correct tool usage
 - Common patterns in tool mistakes
-- Whether better answers correlate with better tool usage
+- Whether tool usage improves or degrades throughout the conversation
 
-### Example with K=3
+### Example with 3 Interactions
 
 ```python
-# Assume we have K=3 responses for "What is 5 + 7?"
-# Response 1: Uses calculator with correct parameters → Overall: 1.0 ✓
-# Response 2: Uses calculator with WRONG parameters (a=5, b=8) → Overall: 0.75 ✗
-# Response 3: Doesn't use tools at all → tool_correctness_scores[2] = None
+# Conversation with 3 interactions
+# Interaction 1: Uses calculator with correct parameters → Overall: 1.0 ✓
+# Interaction 2: Uses calculator with WRONG parameters (a=5, b=8) → Overall: 0.75 ✗
+# Interaction 3: Doesn't use tools at all → tool_correctness_scores[2] = None
 
-metrics = Agentic.run(AgenticRetriever, model=judge_model, tool_threshold=1.0)
+metrics = Agentic.run(AgenticRetriever, model=judge_model, tool_threshold=0.75)
 
 for metric in metrics:
     # metric.tool_correctness_scores = [ToolCorrectnessScore(...), ToolCorrectnessScore(...), None]
-    print(f"Response 1 tool score: {metric.tool_correctness_scores[0].overall_correctness}")  # 1.0
-    print(f"Response 2 tool score: {metric.tool_correctness_scores[1].overall_correctness}")  # 0.75
-    print(f"Response 3 tool score: {metric.tool_correctness_scores[2]}")  # None
+    print(f"Conversation: {metric.session_id}")
+    print(f"Interaction 1 tool score: {metric.tool_correctness_scores[0].overall_correctness}")  # 1.0
+    print(f"Interaction 2 tool score: {metric.tool_correctness_scores[1].overall_correctness}")  # 0.75
+    print(f"Interaction 3 tool score: {metric.tool_correctness_scores[2]}")  # None
 ```
 
-### Why tool_threshold=1.0 by Default?
+### Why tool_threshold=0.75 by Default?
 
-Tool usage is **deterministic** - either the agent called the right tool with right parameters or it didn't. Unlike answer correctness (which can be subjective), tool correctness should be strict:
+Tool usage should be evaluated with high standards but allow for minor deviations:
 
 - **1.0 (Perfect)**: Agent used exactly the right tools, parameters, sequence, and utilized results
-- **&lt;1.0 (Imperfect)**: Something was wrong - wrong tool, wrong params, wrong order, or didn't use results
+- **0.75-0.99 (Good)**: Minor issues but generally correct (default threshold)
+- **<0.75 (Needs work)**: Significant problems with tool usage
 
-If you want to allow **small deviations** (e.g., extra parameters that don't affect the result), lower the threshold:
+If you want to be stricter, raise the threshold:
 
 ```python
 metrics = Agentic.run(
     AgenticRetriever,
     model=judge_model,
-    tool_threshold=0.9,  # Allow 10% deviation
+    tool_threshold=1.0,  # Require perfect tool usage
 )
 ```
 
@@ -521,9 +652,17 @@ metrics = Agentic.run(
 
 <AccordionGroup>
   <Accordion title="Choose Appropriate K Values">
-    - **K=1**: Standard single-response evaluation
-    - **K=3-5**: Balance between reliability and cost
-    - **K=10+**: High-stakes scenarios (code generation, medical advice)
+    - **K=1**: Evaluate single conversation success rate
+    - **K=3-5**: Balance between reliability and cost (recommended)
+    - **K=10+**: High-stakes scenarios requiring high confidence
+    - Remember: K is chosen AFTER evaluation based on your use case
+  </Accordion>
+
+  <Accordion title="Design Complete Conversations">
+    - Each Dataset = 1 complete conversation with multiple interactions
+    - Test realistic multi-turn scenarios (2-5 interactions typical)
+    - Mix simple and complex interactions
+    - A conversation fails if ANY interaction fails - this measures consistency
   </Accordion>
 
   <Accordion title="Set Meaningful Thresholds">
@@ -533,7 +672,7 @@ metrics = Agentic.run(
   </Accordion>
 
   <Accordion title="Define Clear Tool Expectations">
-    Provide complete `ground_truth_agentic` with:
+    Provide complete `ground_truth_agentic` per interaction with:
     - Expected tool names
     - Required parameters
     - Whether sequence matters
@@ -559,22 +698,23 @@ metrics = Agentic.run(
   </Accordion>
 
   <Accordion title="Tool Correctness Always Fails">
-    **Cause**: Default `tool_threshold=1.0` requires perfect tool usage, or `ground_truth_agentic` expectations don't match actual tool usage.
+    **Cause**: Default `tool_threshold=0.75` requires 75% correctness, or `ground_truth_agentic` expectations don't match actual tool usage.
 
     **Solution**:
-    - **Lower the threshold** if you want to allow small deviations: `tool_threshold=0.9`
+    - **Lower the threshold** if you want to be more lenient: `tool_threshold=0.6`
+    - **Raise the threshold** if you want stricter evaluation: `tool_threshold=1.0`
     - Verify tool names match exactly (case-sensitive)
     - Check parameter structure (keys and values must match exactly)
     - Confirm step numbers if sequence matters
     - Set `tool_sequence_matters: False` if order doesn't matter
-    - Check each response's tool score individually: `metric.tool_correctness_scores[i]`
+    - Check each interaction's tool score: `metric.tool_correctness_scores[i]`
   </Accordion>
 
-  <Accordion title="Some Responses Have None for Tool Correctness">
-    **Cause**: Not all K responses used tools, which is expected behavior.
+  <Accordion title="Some Interactions Have None for Tool Correctness">
+    **Cause**: Not all interactions used tools, which is expected behavior.
 
     **Solution**:
-    - This is normal - `tool_correctness_scores[i]` will be `None` if response didn't use tools
+    - This is normal - `tool_correctness_scores[i]` will be `None` if interaction didn't use tools
     - Check if tools were needed: `batch.agentic.get('tools_used', [])`
     - Filter out None values when calculating averages:
       ```python
@@ -583,13 +723,14 @@ metrics = Agentic.run(
       ```
   </Accordion>
 
-  <Accordion title="Multiple Datasets with Same qa_id Not Grouping">
-    **Cause**: Datasets may have different `qa_id` values.
+  <Accordion title="Conversation Not Fully Correct Despite High Scores">
+    **Cause**: A conversation is correct only if ALL interactions are correct. One low-scoring interaction fails the entire conversation.
 
     **Solution**:
-    - Ensure all K responses have **identical** `qa_id`
-    - Use different `assistant_id` for each response
-    - Check logs with `verbose=True` to see grouping
+    - Check `metric.correct_interactions` vs `metric.total_interactions`
+    - Review `metric.correctness_scores` to find which interaction failed
+    - Lower the `threshold` if too strict (e.g., from 0.7 to 0.65)
+    - Use `metric.correct_indices` to identify which interactions passed
   </Accordion>
 </AccordionGroup>
 

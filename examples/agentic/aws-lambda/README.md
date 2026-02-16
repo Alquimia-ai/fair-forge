@@ -1,18 +1,35 @@
 # Fair-Forge Agentic Lambda
 
-AWS Lambda function for evaluating AI agent responses with pass@K and tool correctness metrics.
+AWS Lambda function for evaluating AI agent conversations with pass@K and tool correctness metrics.
 
 ## Description
 
-This Lambda function uses the Fair-Forge `Agentic` metric to evaluate multiple agent responses (K responses) for the same question. It provides three types of evaluations:
+This Lambda function uses the Fair-Forge `Agentic` metric to evaluate complete agent conversations. Each Dataset represents one complete conversation. A conversation is correct only if ALL its interactions are correct. It provides probabilistic evaluations using:
 
-1. **pass@K**: At least one of the K responses is correct (similarity score >= threshold)
-2. **pass^K**: All K responses are correct
-3. **Tool Correctness**: Evaluates proper tool usage across four dimensions:
+### Formulas
+
+```
+pass@k = 1 - C(n-c, k) / C(n, k)   # Probability of ≥1 correct conversation
+pass^k = (c/n)^k                    # Probability of all k conversations correct
+```
+
+Where:
+- **n** = total conversations evaluated
+- **c** = fully correct conversations (all interactions correct)
+- **k** = number of conversations to attempt (user-configurable)
+
+### Metrics Provided
+
+1. **pass@K** (0.0-1.0): Probability of ≥1 correct conversation when attempting k conversations
+2. **pass^K** (0.0-1.0): Probability of all k conversations being fully correct
+3. **Conversation Correctness**: A conversation is correct only if ALL interactions are correct
+4. **Tool Correctness** (per interaction): Evaluates proper tool usage across four dimensions:
    - **Selection** (25%): Were the correct tools chosen?
    - **Parameters** (25%): Were the correct parameters passed?
    - **Sequence** (25%): Were tools used in the correct order? (if required)
    - **Utilization** (25%): Were tool results properly used in the final answer?
+
+5. **Aggregated Metrics**: Overall agent performance across all conversations (recommended for evaluation)
 
 The metric uses an LLM judge to evaluate answer correctness and direct dictionary comparison for tool correctness.
 
@@ -49,13 +66,13 @@ curl -s -X POST "<INVOKE_URL>/run" \
     },
     "datasets": [
       {
-        "session_id": "eval_session",
-        "assistant_id": "agent_response_1",
+        "session_id": "conversation_001",
+        "assistant_id": "agent_v1",
         "language": "english",
-        "context": "You are a helpful calculator agent.",
+        "context": "Math calculator conversation",
         "conversation": [
           {
-            "qa_id": "q1",
+            "qa_id": "q1_interaction1",
             "query": "What is 5 + 3?",
             "assistant": "The result is 8.",
             "ground_truth_assistant": "5 + 3 equals 8",
@@ -80,41 +97,26 @@ curl -s -X POST "<INVOKE_URL>/run" \
               ],
               "tool_sequence_matters": false
             }
+          },
+          {
+            "qa_id": "q1_interaction2",
+            "query": "What is 10 * 2?",
+            "assistant": "10 times 2 is 20.",
+            "ground_truth_assistant": "20"
           }
         ]
       },
       {
-        "session_id": "eval_session",
-        "assistant_id": "agent_response_2",
+        "session_id": "conversation_002",
+        "assistant_id": "agent_v1",
         "language": "english",
-        "context": "You are a helpful calculator agent.",
+        "context": "Simple Q&A conversation",
         "conversation": [
           {
-            "qa_id": "q1",
-            "query": "What is 5 + 3?",
-            "assistant": "5 + 3 is 8.",
-            "ground_truth_assistant": "5 + 3 equals 8",
-            "agentic": {
-              "tools_used": [
-                {
-                  "tool_name": "calculator",
-                  "parameters": {"operation": "add", "a": 5, "b": 3},
-                  "result": 8,
-                  "step": 1
-                }
-              ],
-              "final_answer_uses_tools": true
-            },
-            "ground_truth_agentic": {
-              "expected_tools": [
-                {
-                  "tool_name": "calculator",
-                  "parameters": {"operation": "add", "a": 5, "b": 3},
-                  "step": 1
-                }
-              ],
-              "tool_sequence_matters": false
-            }
+            "qa_id": "q2_interaction1",
+            "query": "What is the capital of France?",
+            "assistant": "The capital of France is Paris.",
+            "ground_truth_assistant": "Paris"
           }
         ]
       }
@@ -122,6 +124,7 @@ curl -s -X POST "<INVOKE_URL>/run" \
     "config": {
       "threshold": 0.7,
       "tool_threshold": 0.75,
+      "k": 3,
       "verbose": false
     }
   }' | jq
@@ -161,16 +164,16 @@ curl -s -X POST "<INVOKE_URL>/run" \
   },
   "datasets": [
     {
-      "session_id": "eval_session",
-      "assistant_id": "agent_response_1",
+      "session_id": "conversation_001",
+      "assistant_id": "agent_v1",
       "language": "english",
-      "context": "System context",
+      "context": "Complete conversation context",
       "conversation": [
         {
-          "qa_id": "q1",
-          "query": "User question",
-          "assistant": "Agent response",
-          "ground_truth_assistant": "Expected response",
+          "qa_id": "interaction_1",
+          "query": "First user question",
+          "assistant": "Agent's first response",
+          "ground_truth_assistant": "Expected first response",
           "agentic": {
             "tools_used": [
               {
@@ -192,6 +195,26 @@ curl -s -X POST "<INVOKE_URL>/run" \
             ],
             "tool_sequence_matters": false
           }
+        },
+        {
+          "qa_id": "interaction_2",
+          "query": "Follow-up question",
+          "assistant": "Agent's second response",
+          "ground_truth_assistant": "Expected second response"
+        }
+      ]
+    },
+    {
+      "session_id": "conversation_002",
+      "assistant_id": "agent_v1",
+      "language": "english",
+      "context": "Another complete conversation",
+      "conversation": [
+        {
+          "qa_id": "interaction_1",
+          "query": "Different question",
+          "assistant": "Different response",
+          "ground_truth_assistant": "Expected response"
         }
       ]
     }
@@ -205,6 +228,7 @@ curl -s -X POST "<INVOKE_URL>/run" \
       "sequence": 0.25,
       "utilization": 0.25
     },
+    "k": 3,
     "use_structured_output": false,
     "verbose": false
   }
@@ -225,19 +249,21 @@ curl -s -X POST "<INVOKE_URL>/run" \
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `datasets` | array | Yes | List of datasets with K responses for the same qa_id |
-| `datasets[].session_id` | string | Yes | Session identifier (same across K responses) |
-| `datasets[].assistant_id` | string | Yes | Unique identifier for each response (K different IDs) |
-| `datasets[].conversation[].qa_id` | string | Yes | Question identifier (same across K responses) |
-| `datasets[].conversation[].agentic` | object | No | Agent's actual tool usage |
+| `datasets` | array | Yes | List of datasets - each Dataset represents one complete conversation |
+| `datasets[].session_id` | string | Yes | Unique conversation identifier |
+| `datasets[].assistant_id` | string | Yes | Assistant/agent identifier |
+| `datasets[].conversation` | array | Yes | List of interactions in the conversation |
+| `datasets[].conversation[].qa_id` | string | Yes | Unique identifier for each interaction |
+| `datasets[].conversation[].agentic` | object | No | Agent's actual tool usage for this interaction |
 | `datasets[].conversation[].agentic.tools_used` | array | No | List of tools used by the agent |
 | `datasets[].conversation[].agentic.final_answer_uses_tools` | boolean | No | Whether tool results are used in final answer |
-| `datasets[].conversation[].ground_truth_agentic` | object | No | Expected tool usage |
+| `datasets[].conversation[].ground_truth_agentic` | object | No | Expected tool usage for this interaction |
 | `datasets[].conversation[].ground_truth_agentic.expected_tools` | array | No | List of expected tools |
 | `datasets[].conversation[].ground_truth_agentic.tool_sequence_matters` | boolean | No | Whether tool order matters (default: false) |
 | `config.threshold` | float | No | Answer correctness threshold (0.0-1.0, default: 0.7) |
 | `config.tool_threshold` | float | No | Tool correctness threshold (0.0-1.0, default: 0.75) |
 | `config.tool_weights` | object | No | Weights for tool correctness components (default: 0.25 each) |
+| `config.k` | integer | No | K value for pass@K calculations (default: 3) |
 | `config.use_structured_output` | boolean | No | Use LangChain structured output (default: false) |
 | `config.verbose` | boolean | No | Enable verbose logging (default: false) |
 
@@ -246,15 +272,15 @@ curl -s -X POST "<INVOKE_URL>/run" \
 ```json
 {
   "success": true,
-  "metrics": [
+  "per_conversation_metrics": [
     {
-      "qa_id": "q1",
-      "k": 3,
+      "session_id": "conversation_001",
+      "total_interactions": 3,
+      "correct_interactions": 3,
+      "is_fully_correct": true,
       "threshold": 0.7,
-      "pass_at_k": true,
-      "pass_pow_k": false,
-      "correctness_scores": [0.85, 0.92, 0.65],
-      "correct_indices": [0, 1],
+      "correctness_scores": [0.850, 0.920, 0.880],
+      "correct_indices": [0, 1, 2],
       "tool_correctness_scores": [
         {
           "tool_selection_correct": 1.0,
@@ -265,53 +291,67 @@ curl -s -X POST "<INVOKE_URL>/run" \
           "is_correct": true,
           "reasoning": "All tools used correctly"
         },
+        null,
         {
           "tool_selection_correct": 1.0,
           "parameter_accuracy": 0.5,
           "sequence_correct": 1.0,
           "result_utilization": 1.0,
           "overall_correctness": 0.875,
-          "is_correct": false,
-          "reasoning": "Incorrect parameter values"
-        },
-        null
+          "is_correct": true,
+          "reasoning": "Minor parameter deviation"
+        }
       ]
+    },
+    {
+      "session_id": "conversation_002",
+      "total_interactions": 2,
+      "correct_interactions": 1,
+      "is_fully_correct": false,
+      "threshold": 0.7,
+      "correctness_scores": [0.920, 0.650],
+      "correct_indices": [0],
+      "tool_correctness_scores": [null, null]
     }
   ],
-  "count": 1,
-  "summary": {
-    "total_qa_ids": 1,
-    "pass_at_k_count": 1,
-    "pass_pow_k_count": 0
+  "aggregated_metrics": {
+    "total_conversations": 3,
+    "fully_correct_conversations": 2,  // Conversations where ALL interactions correct
+    "conversation_success_rate": 0.6667,  // c/n = 2/3
+    "k": 3,  // K value for calculations
+    "pass_at_k": 0.9630,  // 96.3% chance of ≥1 correct conversation in 3 attempts
+    "pass_pow_k": 0.2963,  // 29.63% chance of all 3 conversations correct
+    "interpretation": "inconsistent"  // reliable | inconsistent | functional | needs_improvement
   }
 }
 ```
 
 ### Response Fields
 
+#### Per-Conversation Metrics
+
 | Field | Type | Description |
 |-------|------|-------------|
-| `success` | boolean | Whether evaluation succeeded |
-| `metrics` | array | List of evaluation results (one per qa_id) |
-| `metrics[].qa_id` | string | Question identifier |
-| `metrics[].k` | integer | Number of responses evaluated |
-| `metrics[].threshold` | float | Answer correctness threshold used |
-| `metrics[].pass_at_k` | boolean | At least one response is correct |
-| `metrics[].pass_pow_k` | boolean | All responses are correct |
-| `metrics[].correctness_scores` | array | Correctness scores for each response (0.0-1.0) |
-| `metrics[].correct_indices` | array | Indices of correct responses (score >= threshold) |
-| `metrics[].tool_correctness_scores` | array | Tool usage evaluation for each of K responses (if ground_truth_agentic provided) |
-| `metrics[].tool_correctness_scores[].tool_selection_correct` | float | Tool selection score (0.0-1.0) |
-| `metrics[].tool_correctness_scores[].parameter_accuracy` | float | Parameter accuracy score (0.0-1.0) |
-| `metrics[].tool_correctness_scores[].sequence_correct` | float | Sequence correctness score (0.0-1.0) |
-| `metrics[].tool_correctness_scores[].result_utilization` | float | Result utilization score (0.0-1.0) |
-| `metrics[].tool_correctness_scores[].overall_correctness` | float | Weighted average of all components |
-| `metrics[].tool_correctness_scores[].is_correct` | boolean | Overall correctness >= tool_threshold |
-| `metrics[].tool_correctness_scores[].reasoning` | string | Optional explanation |
-| `count` | integer | Total number of qa_ids evaluated |
-| `summary.total_qa_ids` | integer | Total questions evaluated |
-| `summary.pass_at_k_count` | integer | Number of questions with pass@K=true |
-| `summary.pass_pow_k_count` | integer | Number of questions with pass^K=true |
+| `session_id` | string | Unique conversation identifier |
+| `total_interactions` | integer | Number of interactions in the conversation |
+| `correct_interactions` | integer | Number of correct interactions |
+| `is_fully_correct` | boolean | True if ALL interactions are correct |
+| `threshold` | float | Answer correctness threshold used |
+| `correctness_scores` | float[] | Score for each interaction (0.0-1.0) |
+| `correct_indices` | int[] | Indices of correct interactions |
+| `tool_correctness_scores` | object[] | Tool evaluation per interaction (null if no tools used) |
+
+#### Aggregated Metrics (Recommended)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_conversations` | integer | Number of conversations evaluated (n) |
+| `fully_correct_conversations` | integer | Conversations where ALL interactions correct (c) |
+| `conversation_success_rate` | float | Percentage of fully correct conversations (c/n) |
+| `k` | integer | K value for pass@K calculations |
+| `pass_at_k` | float | Probability of ≥1 correct conversation in K attempts |
+| `pass_pow_k` | float | Probability of all K conversations being correct |
+| `interpretation` | string | Agent quality: `reliable` \| `inconsistent` \| `functional` \| `needs_improvement` |
 
 ## Error Responses
 
@@ -362,9 +402,38 @@ The Lambda function supports the following environment variables:
 
 ## Understanding pass@K vs pass^K
 
-- **pass@K**: Measures if *at least one* of K responses is correct. This is useful for evaluating whether an agent can produce a correct answer with multiple attempts.
+These metrics use probabilistic formulas from research ([reference](https://www.philschmid.de/agents-pass-at-k-pass-power-k)):
 
-- **pass^K**: Measures if *all* K responses are correct. This is a stricter metric that evaluates consistency and reliability.
+```
+pass@k = 1 - C(n-c, k) / C(n, k)   # Probability of ≥1 correct conversation
+pass^k = (c/n)^k                    # Probability of all k conversations correct
+```
+
+- **pass@K** (0.0-1.0): Probability of getting *at least one* fully correct conversation when attempting k conversations. High values (>0.9) indicate the agent *can* complete conversations successfully.
+  - Example: pass@3 = 0.92 → 92% chance of getting ≥1 fully correct conversation in 3 attempts
+  - A conversation is fully correct only if ALL its interactions are correct
+
+- **pass^K** (0.0-1.0): Probability that *all* k conversations are fully correct. High values (>0.7) indicate the agent is *consistent* and reliable.
+  - Example: pass^3 = 0.15 → 15% chance of all 3 conversations being fully correct
+
+### Interpretation
+
+| pass@K | pass^K | Assessment |
+|--------|--------|------------|
+| >0.95 | >0.70 | ✅ **Reliable** - High success and consistency |
+| >0.95 | <0.50 | ⚠️ **Inconsistent** - Can succeed but unreliable |
+| 0.70-0.95 | any | 🔶 **Functional** - Works but could improve |
+| <0.70 | any | ❌ **Needs Improvement** - Low success rate |
+
+### Conversation-Level Evaluation
+
+This metric evaluates **complete conversations** as units:
+- Each Dataset = 1 complete conversation with multiple interactions
+- A conversation is correct only if ALL interactions are correct
+- This measures the agent's ability to maintain fully correct multi-turn conversations
+- **n** = total conversations evaluated
+- **c** = fully correct conversations
+- **K** = user-configurable (how many conversations to attempt)
 
 ## Tool Correctness Evaluation
 

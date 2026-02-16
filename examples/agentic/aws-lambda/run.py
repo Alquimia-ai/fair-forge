@@ -1,6 +1,7 @@
 """Fair-Forge Agentic Lambda business logic.
 
-Evaluates agent responses using pass@K and tool correctness metrics.
+Evaluates complete agent conversations using pass@K and tool correctness metrics.
+A conversation is correct only if ALL its interactions are correct.
 """
 
 import importlib
@@ -65,13 +66,16 @@ class PayloadRetriever(Retriever):
 def run(payload: dict) -> dict[str, Any]:
     """Run Agentic metric on payload datasets.
 
+    Evaluates complete agent conversations. Each Dataset represents one complete conversation.
+    A conversation is correct only if ALL its interactions are correct.
+
     Args:
-        payload: Request JSON body with connector, datasets and config
+        payload: Request JSON body with connector, datasets (conversations) and config
 
     Returns:
-        dict: Agentic evaluation results with pass@K, pass^K, and tool correctness
+        dict: Agentic evaluation results with pass@K, pass^K, and tool correctness per conversation
 
-    Example payload:
+    Example payload (2 different conversations):
         {
             "connector": {
                 "class_path": "langchain_groq.chat_models.ChatGroq",
@@ -83,13 +87,13 @@ def run(payload: dict) -> dict[str, Any]:
             },
             "datasets": [
                 {
-                    "session_id": "eval_session",
-                    "assistant_id": "agent_response_1",
+                    "session_id": "conversation_001",
+                    "assistant_id": "agent_v1",
                     "language": "english",
-                    "context": "System context...",
+                    "context": "Math calculator conversation",
                     "conversation": [
                         {
-                            "qa_id": "q1",
+                            "qa_id": "q1_interaction1",
                             "query": "What is 5 + 3?",
                             "assistant": "The result is 8.",
                             "ground_truth_assistant": "5 + 3 equals 8",
@@ -114,41 +118,26 @@ def run(payload: dict) -> dict[str, Any]:
                                 ],
                                 "tool_sequence_matters": false
                             }
+                        },
+                        {
+                            "qa_id": "q1_interaction2",
+                            "query": "What is 10 * 2?",
+                            "assistant": "10 times 2 is 20.",
+                            "ground_truth_assistant": "20"
                         }
                     ]
                 },
                 {
-                    "session_id": "eval_session",
-                    "assistant_id": "agent_response_2",
+                    "session_id": "conversation_002",
+                    "assistant_id": "agent_v1",
                     "language": "english",
-                    "context": "System context...",
+                    "context": "Simple Q&A conversation",
                     "conversation": [
                         {
-                            "qa_id": "q1",
-                            "query": "What is 5 + 3?",
-                            "assistant": "5 + 3 is 8.",
-                            "ground_truth_assistant": "5 + 3 equals 8",
-                            "agentic": {
-                                "tools_used": [
-                                    {
-                                        "tool_name": "calculator",
-                                        "parameters": {"operation": "add", "a": 5, "b": 3},
-                                        "result": 8,
-                                        "step": 1
-                                    }
-                                ],
-                                "final_answer_uses_tools": true
-                            },
-                            "ground_truth_agentic": {
-                                "expected_tools": [
-                                    {
-                                        "tool_name": "calculator",
-                                        "parameters": {"operation": "add", "a": 5, "b": 3},
-                                        "step": 1
-                                    }
-                                ],
-                                "tool_sequence_matters": false
-                            }
+                            "qa_id": "q2_interaction1",
+                            "query": "What is the capital of France?",
+                            "assistant": "The capital of France is Paris.",
+                            "ground_truth_assistant": "Paris"
                         }
                     ]
                 }
@@ -163,7 +152,8 @@ def run(payload: dict) -> dict[str, Any]:
                     "utilization": 0.25
                 },
                 "use_structured_output": false,
-                "verbose": false
+                "verbose": false,
+                "k": 3  # Optional: K value for pass@K calculations (default: 3)
             }
         }
     """
@@ -184,15 +174,8 @@ def run(payload: dict) -> dict[str, Any]:
     if not datasets:
         return {"success": False, "error": "No datasets provided"}
 
-    # For Agentic metric, we need multiple responses for the same qa_id (K responses)
-    # Each dataset should have the same qa_id but different assistant_id
-    qa_ids = set()
-    for d in datasets:
-        for conv in d.get("conversation", []):
-            qa_ids.add(conv.get("qa_id"))
-
-    if not qa_ids:
-        return {"success": False, "error": "No qa_ids found in datasets"}
+    # Each dataset represents one complete conversation
+    # A conversation is correct only if ALL its interactions are correct
 
     config = payload.get("config", {})
 
@@ -213,27 +196,27 @@ def run(payload: dict) -> dict[str, Any]:
     if not metrics:
         return {"success": False, "error": "No metrics produced"}
 
-    # Extract results
+    # Extract per-conversation results
     results = []
     for metric in metrics:
         result = {
-            "qa_id": metric.qa_id,
-            "k": metric.k,
+            "session_id": metric.session_id,
+            "total_interactions": metric.total_interactions,
+            "correct_interactions": metric.correct_interactions,
+            "is_fully_correct": metric.is_fully_correct,
             "threshold": metric.threshold,
-            "pass_at_k": metric.pass_at_k,
-            "pass_pow_k": metric.pass_pow_k,
-            "correctness_scores": metric.correctness_scores,
+            "correctness_scores": [round(s, 3) for s in metric.correctness_scores],
             "correct_indices": metric.correct_indices,
         }
 
         if metric.tool_correctness_scores:
             result["tool_correctness_scores"] = [
                 {
-                    "tool_selection_correct": tc.tool_selection_correct,
-                    "parameter_accuracy": tc.parameter_accuracy,
-                    "sequence_correct": tc.sequence_correct,
-                    "result_utilization": tc.result_utilization,
-                    "overall_correctness": tc.overall_correctness,
+                    "tool_selection_correct": round(tc.tool_selection_correct, 3),
+                    "parameter_accuracy": round(tc.parameter_accuracy, 3),
+                    "sequence_correct": round(tc.sequence_correct, 3),
+                    "result_utilization": round(tc.result_utilization, 3),
+                    "overall_correctness": round(tc.overall_correctness, 3),
                     "is_correct": tc.is_correct,
                     "reasoning": tc.reasoning,
                 }
@@ -244,13 +227,29 @@ def run(payload: dict) -> dict[str, Any]:
 
         results.append(result)
 
+    # Calculate aggregated metrics (recommended for overall performance)
+    k_value = config.get("k", 3)  # Default K=3 for pass@K calculations
+    aggregated = Agentic.aggregate_metrics(metrics, k=k_value)
+
+    # Determine agent quality
+    interpretation = "functional"
+    if aggregated["pass_at_k"] > 0.95 and aggregated["pass_pow_k"] > 0.7:
+        interpretation = "reliable"
+    elif aggregated["pass_at_k"] > 0.95 and aggregated["pass_pow_k"] < 0.5:
+        interpretation = "inconsistent"
+    elif aggregated["pass_at_k"] < 0.7:
+        interpretation = "needs_improvement"
+
     return {
         "success": True,
-        "metrics": results,
-        "count": len(results),
-        "summary": {
-            "total_qa_ids": len(results),
-            "pass_at_k_count": sum(1 for m in metrics if m.pass_at_k),
-            "pass_pow_k_count": sum(1 for m in metrics if m.pass_pow_k),
+        "per_conversation_metrics": results,
+        "aggregated_metrics": {
+            "total_conversations": aggregated["total_conversations"],
+            "fully_correct_conversations": aggregated["fully_correct_conversations"],
+            "conversation_success_rate": round(aggregated["conversation_success_rate"], 4),
+            "k": aggregated["k"],
+            "pass_at_k": round(aggregated["pass_at_k"], 4),
+            "pass_pow_k": round(aggregated["pass_pow_k"], 4),
+            "interpretation": interpretation,
         },
     }

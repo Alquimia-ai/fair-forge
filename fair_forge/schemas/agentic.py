@@ -25,18 +25,22 @@ class ToolCorrectnessScore(BaseModel):
 
 class AgenticMetric(BaseMetric):
     """
-    Metric for evaluating agentic responses with pass@K and tool correctness.
+    Metric for evaluating complete agent conversations with pass@K and tool correctness.
 
-    pass@K: At least one of K responses is correct (similarity >= threshold).
-    pass^K: All K responses are correct.
-    tool_correctness: Optional evaluation of tool usage quality.
+    Evaluates conversations as complete units where a conversation is correct only if
+    ALL its interactions are correct. This measures the agent's capability to maintain
+    fully correct conversations.
+
+    pass@K: Probability of ≥1 correct conversation when attempting k different conversations (0.0-1.0).
+    pass^K: Probability of k consecutive correct conversations (0.0-1.0).
+    tool_correctness: Optional evaluation of tool usage quality per interaction.
     """
 
-    qa_id: str
-    k: int
-    threshold: float
-    correctness_scores: list[float]
-    pass_at_k: bool
-    pass_pow_k: bool
-    correct_indices: list[int]
-    tool_correctness_scores: list[ToolCorrectnessScore | None] = []
+    session_id: str  # Unique conversation ID
+    total_interactions: int  # Number of interactions in the conversation
+    correct_interactions: int  # Number of correct interactions
+    is_fully_correct: bool  # True if ALL interactions are correct
+    threshold: float  # Threshold for answer correctness
+    correctness_scores: list[float]  # Score per interaction
+    correct_indices: list[int]  # Indices of correct interactions
+    tool_correctness_scores: list[ToolCorrectnessScore | None] = []  # Tool scores per interaction
