@@ -9,7 +9,7 @@ import os
 from typing import Any
 
 from fair_forge.core import Retriever
-from fair_forge.metrics.agentic import Agentic, pass_at_k, pass_pow_k
+from fair_forge.metrics.agentic import Agentic
 from fair_forge.schemas import Dataset
 
 
@@ -180,12 +180,17 @@ def run(payload: dict) -> dict[str, Any]:
     config = payload.get("config", {})
 
     # Run Agentic metric
+    k_value = config.get("k")
+    if not k_value:
+        return {"success": False, "error": "config.k is required"}
+
     try:
         metrics = Agentic.run(
             lambda: PayloadRetriever(payload),
             model=model,
+            k=k_value,
             threshold=config.get("threshold", 0.7),
-            tool_threshold=config.get("tool_threshold", 0.75),
+            tool_threshold=config.get("tool_threshold", 1.0),
             tool_weights=config.get("tool_weights"),
             use_structured_output=config.get("use_structured_output", True),
             verbose=config.get("verbose", False),
@@ -196,7 +201,7 @@ def run(payload: dict) -> dict[str, Any]:
     if not metrics:
         return {"success": False, "error": "No metrics produced"}
 
-    # Extract per-conversation results
+    # Extract per-conversation results — pass@K is computed per conversation
     results = []
     for metric in metrics:
         result = {
@@ -207,6 +212,9 @@ def run(payload: dict) -> dict[str, Any]:
             "threshold": metric.threshold,
             "correctness_scores": [round(s, 3) for s in metric.correctness_scores],
             "correct_indices": metric.correct_indices,
+            "k": metric.k,
+            "pass_at_k": round(metric.pass_at_k, 4),
+            "pass_pow_k": round(metric.pass_pow_k, 4),
         }
 
         if metric.tool_correctness_scores:
@@ -227,31 +235,16 @@ def run(payload: dict) -> dict[str, Any]:
 
         results.append(result)
 
-    k_value = config.get("k", 3)
     n_conversations = len(metrics)
     c_conversations = sum(1 for m in metrics if m.is_fully_correct)
-    success_rate = c_conversations / n_conversations
-    agg_pass_at_k = pass_at_k(n_conversations, c_conversations, k_value)
-    agg_pass_pow_k = pass_pow_k(n_conversations, c_conversations, k_value)
-
-    interpretation = "functional"
-    if agg_pass_at_k > 0.95 and agg_pass_pow_k > 0.7:
-        interpretation = "reliable"
-    elif agg_pass_at_k > 0.95 and agg_pass_pow_k < 0.5:
-        interpretation = "inconsistent"
-    elif agg_pass_at_k < 0.7:
-        interpretation = "needs_improvement"
 
     return {
         "success": True,
         "per_conversation_metrics": results,
-        "aggregated_metrics": {
+        "summary": {
             "total_conversations": n_conversations,
             "fully_correct_conversations": c_conversations,
-            "conversation_success_rate": round(success_rate, 4),
+            "conversation_success_rate": round(c_conversations / n_conversations, 4),
             "k": k_value,
-            "pass_at_k": round(agg_pass_at_k, 4),
-            "pass_pow_k": round(agg_pass_pow_k, 4),
-            "interpretation": interpretation,
         },
     }

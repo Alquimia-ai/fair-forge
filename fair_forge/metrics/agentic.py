@@ -80,17 +80,19 @@ class Agentic(FairForge):
     Uses an LLM judge for answer correctness, and direct dictionary comparison for tool correctness.
 
     Formulas:
-        pass@k = 1 - C(n-c, k) / C(n, k)  # Prob. of ≥1 correct conversation
-        pass^k = (c/n)^k                   # Prob. of all k conversations correct
+        pass@k = 1 - (1 - p)^k  # Prob. of ≥1 correct conversation, p = c/n
+        pass^k = p^k             # Prob. of all k conversations correct
 
     Where:
         n = total conversations evaluated
         c = fully correct conversations (all interactions correct)
-        k = number of conversation attempts (user-specified)
+        p = c/n, estimated success rate
+        k = number of conversation attempts (required, user-specified)
 
     Args:
         retriever: Retriever class for loading datasets (each Dataset = 1 conversation)
         model: LangChain BaseChatModel instance for evaluation
+        k: Number of independent attempts for pass@K/pass^K computation (required)
         use_structured_output: If True, use LangChain's with_structured_output()
         bos_json_clause: Opening marker for JSON blocks
         eos_json_clause: Closing marker for JSON blocks
@@ -102,20 +104,16 @@ class Agentic(FairForge):
     Example:
         >>> from langchain_groq import ChatGroq
         >>> model = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
-        >>> results = Agentic.run(MyRetriever, model=model, threshold=0.8)
+        >>> results = Agentic.run(MyRetriever, model=model, k=3, threshold=0.8)
         >>> for r in results:
-        ...     print(f"{r.session_id}: {r.correct_interactions}/{r.total_interactions}")
-        >>> # Compute aggregated metrics manually
-        >>> from fair_forge.metrics.agentic import pass_at_k, pass_pow_k
-        >>> n, c = len(results), sum(1 for r in results if r.is_fully_correct)
-        >>> print(f"pass@3: {pass_at_k(n, c, 3):.3f}")
-        >>> print(f"pass^3: {pass_pow_k(n, c, 3):.3f}")
+        ...     print(f"{r.session_id}: pass@3={r.pass_at_k:.3f}, pass^3={r.pass_pow_k:.3f}")
     """
 
     def __init__(
         self,
         retriever: type[Retriever],
         model: BaseChatModel,
+        k: int,
         use_structured_output: bool = True,
         bos_json_clause: str = "```json",
         eos_json_clause: str = "```",
@@ -127,6 +125,7 @@ class Agentic(FairForge):
         super().__init__(retriever, **kwargs)
 
         self.model = model
+        self.k = k
         self.use_structured_output = use_structured_output
         self.bos_json_clause = bos_json_clause
         self.eos_json_clause = eos_json_clause
@@ -144,6 +143,10 @@ class Agentic(FairForge):
 
         self.logger.info(f"Initialized Agentic metric with model: {model.__class__.__name__}")
         self.logger.info(f"Thresholds - Answer: {threshold}, Tool: {tool_threshold}")
+
+    @classmethod
+    def run(cls, retriever: type[Retriever], k: int, **kwargs) -> list[AgenticMetric]:
+        return cls(retriever, k=k, **kwargs)._process()
 
     def batch(
         self,
@@ -431,6 +434,9 @@ Examples:
                 correctness_scores=correctness_scores,
                 correct_indices=correct_indices,
                 tool_correctness_scores=tool_correctness_scores if tool_correctness_scores else [],
+                k=self.k,
+                pass_at_k=pass_at_k(total_interactions, correct_interactions, self.k),
+                pass_pow_k=pass_pow_k(total_interactions, correct_interactions, self.k),
             )
 
             self.metrics.append(metric)
