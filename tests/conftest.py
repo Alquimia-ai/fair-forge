@@ -35,6 +35,7 @@ from tests.fixtures.mock_data import (
     create_context_dataset,
     create_conversational_dataset,
     create_emotional_dataset,
+    create_regulatory_dataset,
     create_sample_batch,
     create_sample_dataset,
     create_toxicity_dataset,
@@ -49,6 +50,7 @@ from tests.fixtures.mock_retriever import (
     EmptyRetriever,
     MockRetriever,
     MultipleDatasetRetriever,
+    RegulatoryDatasetRetriever,
     SingleDatasetRetriever,
     ToxicityDatasetRetriever,
 )
@@ -106,6 +108,12 @@ def bestof_dataset() -> Dataset:
 def agentic_dataset() -> list[Dataset]:
     """Fixture providing an agentic testing dataset."""
     return create_agentic_dataset()
+
+
+@pytest.fixture
+def regulatory_dataset() -> Dataset:
+    """Fixture providing a regulatory testing dataset."""
+    return create_regulatory_dataset()
 
 
 @pytest.fixture
@@ -172,6 +180,12 @@ def bestof_dataset_retriever() -> type[BestOfDatasetRetriever]:
 def agentic_dataset_retriever() -> type[AgenticDatasetRetriever]:
     """Fixture providing AgenticDatasetRetriever class."""
     return AgenticDatasetRetriever
+
+
+@pytest.fixture
+def regulatory_dataset_retriever() -> type[RegulatoryDatasetRetriever]:
+    """Fixture providing RegulatoryDatasetRetriever class."""
+    return RegulatoryDatasetRetriever
 
 
 @pytest.fixture

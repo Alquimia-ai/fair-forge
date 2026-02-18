@@ -30,3 +30,18 @@ class BestOfJudgeOutput(BaseModel):
     verdict: str = Field(description="Explanation of why this contestant won")
     confidence: float = Field(ge=0, le=1, description="Confidence in the decision (0-1)")
     reasoning: dict = Field(description="Strengths and weaknesses for each contestant")
+
+
+class RegulatoryJudgeOutput(BaseModel):
+    """Structured output for regulatory compliance evaluation."""
+
+    compliance_score: float = Field(
+        ge=0, le=1, description="Overall compliance score (0-1), 1 means fully compliant"
+    )
+    insight: str = Field(description="Summary insight about regulatory compliance")
+    violated_rules: list[str] = Field(
+        description="List of rule identifiers that were violated (empty if compliant)"
+    )
+    rule_assessments: dict = Field(
+        description="Assessment for each rule: {rule_id: {compliant: bool, reason: str}}"
+    )

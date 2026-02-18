@@ -7,6 +7,7 @@ from fair_forge.llm.schemas import (
     BestOfJudgeOutput,
     ContextJudgeOutput,
     ConversationalJudgeOutput,
+    RegulatoryJudgeOutput,
 )
 
 
@@ -189,3 +190,103 @@ class TestBestOfJudgeOutput:
         output = BestOfJudgeOutput.model_validate(data)
         assert output.winner == "model_x"
         assert output.confidence == 0.85
+
+
+class TestRegulatoryJudgeOutput:
+    """Tests for RegulatoryJudgeOutput schema."""
+
+    def test_valid_output(self):
+        """Test valid regulatory judge output."""
+        output = RegulatoryJudgeOutput(
+            compliance_score=0.95,
+            insight="Fully compliant with all regulations",
+            violated_rules=[],
+            rule_assessments={
+                "1": {"compliant": True, "reason": "Verified identity"},
+                "2": {"compliant": True, "reason": "No data sharing"},
+            },
+        )
+        assert output.compliance_score == 0.95
+        assert output.insight == "Fully compliant with all regulations"
+        assert output.violated_rules == []
+        assert len(output.rule_assessments) == 2
+
+    def test_with_violations(self):
+        """Test regulatory output with violations."""
+        output = RegulatoryJudgeOutput(
+            compliance_score=0.5,
+            insight="Some rules violated",
+            violated_rules=["1", "3"],
+            rule_assessments={
+                "1": {"compliant": False, "reason": "No identity check"},
+                "2": {"compliant": True, "reason": "OK"},
+                "3": {"compliant": False, "reason": "Shared data without consent"},
+            },
+        )
+        assert output.compliance_score == 0.5
+        assert output.violated_rules == ["1", "3"]
+        assert output.rule_assessments["1"]["compliant"] is False
+
+    def test_compliance_score_lower_bound(self):
+        """Test compliance score at lower bound."""
+        output = RegulatoryJudgeOutput(
+            compliance_score=0.0,
+            insight="Total non-compliance",
+            violated_rules=["all"],
+            rule_assessments={},
+        )
+        assert output.compliance_score == 0.0
+
+    def test_compliance_score_upper_bound(self):
+        """Test compliance score at upper bound."""
+        output = RegulatoryJudgeOutput(
+            compliance_score=1.0,
+            insight="Perfect compliance",
+            violated_rules=[],
+            rule_assessments={},
+        )
+        assert output.compliance_score == 1.0
+
+    def test_compliance_score_below_lower_bound(self):
+        """Test compliance score below lower bound raises error."""
+        with pytest.raises(ValidationError):
+            RegulatoryJudgeOutput(
+                compliance_score=-0.1,
+                insight="Test",
+                violated_rules=[],
+                rule_assessments={},
+            )
+
+    def test_compliance_score_above_upper_bound(self):
+        """Test compliance score above upper bound raises error."""
+        with pytest.raises(ValidationError):
+            RegulatoryJudgeOutput(
+                compliance_score=1.5,
+                insight="Test",
+                violated_rules=[],
+                rule_assessments={},
+            )
+
+    def test_from_dict(self):
+        """Test creating from dictionary."""
+        data = {
+            "compliance_score": 0.75,
+            "insight": "Mostly compliant",
+            "violated_rules": ["rule_x"],
+            "rule_assessments": {"rule_x": {"compliant": False, "reason": "Failed check"}},
+        }
+        output = RegulatoryJudgeOutput.model_validate(data)
+        assert output.compliance_score == 0.75
+        assert output.violated_rules == ["rule_x"]
+
+    def test_missing_required_fields(self):
+        """Test missing required fields raises error."""
+        with pytest.raises(ValidationError):
+            RegulatoryJudgeOutput(compliance_score=0.5)
+
+        with pytest.raises(ValidationError):
+            RegulatoryJudgeOutput(
+                compliance_score=0.5,
+                insight="Test",
+                # Missing violated_rules and rule_assessments
+            )

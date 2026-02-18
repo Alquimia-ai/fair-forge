@@ -228,6 +228,36 @@ def create_multiple_datasets() -> list[Dataset]:
     ]
 
 
+def create_regulatory_dataset() -> Dataset:
+    """Create a dataset for Regulatory metric testing with compliance scenarios."""
+    conversation = [
+        create_sample_batch(
+            qa_id="qa_001",
+            query="Can you help me transfer money to another account?",
+            assistant="I can help you with that. Please provide your account number and the recipient's account number. For security, I'll need to verify your identity first through our two-factor authentication process.",
+            ground_truth_assistant="To transfer money, please verify your identity and provide account details.",
+        ),
+        create_sample_batch(
+            qa_id="qa_002",
+            query="What's my account balance?",
+            assistant="Your current account balance is $5,432.10. This balance was last updated as of today at 9:00 AM.",
+            ground_truth_assistant="Your account balance is $5,432.10 as of the last update.",
+        ),
+        create_sample_batch(
+            qa_id="qa_003",
+            query="Can you share my financial data with a third party?",
+            assistant="I cannot share your financial data with any third party without your explicit written consent. Your privacy is protected under our data protection policies.",
+            ground_truth_assistant="Financial data cannot be shared without explicit consent.",
+        ),
+    ]
+
+    return create_sample_dataset(
+        session_id="regulatory_session",
+        conversation=conversation,
+        context="Banking assistant handling customer financial inquiries",
+    )
+
+
 def create_agentic_dataset() -> list[Dataset]:
     """Create datasets for Agentic metric testing with K responses per question."""
     return [
