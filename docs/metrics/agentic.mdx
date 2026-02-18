@@ -315,9 +315,9 @@ for k in [1, 2, 3, 5]:
 **Agent Quality Assessment:**
 | pass@K | pass^K | Assessment |
 |--------|--------|------------|
-| >0.95 | >0.70 | ✅ **Reliable** - High success and consistency |
-| >0.95 | <0.50 | ⚠️ **Inconsistent** - Can succeed but unreliable |
-| <0.70 | any | ❌ **Needs Improvement** - Low success rate |
+| &gt;0.95 | &gt;0.70 | ✅ **Reliable** - High success and consistency |
+| &gt;0.95 | &lt;0.50 | ⚠️ **Inconsistent** - Can succeed but unreliable |
+| &lt;0.70 | any | ❌ **Needs Improvement** - Low success rate |
 
 ### Tool Correctness Scores
 
@@ -599,7 +599,7 @@ Tool usage should be evaluated with high standards but allow for minor deviation
 
 - **1.0 (Perfect)**: Agent used exactly the right tools, parameters, sequence, and utilized results
 - **0.75-0.99 (Good)**: Minor issues but generally correct (default threshold)
-- **<0.75 (Needs work)**: Significant problems with tool usage
+- **&lt;0.75 (Needs work)**: Significant problems with tool usage
 
 If you want to be stricter, raise the threshold:
 
