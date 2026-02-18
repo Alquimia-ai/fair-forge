@@ -2,6 +2,28 @@
 
 <!-- version list -->
 
+## v1.2.0-b.5 (2026-02-18)
+
+### Bug Fixes
+
+- **agentic**: Evaluate conversations as complete units with probabilistic formulas
+  ([`95533bb`](https://github.com/Alquimia-ai/fair-forge/commit/95533bb78fc8dfff1ee1f4648f1b909c3056d313))
+
+- **agentic**: Replace combinatorial pass@k with Bernoulli model and remove aggregate_metrics
+  ([`2c68665`](https://github.com/Alquimia-ai/fair-forge/commit/2c686658e318c7c7e11ecca5cca3a832960ebb53))
+
+- **agentic**: Update use_structured_output default to True in tests, docs, and lambda
+  ([`ee1218e`](https://github.com/Alquimia-ai/fair-forge/commit/ee1218ec85eb3c0ca2ff19651d53a66de6c0d5b1))
+
+- **docs**: Escape < and > characters in agentic MDX to fix parsing errors
+  ([`cb2e864`](https://github.com/Alquimia-ai/fair-forge/commit/cb2e864e3b7cee68ea197d64c11d57a447e69541))
+
+### Features
+
+- **agentic**: Compute pass@k and pass^k per conversation with required k parameter
+  ([`5dd936a`](https://github.com/Alquimia-ai/fair-forge/commit/5dd936a38dfb168166413625657a0c22d7a9f01b))
+
+
 ## v1.2.0-b.4 (2026-02-13)
 
 ### Bug Fixes
