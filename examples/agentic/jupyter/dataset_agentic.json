@@ -100,7 +100,7 @@
     ]
   },
   {
-    "session_id": "agentic_eval_session",
+    "session_id": "agentic_eval_session2",
     "assistant_id": "agent_response_2",
     "language": "english",
     "context": "You are a helpful AI assistant with access to a calculator tool.",
@@ -200,7 +200,7 @@
     ]
   },
   {
-    "session_id": "agentic_eval_session",
+    "session_id": "agentic_eval_session3",
     "assistant_id": "agent_response_3",
     "language": "english",
     "context": "You are a helpful AI assistant with access to a calculator tool.",
@@ -209,7 +209,7 @@
         "qa_id": "q1_math",
         "query": "What is 15 + 27?",
         "ground_truth_assistant": "15 + 27 equals 42.",
-        "assistant": "I calculated 15 + 27 and got 42.",
+        "assistant": "I calculated 15 + 27 and got 53.",
         "agentic": {
           "tools_used": [
             {

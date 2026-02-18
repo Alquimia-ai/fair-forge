@@ -19,39 +19,102 @@ class AnswerCorrectnessOutput(BaseModel):
     reasoning: str = Field(description="Brief explanation of the evaluation")
 
 
+def pass_at_k(n: int, c: int, k: int) -> float:
+    """
+    Calculate pass@k: probability of ≥1 correct conversation in k independent attempts.
+
+    Uses the Bernoulli model: p = c/n is the estimated success rate from evaluation,
+    and 1 - (1-p)^k is the probability of at least one success in k independent attempts.
+
+    Args:
+        n: Total conversations evaluated
+        c: Fully correct conversations
+        k: Number of independent attempts (not bounded by n)
+
+    Returns:
+        Probability between 0.0 and 1.0
+    """
+    if c == 0:
+        return 0.0
+    if c >= n:
+        return 1.0
+    return 1.0 - (1.0 - c / n) ** k
+
+
+def pass_pow_k(n: int, c: int, k: int) -> float:
+    """
+    Calculate pass^k: probability of k consecutive correct conversations.
+
+    Uses p = c/n as the estimated success rate: (c/n)^k is the probability
+    that k independent attempts are all correct.
+
+    Args:
+        n: Total conversations evaluated
+        c: Fully correct conversations
+        k: Number of consecutive attempts (not bounded by n)
+
+    Returns:
+        Probability between 0.0 and 1.0
+    """
+    if c == 0:
+        return 0.0
+    if c >= n:
+        return 1.0
+
+    return (c / n) ** k
+
+
 class Agentic(FairForge):
     """
-    Agentic metric for evaluating AI agent responses.
+    Agentic metric for evaluating complete agent conversations with pass@K/pass^K formulas.
 
-    Evaluates multiple agent responses using:
-    - pass@K: At least one of K responses is correct
-    - pass^K: All K responses are correct
-    - Tool Correctness: Evaluates correct tool usage (selection, parameters, sequence, utilization)
+    Evaluates conversations as complete units where a conversation is correct only if ALL
+    its interactions are correct. This measures the agent's capability to maintain fully
+    correct multi-turn conversations.
+
+    Metrics:
+    - pass@K: Probability of ≥1 correct conversation when attempting K different conversations (0.0-1.0)
+    - pass^K: Probability of K consecutive correct conversations (0.0-1.0)
+    - Tool Correctness: Evaluates correct tool usage per interaction (selection, parameters, sequence, utilization)
 
     Uses an LLM judge for answer correctness, and direct dictionary comparison for tool correctness.
 
+    Formulas:
+        pass@k = 1 - (1 - p)^k  # Prob. of ≥1 correct conversation, p = c/n
+        pass^k = p^k             # Prob. of all k conversations correct
+
+    Where:
+        n = total conversations evaluated
+        c = fully correct conversations (all interactions correct)
+        p = c/n, estimated success rate
+        k = number of conversation attempts (required, user-specified)
+
     Args:
-        retriever: Retriever class for loading datasets
+        retriever: Retriever class for loading datasets (each Dataset = 1 conversation)
         model: LangChain BaseChatModel instance for evaluation
+        k: Number of independent attempts for pass@K/pass^K computation (required)
         use_structured_output: If True, use LangChain's with_structured_output()
         bos_json_clause: Opening marker for JSON blocks
         eos_json_clause: Closing marker for JSON blocks
         threshold: Similarity threshold for answer correctness (default: 0.7)
-        tool_threshold: Threshold for tool correctness (default: 0.75)
+        tool_threshold: Threshold for tool correctness (default: 1.0)
         tool_weights: Weights for tool correctness components (default: 0.25 each)
         **kwargs: Additional arguments passed to FairForge base class
 
     Example:
         >>> from langchain_groq import ChatGroq
         >>> model = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
-        >>> results = Agentic.run(MyRetriever, model=model, threshold=0.8)
+        >>> results = Agentic.run(MyRetriever, model=model, k=3, threshold=0.8)
+        >>> for r in results:
+        ...     print(f"{r.session_id}: pass@3={r.pass_at_k:.3f}, pass^3={r.pass_pow_k:.3f}")
     """
 
     def __init__(
         self,
         retriever: type[Retriever],
         model: BaseChatModel,
-        use_structured_output: bool = False,
+        k: int,
+        use_structured_output: bool = True,
         bos_json_clause: str = "```json",
         eos_json_clause: str = "```",
         threshold: float = 0.7,
@@ -62,6 +125,7 @@ class Agentic(FairForge):
         super().__init__(retriever, **kwargs)
 
         self.model = model
+        self.k = k
         self.use_structured_output = use_structured_output
         self.bos_json_clause = bos_json_clause
         self.eos_json_clause = eos_json_clause
@@ -80,6 +144,10 @@ class Agentic(FairForge):
         self.logger.info(f"Initialized Agentic metric with model: {model.__class__.__name__}")
         self.logger.info(f"Thresholds - Answer: {threshold}, Tool: {tool_threshold}")
 
+    @classmethod
+    def run(cls, retriever: type[Retriever], k: int, **kwargs) -> list[AgenticMetric]:
+        return cls(retriever, k=k, **kwargs)._process()
+
     def batch(
         self,
         session_id: str,
@@ -95,8 +163,6 @@ class Agentic(FairForge):
     def _evaluate_answer_correctness(self, judge: Judge, query: str, answer: str, ground_truth: str) -> float:
         """Evaluate answer correctness using LLM judge. Returns score 0.0-1.0."""
         system_prompt = """You are a STRICT evaluator. Your task is to determine if an agent's answer is correct compared to the ground truth.
-
-**Question:** {query}
 
 **Agent's Answer:** {answer}
 
@@ -133,23 +199,35 @@ Examples:
 - Q: "Capital of France?", A: "London", GT: "Paris" → 0.0 (wrong country)
 """
 
-        data = {"query": query, "answer": answer, "ground_truth": ground_truth}
+        data = {"answer": answer, "ground_truth": ground_truth}
 
         try:
             _reasoning, result = judge.check(
-                system_prompt, "Evaluate the answer correctness.", data, output_schema=AnswerCorrectnessOutput
+                system_prompt, query, data, output_schema=AnswerCorrectnessOutput
             )
 
+            self.logger.debug(f"Judge returned - reasoning: {_reasoning[:100] if _reasoning else 'None'}...")
+
             if result is None:
-                self.logger.error("No valid response from judge for answer correctness")
+                self.logger.error("❌ Judge returned None - no valid JSON found in response")
                 return 0.0
 
-            if isinstance(result, dict):
-                return float(result.get("correctness_score", 0.0))
-            return float(result.correctness_score)
+            self.logger.debug(f"✓ Judge result type: {type(result)}")
+            self.logger.debug(f"✓ Judge result content: {result}")
 
-        except Exception:
-            self.logger.exception("Error evaluating answer correctness")
+            if isinstance(result, dict):
+                score = float(result.get("correctness_score", 0.0))
+                self.logger.debug(f"✓ Extracted score from dict: {score}")
+                if score == 0.0 and "correctness_score" not in result:
+                    self.logger.warning(f"⚠️  Dict missing 'correctness_score' key. Keys: {list(result.keys())}")
+                return score
+
+            score = float(result.correctness_score)
+            self.logger.debug(f"✓ Extracted score from object: {score}")
+            return score
+
+        except Exception as e:
+            self.logger.exception(f"❌ Error evaluating answer correctness: {e}")
             return 0.0
 
     def _evaluate_tool_correctness(
@@ -280,8 +358,8 @@ Examples:
         )
 
     def _process(self) -> list[AgenticMetric]:
-        """Group responses by qa_id and evaluate pass@K, pass^K, and tool correctness."""
-        self.logger.info("[Agentic] Grouping datasets by qa_id for pass@K evaluation")
+        """Evaluate each conversation (dataset) as a complete unit."""
+        self.logger.info(f"[Agentic] Evaluating {len(self.dataset)} conversations")
 
         judge = Judge(
             model=self.model,
@@ -291,86 +369,82 @@ Examples:
             verbose=self.verbose,
         )
 
-        qa_groups: dict[str, list] = defaultdict(list)
-        for dataset in self.dataset:
-            for batch in dataset.conversation:
-                qa_groups[batch.qa_id].append(
-                    {
-                        "session_id": dataset.session_id,
-                        "assistant_id": dataset.assistant_id,
-                        "query": batch.query,
-                        "answer": batch.assistant,
-                        "ground_truth": batch.ground_truth_assistant,
-                        "agentic": batch.agentic,
-                        "ground_truth_agentic": batch.ground_truth_agentic,
-                    }
-                )
-
-        self.logger.info(f"[Agentic] Found {len(qa_groups)} unique qa_ids")
-
-        for qa_id, responses in qa_groups.items():
-            k = len(responses)
-            self.logger.info(f"[Agentic] Evaluating qa_id={qa_id} with K={k} responses")
-
-            ground_truth = responses[0]["ground_truth"]
-            ground_truth_agentic = responses[0].get("ground_truth_agentic")
+        for dataset_idx, dataset in enumerate(self.dataset, 1):
+            total_interactions = len(dataset.conversation)
+            self.logger.info(
+                f"[Agentic] Evaluating conversation {dataset_idx}/{len(self.dataset)}: "
+                f"{dataset.session_id} ({total_interactions} interactions)"
+            )
 
             correctness_scores = []
             correct_indices = []
+            tool_correctness_scores = []
 
-            for i, response in enumerate(responses):
-                self.logger.debug(f"  Evaluating response {i + 1}/{k} (assistant: {response['assistant_id']})")
+            # Evaluate each interaction in the conversation
+            for i, batch in enumerate(dataset.conversation):
+                self.logger.debug(f"  Interaction {i + 1}/{total_interactions} (qa_id: {batch.qa_id})")
 
+                # Evaluate answer correctness
                 score = self._evaluate_answer_correctness(
-                    judge=judge, query=response["query"], answer=response["answer"], ground_truth=ground_truth
+                    judge=judge,
+                    query=batch.query,
+                    answer=batch.assistant,
+                    ground_truth=batch.ground_truth_assistant,
                 )
 
                 correctness_scores.append(score)
 
                 if score >= self.threshold:
                     correct_indices.append(i)
-                    self.logger.debug(f"    Score: {score:.3f} ✅ CORRECT")
+                    self.logger.debug(f"    Answer score: {score:.3f} ✅ CORRECT")
                 else:
-                    self.logger.debug(f"    Score: {score:.3f} ❌ INCORRECT")
+                    self.logger.debug(f"    Answer score: {score:.3f} ❌ INCORRECT")
 
-            pass_at_k = len(correct_indices) > 0
-            pass_pow_k = len(correct_indices) == k
-
-            self.logger.info(f"  pass@{k}: {pass_at_k}, pass^{k}: {pass_pow_k} ({len(correct_indices)}/{k} correct)")
-
-            # Evaluate tool correctness for ALL K responses
-            tool_correctness_scores = []
-            if ground_truth_agentic:
-                self.logger.debug("  Evaluating tool correctness for all responses...")
-                for i, response in enumerate(responses):
-                    if response.get("agentic") and response["agentic"].get("tools_used"):
+                # Evaluate tool correctness if applicable
+                if batch.ground_truth_agentic:
+                    if batch.agentic and batch.agentic.get("tools_used"):
                         tool_correctness = self._evaluate_tool_correctness(
-                            agentic=response["agentic"], ground_truth_agentic=ground_truth_agentic
+                            agentic=batch.agentic, ground_truth_agentic=batch.ground_truth_agentic
                         )
                         tool_correctness_scores.append(tool_correctness)
                         self.logger.debug(
-                            f"    Response {i+1}/{k} ({response['assistant_id']}): "
-                            f"Overall={tool_correctness.overall_correctness:.3f}, "
+                            f"    Tool correctness: {tool_correctness.overall_correctness:.3f}, "
                             f"Correct={tool_correctness.is_correct}"
                         )
                     else:
                         tool_correctness_scores.append(None)
-                        self.logger.debug(f"    Response {i+1}/{k} ({response['assistant_id']}): No tools used")
+                        self.logger.debug("    No tools used")
+                else:
+                    tool_correctness_scores.append(None)
+
+            # Determine if conversation is fully correct
+            correct_interactions = len(correct_indices)
+            is_fully_correct = correct_interactions == total_interactions
+
+            status = "✅ FULLY CORRECT" if is_fully_correct else f"❌ PARTIAL ({correct_interactions}/{total_interactions})"
+            self.logger.info(f"  Conversation result: {status}")
 
             metric = AgenticMetric(
-                session_id=responses[0]["session_id"],
-                assistant_id=responses[0]["assistant_id"],
-                qa_id=qa_id,
-                k=k,
+                session_id=dataset.session_id,
+                assistant_id=dataset.assistant_id,
+                total_interactions=total_interactions,
+                correct_interactions=correct_interactions,
+                is_fully_correct=is_fully_correct,
                 threshold=self.threshold,
                 correctness_scores=correctness_scores,
-                pass_at_k=pass_at_k,
-                pass_pow_k=pass_pow_k,
                 correct_indices=correct_indices,
-                tool_correctness_scores=tool_correctness_scores,
+                tool_correctness_scores=tool_correctness_scores if tool_correctness_scores else [],
+                k=self.k,
+                pass_at_k=pass_at_k(total_interactions, correct_interactions, self.k),
+                pass_pow_k=pass_pow_k(total_interactions, correct_interactions, self.k),
             )
 
             self.metrics.append(metric)
 
-        self.logger.info(f"[Agentic] Completed evaluation. Total metrics: {len(self.metrics)}")
+        fully_correct_count = sum(1 for m in self.metrics if m.is_fully_correct)
+        self.logger.info(
+            f"[Agentic] Completed evaluation. "
+            f"{fully_correct_count}/{len(self.metrics)} conversations fully correct "
+            f"({fully_correct_count/len(self.metrics)*100:.1f}%)"
+        )
         return self.metrics
