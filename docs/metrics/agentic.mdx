@@ -97,7 +97,7 @@ print(f"Fully correct: {agg['fully_correct_conversations']}/{agg['total_conversa
 | `threshold` | `float` | `0.7` | Answer correctness threshold (0.6-0.9) |
 | `tool_threshold` | `float` | `0.75` | Tool correctness threshold (0.6-1.0) |
 | `tool_weights` | `dict[str, float]` | `0.25` each | Weights for tool aspects (selection, parameters, sequence, utilization) |
-| `use_structured_output` | `bool` | `False` | Use LangChain structured output |
+| `use_structured_output` | `bool` | `True` | Use LangChain structured output |
 | `bos_json_clause` | `str` | `"```json"` | JSON block start marker |
 | `eos_json_clause` | `str` | `"```"` | JSON block end marker |
 | `verbose` | `bool` | `False` | Enable verbose logging |

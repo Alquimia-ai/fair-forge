@@ -151,7 +151,7 @@ def run(payload: dict) -> dict[str, Any]:
                     "sequence": 0.25,
                     "utilization": 0.25
                 },
-                "use_structured_output": false,
+                "use_structured_output": true,
                 "verbose": false,
                 "k": 3  # Optional: K value for pass@K calculations (default: 3)
             }
@@ -187,7 +187,7 @@ def run(payload: dict) -> dict[str, Any]:
             threshold=config.get("threshold", 0.7),
             tool_threshold=config.get("tool_threshold", 0.75),
             tool_weights=config.get("tool_weights"),
-            use_structured_output=config.get("use_structured_output", False),
+            use_structured_output=config.get("use_structured_output", True),
             verbose=config.get("verbose", False),
         )
     except Exception as e:

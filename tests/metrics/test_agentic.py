@@ -22,7 +22,7 @@ class TestAgenticMetric:
         agentic = Agentic(retriever=MockRetriever, model=mock_model)
 
         assert agentic.model == mock_model
-        assert agentic.use_structured_output is False
+        assert agentic.use_structured_output is True
         assert agentic.bos_json_clause == "```json"
         assert agentic.eos_json_clause == "```"
         assert agentic.threshold == 0.7
