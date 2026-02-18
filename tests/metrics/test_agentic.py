@@ -461,183 +461,58 @@ class TestAgenticMetric:
         )
 
     def test_pass_at_k_formula(self):
-        """Test pass@k formula implementation."""
+        """Test pass@k Bernoulli formula: 1 - (1 - c/n)^k."""
         from fair_forge.metrics.agentic import pass_at_k
 
-        # 2/3 correct, sample k=3
+        # 2/3 correct, k=3: 1 - (1/3)^3 = 1 - 1/27 ≈ 0.963
         result = pass_at_k(n=3, c=2, k=3)
-        assert result == 1.0  # If c=2, k=3, then k > n-c, so result is 1.0
+        assert 0.96 < result < 0.97
 
-        # 0/3 correct
+        # 0/3 correct: always 0.0
         result = pass_at_k(n=3, c=0, k=3)
         assert result == 0.0
 
-        # 3/3 correct
+        # 3/3 correct: always 1.0
         result = pass_at_k(n=3, c=3, k=3)
         assert result == 1.0
 
-        # Aggregated: 9 attempts, 3 correct, k=3
+        # 9 evaluated, 3 correct, k=3: 1 - (2/3)^3 = 1 - 8/27 ≈ 0.704
         result = pass_at_k(n=9, c=3, k=3)
-        assert 0.7 < result < 0.8  # Should be approximately 0.762
+        assert 0.70 < result < 0.71
 
     def test_pass_pow_k_formula(self):
-        """Test pass^k formula implementation."""
+        """Test pass^k formula: (c/n)^k."""
         from fair_forge.metrics.agentic import pass_pow_k
 
-        # 2/3 correct, k=3
+        # 2/3 correct, k=3: (2/3)^3 ≈ 0.296
         result = pass_pow_k(n=3, c=2, k=3)
-        assert 0.29 < result < 0.30  # (2/3)^3 ≈ 0.296
+        assert 0.29 < result < 0.30
 
-        # 0/3 correct
+        # 0/3 correct: always 0.0
         result = pass_pow_k(n=3, c=0, k=3)
         assert result == 0.0
 
-        # 3/3 correct
+        # 3/3 correct: always 1.0
         result = pass_pow_k(n=3, c=3, k=3)
         assert result == 1.0
 
-        # Aggregated: 9 attempts, 3 correct, k=3
+        # 9 evaluated, 3 correct, k=3: (1/3)^3 ≈ 0.037
         result = pass_pow_k(n=9, c=3, k=3)
-        assert 0.037 < result < 0.038  # (3/9)^3 ≈ 0.037
+        assert 0.037 < result < 0.038
 
-    def test_pass_at_k_error_handling(self):
-        """Test pass@k error handling for invalid inputs."""
+    def test_pass_at_k_k_exceeds_n(self):
+        """Test pass@k when k > n — valid with the Bernoulli model."""
         from fair_forge.metrics.agentic import pass_at_k
 
-        with pytest.raises(ValueError, match="cannot sample more than available"):
-            pass_at_k(n=3, c=2, k=5)
+        # k=5 > n=3: valid, p=2/3, 1-(1/3)^5 ≈ 0.9959
+        result = pass_at_k(n=3, c=2, k=5)
+        assert 0.99 < result < 1.0
 
-    def test_pass_pow_k_error_handling(self):
-        """Test pass^k error handling for invalid inputs."""
+    def test_pass_pow_k_k_exceeds_n(self):
+        """Test pass^k when k > n — valid with the Bernoulli model."""
         from fair_forge.metrics.agentic import pass_pow_k
 
-        with pytest.raises(ValueError, match=r"k \(5\) > n \(3\)"):
-            pass_pow_k(n=3, c=2, k=5)
+        # k=5 > n=3: valid, (2/3)^5 ≈ 0.132
+        result = pass_pow_k(n=3, c=2, k=5)
+        assert 0.13 < result < 0.14
 
-    def test_aggregate_metrics_empty(self):
-        """Test aggregate_metrics with empty list."""
-        result = Agentic.aggregate_metrics([])
-
-        assert result["total_conversations"] == 0
-        assert result["fully_correct_conversations"] == 0
-        assert result["conversation_success_rate"] == 0.0
-        assert result["k"] == 3
-        assert result["pass_at_k"] == 0.0
-        assert result["pass_pow_k"] == 0.0
-
-    def test_aggregate_metrics_single_conversation(self, mock_model):
-        """Test aggregate_metrics with a single conversation."""
-        metrics = [
-            AgenticMetric(
-                session_id="conversation_001",
-                assistant_id="agent_v1",
-                total_interactions=3,
-                correct_interactions=3,
-                is_fully_correct=True,
-                threshold=0.7,
-                correctness_scores=[0.9, 0.85, 0.95],
-                correct_indices=[0, 1, 2],
-            )
-        ]
-
-        result = Agentic.aggregate_metrics(metrics, k=1)
-
-        assert result["total_conversations"] == 1
-        assert result["fully_correct_conversations"] == 1
-        assert result["conversation_success_rate"] == 1.0
-        assert result["k"] == 1
-        assert result["pass_at_k"] == 1.0  # 1/1 correct
-        assert result["pass_pow_k"] == 1.0  # (1/1)^1 = 1.0
-
-    def test_aggregate_metrics_multiple_conversations(self, mock_model):
-        """Test aggregate_metrics with multiple conversations."""
-        metrics = [
-            AgenticMetric(
-                session_id="conversation_001",
-                assistant_id="agent_v1",
-                total_interactions=3,
-                correct_interactions=3,
-                is_fully_correct=True,
-                threshold=0.7,
-                correctness_scores=[0.9, 0.85, 0.95],
-                correct_indices=[0, 1, 2],
-            ),
-            AgenticMetric(
-                session_id="conversation_002",
-                assistant_id="agent_v1",
-                total_interactions=2,
-                correct_interactions=2,
-                is_fully_correct=True,
-                threshold=0.7,
-                correctness_scores=[0.9, 0.85],
-                correct_indices=[0, 1],
-            ),
-            AgenticMetric(
-                session_id="conversation_003",
-                assistant_id="agent_v1",
-                total_interactions=3,
-                correct_interactions=1,
-                is_fully_correct=False,  # NOT fully correct
-                threshold=0.7,
-                correctness_scores=[0.9, 0.3, 0.2],
-                correct_indices=[0],
-            ),
-            AgenticMetric(
-                session_id="conversation_004",
-                assistant_id="agent_v1",
-                total_interactions=1,
-                correct_interactions=1,
-                is_fully_correct=True,
-                threshold=0.7,
-                correctness_scores=[0.9],
-                correct_indices=[0],
-            ),
-        ]
-
-        result = Agentic.aggregate_metrics(metrics, k=3)
-
-        assert result["total_conversations"] == 4
-        assert result["fully_correct_conversations"] == 3  # 001, 002, 004
-        assert result["conversation_success_rate"] == 0.75  # 3/4
-        assert result["k"] == 3
-        # pass@3 with n=4, c=3, k=3: 1 - C(1,3)/C(4,3) = 1 - 0/4 = 1.0
-        assert result["pass_at_k"] == 1.0
-        # pass^3 with success_rate=0.75: (0.75)^3 = 0.421875
-        assert 0.42 < result["pass_pow_k"] < 0.43
-
-    def test_aggregate_metrics_custom_k(self, mock_model):
-        """Test aggregate_metrics with user-provided k value."""
-        metrics = [
-            AgenticMetric(
-                session_id="conversation_001",
-                assistant_id="agent_v1",
-                total_interactions=2,
-                correct_interactions=2,
-                is_fully_correct=True,
-                threshold=0.7,
-                correctness_scores=[0.9, 0.85],
-                correct_indices=[0, 1],
-            ),
-            AgenticMetric(
-                session_id="conversation_002",
-                assistant_id="agent_v1",
-                total_interactions=3,
-                correct_interactions=1,
-                is_fully_correct=False,
-                threshold=0.7,
-                correctness_scores=[0.95, 0.2, 0.3],
-                correct_indices=[0],
-            ),
-        ]
-
-        # Test with k=2 (out of 2 conversations, 1 is fully correct)
-        result = Agentic.aggregate_metrics(metrics, k=2)
-
-        assert result["total_conversations"] == 2
-        assert result["fully_correct_conversations"] == 1  # Only first one
-        assert result["conversation_success_rate"] == 0.5  # 1/2
-        assert result["k"] == 2
-        # pass@2 with n=2, c=1, k=2: 1 - C(1,2)/C(2,2) = 1 - 0/1 = 1.0 (k > n-c)
-        assert result["pass_at_k"] == 1.0
-        # pass^2: (1/2)^2 = 0.25
-        assert result["pass_pow_k"] == 0.25

@@ -9,7 +9,7 @@ import os
 from typing import Any
 
 from fair_forge.core import Retriever
-from fair_forge.metrics.agentic import Agentic
+from fair_forge.metrics.agentic import Agentic, pass_at_k, pass_pow_k
 from fair_forge.schemas import Dataset
 
 
@@ -153,7 +153,7 @@ def run(payload: dict) -> dict[str, Any]:
                 },
                 "use_structured_output": true,
                 "verbose": false,
-                "k": 3  # Optional: K value for pass@K calculations (default: 3)
+                "k": 3
             }
         }
     """
@@ -227,29 +227,31 @@ def run(payload: dict) -> dict[str, Any]:
 
         results.append(result)
 
-    # Calculate aggregated metrics (recommended for overall performance)
-    k_value = config.get("k", 3)  # Default K=3 for pass@K calculations
-    aggregated = Agentic.aggregate_metrics(metrics, k=k_value)
+    k_value = config.get("k", 3)
+    n_conversations = len(metrics)
+    c_conversations = sum(1 for m in metrics if m.is_fully_correct)
+    success_rate = c_conversations / n_conversations
+    agg_pass_at_k = pass_at_k(n_conversations, c_conversations, k_value)
+    agg_pass_pow_k = pass_pow_k(n_conversations, c_conversations, k_value)
 
-    # Determine agent quality
     interpretation = "functional"
-    if aggregated["pass_at_k"] > 0.95 and aggregated["pass_pow_k"] > 0.7:
+    if agg_pass_at_k > 0.95 and agg_pass_pow_k > 0.7:
         interpretation = "reliable"
-    elif aggregated["pass_at_k"] > 0.95 and aggregated["pass_pow_k"] < 0.5:
+    elif agg_pass_at_k > 0.95 and agg_pass_pow_k < 0.5:
         interpretation = "inconsistent"
-    elif aggregated["pass_at_k"] < 0.7:
+    elif agg_pass_at_k < 0.7:
         interpretation = "needs_improvement"
 
     return {
         "success": True,
         "per_conversation_metrics": results,
         "aggregated_metrics": {
-            "total_conversations": aggregated["total_conversations"],
-            "fully_correct_conversations": aggregated["fully_correct_conversations"],
-            "conversation_success_rate": round(aggregated["conversation_success_rate"], 4),
-            "k": aggregated["k"],
-            "pass_at_k": round(aggregated["pass_at_k"], 4),
-            "pass_pow_k": round(aggregated["pass_pow_k"], 4),
+            "total_conversations": n_conversations,
+            "fully_correct_conversations": c_conversations,
+            "conversation_success_rate": round(success_rate, 4),
+            "k": k_value,
+            "pass_at_k": round(agg_pass_at_k, 4),
+            "pass_pow_k": round(agg_pass_pow_k, 4),
             "interpretation": interpretation,
         },
     }

@@ -19,17 +19,20 @@ This metric evaluates:
 ### Formulas
 
 ```
-pass@k = 1 - C(n-c, k) / C(n, k)   # Probability of ≥1 correct conversation
-pass^k = (c/n)^k                    # Probability of all k conversations correct
+pass@k = 1 - (1 - p)^k   # Probability of ≥1 correct in k independent attempts
+pass^k = p^k              # Probability of all k attempts correct
+
+Where p = c/n (estimated success rate from evaluation)
 ```
 
 Where:
 - **n** = total conversations evaluated
 - **c** = fully correct conversations (all interactions correct)
-- **k** = number of conversations to attempt (user-configurable)
+- **p** = c/n, the agent's estimated success rate
+- **k** = number of attempts (user-configurable, not bounded by n)
 
 <Note>
-**Important:** This metric evaluates **complete conversations** as units. Each Dataset represents one conversation with multiple interactions. A conversation is correct only if ALL its interactions are correct. Use `Agentic.aggregate_metrics()` to calculate pass@K and pass^K with your chosen K value. The default `tool_threshold=0.75` requires strong tool usage (75% correct).
+**Important:** This metric evaluates **complete conversations** as units. Each Dataset represents one conversation with multiple interactions. A conversation is correct only if ALL its interactions are correct. Use the standalone `pass_at_k(n, c, k)` and `pass_pow_k(n, c, k)` functions to compute aggregated metrics with your chosen K value. The default `tool_threshold=1.0` requires perfect tool usage — lower it (e.g. `0.75`) to allow minor deviations.
 </Note>
 
 ## Installation
@@ -42,7 +45,7 @@ uv add langchain-groq  # Or your preferred LLM provider
 ## Basic Usage
 
 ```python
-from fair_forge.metrics.agentic import Agentic
+from fair_forge.metrics.agentic import Agentic, pass_at_k, pass_pow_k
 from langchain_groq import ChatGroq
 from your_retriever import AgenticRetriever
 
@@ -74,11 +77,13 @@ for metric in metrics:
             if tc:
                 print(f"  Interaction {i+1} tool correctness: {tc.overall_correctness:.2f}")
 
-# Aggregated metrics with chosen K (recommended for overall performance)
-agg = Agentic.aggregate_metrics(metrics, k=3)
-print(f"\npass@{agg['k']}: {agg['pass_at_k']:.3f} ({agg['pass_at_k']*100:.1f}%)")
-print(f"pass^{agg['k']}: {agg['pass_pow_k']:.3f} ({agg['pass_pow_k']*100:.1f}%)")
-print(f"Fully correct: {agg['fully_correct_conversations']}/{agg['total_conversations']}")
+# Compute aggregated metrics manually
+n = len(metrics)
+c = sum(1 for m in metrics if m.is_fully_correct)
+K = 3
+print(f"\npass@{K}: {pass_at_k(n, c, K):.3f} ({pass_at_k(n, c, K)*100:.1f}%)")
+print(f"pass^{K}: {pass_pow_k(n, c, K):.3f} ({pass_pow_k(n, c, K)*100:.1f}%)")
+print(f"Fully correct: {c}/{n}")
 ```
 
 ## Parameters
@@ -95,29 +100,31 @@ print(f"Fully correct: {agg['fully_correct_conversations']}/{agg['total_conversa
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `threshold` | `float` | `0.7` | Answer correctness threshold (0.6-0.9) |
-| `tool_threshold` | `float` | `0.75` | Tool correctness threshold (0.6-1.0) |
+| `tool_threshold` | `float` | `1.0` | Tool correctness threshold (0.6-1.0) |
 | `tool_weights` | `dict[str, float]` | `0.25` each | Weights for tool aspects (selection, parameters, sequence, utilization) |
 | `use_structured_output` | `bool` | `True` | Use LangChain structured output |
 | `bos_json_clause` | `str` | `"```json"` | JSON block start marker |
 | `eos_json_clause` | `str` | `"```"` | JSON block end marker |
 | `verbose` | `bool` | `False` | Enable verbose logging |
 
-### Aggregated Metrics Method
+### Aggregation Functions
+
+`pass_at_k` and `pass_pow_k` are standalone module-level functions — aggregate results yourself after evaluation:
 
 ```python
-@staticmethod
-def aggregate_metrics(
-    metrics: list[AgenticMetric],
-    k: int | None = None
-) -> dict[str, Any]
+from fair_forge.metrics.agentic import pass_at_k, pass_pow_k
+
+n = len(metrics)                                    # total conversations
+c = sum(1 for m in metrics if m.is_fully_correct)  # fully correct conversations
+
+pass_at_k(n, c, k=3)   # 1 - (1 - c/n)^3  →  Probability of ≥1 correct in 3 attempts
+pass_pow_k(n, c, k=3)  # (c/n)^3          →  Probability of all 3 correct
 ```
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `metrics` | `list[AgenticMetric]` | Required | List of per-conversation metrics from `Agentic.run()` |
-| `k` | `int \| None` | `3` | K value for pass@K calculations (number of conversations to attempt) |
-
-**Returns:** Dictionary with `total_conversations`, `fully_correct_conversations`, `conversation_success_rate`, `k`, `pass_at_k`, and `pass_pow_k`.
+| Function | Parameters | Description |
+|----------|------------|-------------|
+| `pass_at_k(n, c, k)` | n=total, c=correct, k=attempts | Probability of ≥1 correct in k attempts |
+| `pass_pow_k(n, c, k)` | n=total, c=correct, k=attempts | Probability of all k attempts correct |
 
 ## Data Requirements
 
@@ -263,26 +270,20 @@ class ToolCorrectnessScore(BaseModel):
 
 ## Aggregated Metrics
 
-For overall agent performance, use `aggregate_metrics()` with your chosen K value:
+Aggregate results yourself using `pass_at_k` and `pass_pow_k` — you choose K after evaluation:
 
 ```python
-# Calculate pass@K and pass^K with K=3
-agg = Agentic.aggregate_metrics(metrics, k=3)
+from fair_forge.metrics.agentic import pass_at_k, pass_pow_k
 
-# Returns dict with:
-# {
-#     "total_conversations": 5,            # n = conversations evaluated
-#     "fully_correct_conversations": 3,    # c = fully correct (all interactions)
-#     "conversation_success_rate": 0.6,    # c/n = 3/5
-#     "k": 3,                              # K value for calculations
-#     "pass_at_k": 0.936,                  # Probability of ≥1 correct in 3 attempts
-#     "pass_pow_k": 0.216                  # Probability of all 3 correct
-# }
+n = len(metrics)                                    # n = conversations evaluated
+c = sum(1 for m in metrics if m.is_fully_correct)  # c = fully correct (all interactions)
+success_rate = c / n                                # e.g. 3/5 = 0.6
 
 # Try different K values
 for k in [1, 2, 3, 5]:
-    agg = Agentic.aggregate_metrics(metrics, k=k)
-    print(f"pass@{k}: {agg['pass_at_k']:.3f}")
+    pak = pass_at_k(n, c, k)
+    ppk = pass_pow_k(n, c, k)
+    print(f"pass@{k}={pak:.3f}  pass^{k}={ppk:.3f}")
 ```
 
 ### Conversation-Level Evaluation
@@ -322,14 +323,14 @@ for k in [1, 2, 3, 5]:
 ### Tool Correctness Scores
 
 <Note>
-**Default threshold: 0.75** - By default, tool correctness requires 75% or higher. You can adjust this with the `tool_threshold` parameter based on your strictness requirements.
+**Default threshold: 1.0** - By default, tool correctness requires a perfect score. Lower it with the `tool_threshold` parameter to allow minor deviations (e.g. `tool_threshold=0.75`).
 </Note>
 
 | Score Range | Interpretation |
 |-------------|----------------|
 | **1.0** | Perfect - All aspects correct |
 | 0.9 - 0.99 | Excellent - Near perfect with tiny issues |
-| **0.75 - 0.89** | **Good - Minor issues (default threshold)** |
+| 0.75 - 0.89 | Good - Minor issues |
 | 0.6 - 0.74 | Moderate - Several issues |
 | 0.4 - 0.59 | Poor - Significant problems |
 | 0.0 - 0.39 | Very Poor - Incorrect tool usage |
@@ -345,7 +346,7 @@ for k in [1, 2, 3, 5]:
 
 ```python
 import os
-from fair_forge.metrics.agentic import Agentic
+from fair_forge.metrics.agentic import Agentic, pass_at_k, pass_pow_k
 from fair_forge.core.retriever import Retriever
 from fair_forge.schemas.common import Dataset, Batch
 from langchain_groq import ChatGroq
@@ -487,16 +488,21 @@ for metric in metrics:
             else:
                 print(f"\n  Interaction {i}: No tools used")
 
-# Calculate aggregated metrics with K=3 (recommended)
-agg = Agentic.aggregate_metrics(metrics, k=3)
+# Compute aggregated metrics manually
+n = len(metrics)
+c = sum(1 for m in metrics if m.is_fully_correct)
 
 print(f"\n{'=' * 60}")
-print(f"Aggregated Metrics (K={agg['k']}):")
-print(f"  Total conversations (n): {agg['total_conversations']}")
-print(f"  Fully correct (c): {agg['fully_correct_conversations']}")
-print(f"  Success rate: {agg['conversation_success_rate']:.1%}")
-print(f"\n  pass@{agg['k']}: {agg['pass_at_k']:.3f} ({agg['pass_at_k']*100:.1f}%)")
-print(f"  pass^{agg['k']}: {agg['pass_pow_k']:.3f} ({agg['pass_pow_k']*100:.1f}%)")
+print(f"Aggregated Metrics:")
+print(f"  Total conversations (n): {n}")
+print(f"  Fully correct (c): {c}  ({c/n:.1%})")
+
+for k in [1, 2, 3, 5]:
+    if k > n:
+        continue
+    pak = pass_at_k(n, c, k)
+    ppk = pass_pow_k(n, c, k)
+    print(f"  K={k}: pass@{k}={pak:.3f}, pass^{k}={ppk:.3f}")
 
 # Average tool correctness across all interactions
 all_tool_scores = [
@@ -507,21 +513,17 @@ all_tool_scores = [
 ]
 if all_tool_scores:
     avg_tool_correctness = sum(all_tool_scores) / len(all_tool_scores)
-    print(f"\n  Avg tool correctness: {avg_tool_correctness:.2f}")
+    print(f"  Avg tool correctness: {avg_tool_correctness:.2f}")
 
-# Try different K values
-print(f"\n{'=' * 60}")
-print("pass@K with different K values:")
-for k in [1, 2, 3, 5]:
-    agg_k = Agentic.aggregate_metrics(metrics, k=k)
-    print(f"  K={k}: pass@{k}={agg_k['pass_at_k']:.3f}, pass^{k}={agg_k['pass_pow_k']:.3f}")
-
-# Interpretation
-if agg['pass_at_k'] > 0.95 and agg['pass_pow_k'] < 0.5:
+# Interpretation (using K=3)
+K = min(3, n)
+pak3 = pass_at_k(n, c, K)
+ppk3 = pass_pow_k(n, c, K)
+if pak3 > 0.95 and ppk3 < 0.5:
     print("\n  ⚠️  High pass@k but low pass^k → Agent is INCONSISTENT")
-elif agg['pass_at_k'] > 0.95 and agg['pass_pow_k'] > 0.7:
+elif pak3 > 0.95 and ppk3 > 0.7:
     print("\n  ✅ High pass@k and pass^k → Agent is RELIABLE")
-elif agg['pass_at_k'] < 0.7:
+elif pak3 < 0.7:
     print("\n  ❌ Low pass@k → Agent needs IMPROVEMENT")
 ```
 
@@ -593,21 +595,21 @@ for metric in metrics:
     print(f"Interaction 3 tool score: {metric.tool_correctness_scores[2]}")  # None
 ```
 
-### Why tool_threshold=0.75 by Default?
+### Why tool_threshold=1.0 by Default?
 
-Tool usage should be evaluated with high standards but allow for minor deviations:
+Tool usage in agentic systems should be exact — wrong parameters or tools can cascade into incorrect answers. The default requires a perfect score:
 
-- **1.0 (Perfect)**: Agent used exactly the right tools, parameters, sequence, and utilized results
-- **0.75-0.99 (Good)**: Minor issues but generally correct (default threshold)
-- **&lt;0.75 (Needs work)**: Significant problems with tool usage
+- **1.0 (Perfect)**: Exactly the right tools, parameters, sequence, and result utilization — **default**
+- **0.75-0.99**: Minor issues but generally correct — use `tool_threshold=0.75` to allow this
+- **&lt;0.75**: Significant problems with tool usage
 
-If you want to be stricter, raise the threshold:
+Lower the threshold if you want to allow minor deviations:
 
 ```python
 metrics = Agentic.run(
     AgenticRetriever,
     model=judge_model,
-    tool_threshold=1.0,  # Require perfect tool usage
+    tool_threshold=0.75,  # Allow minor tool usage imperfections
 )
 ```
 
@@ -698,7 +700,7 @@ metrics = Agentic.run(
   </Accordion>
 
   <Accordion title="Tool Correctness Always Fails">
-    **Cause**: Default `tool_threshold=0.75` requires 75% correctness, or `ground_truth_agentic` expectations don't match actual tool usage.
+    **Cause**: Default `tool_threshold=1.0` requires perfect tool correctness, or `ground_truth_agentic` expectations don't match actual tool usage.
 
     **Solution**:
     - **Lower the threshold** if you want to be more lenient: `tool_threshold=0.6`

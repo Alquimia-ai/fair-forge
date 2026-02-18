@@ -209,7 +209,7 @@
         "qa_id": "q1_math",
         "query": "What is 15 + 27?",
         "ground_truth_assistant": "15 + 27 equals 42.",
-        "assistant": "I calculated 15 + 27 and got 42.",
+        "assistant": "I calculated 15 + 27 and got 53.",
         "agentic": {
           "tools_used": [
             {

@@ -1,7 +1,6 @@
 """Agentic metric for evaluating agent responses with pass@K and tool correctness."""
 
 from collections import defaultdict
-from math import comb
 from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -22,44 +21,45 @@ class AnswerCorrectnessOutput(BaseModel):
 
 def pass_at_k(n: int, c: int, k: int) -> float:
     """
-    Calculate pass@k: probability of ≥1 correct conversation when attempting k conversations.
+    Calculate pass@k: probability of ≥1 correct conversation in k independent attempts.
+
+    Uses the Bernoulli model: p = c/n is the estimated success rate from evaluation,
+    and 1 - (1-p)^k is the probability of at least one success in k independent attempts.
 
     Args:
         n: Total conversations evaluated
         c: Fully correct conversations
-        k: Number of conversation attempts
+        k: Number of independent attempts (not bounded by n)
 
     Returns:
         Probability between 0.0 and 1.0
     """
-    if k > n:
-        raise ValueError(f"k ({k}) > n ({n}): cannot sample more than available")
     if c == 0:
         return 0.0
     if c >= n:
         return 1.0
-    if k > n - c:
-        return 1.0
-
-    return 1.0 - (comb(n - c, k) / comb(n, k))
+    return 1.0 - (1.0 - c / n) ** k
 
 
 def pass_pow_k(n: int, c: int, k: int) -> float:
     """
     Calculate pass^k: probability of k consecutive correct conversations.
 
+    Uses p = c/n as the estimated success rate: (c/n)^k is the probability
+    that k independent attempts are all correct.
+
     Args:
         n: Total conversations evaluated
         c: Fully correct conversations
-        k: Number of consecutive conversations
+        k: Number of consecutive attempts (not bounded by n)
 
     Returns:
         Probability between 0.0 and 1.0
     """
-    if k > n:
-        raise ValueError(f"k ({k}) > n ({n})")
     if c == 0:
         return 0.0
+    if c >= n:
+        return 1.0
 
     return (c / n) ** k
 
@@ -88,10 +88,6 @@ class Agentic(FairForge):
         c = fully correct conversations (all interactions correct)
         k = number of conversation attempts (user-specified)
 
-    Individual conversation metrics are returned per dataset. For aggregated probabilities
-    across all conversations, use Agentic.aggregate_metrics(results, k=3) to calculate
-    pass@K and pass^K for a chosen K value.
-
     Args:
         retriever: Retriever class for loading datasets (each Dataset = 1 conversation)
         model: LangChain BaseChatModel instance for evaluation
@@ -99,7 +95,7 @@ class Agentic(FairForge):
         bos_json_clause: Opening marker for JSON blocks
         eos_json_clause: Closing marker for JSON blocks
         threshold: Similarity threshold for answer correctness (default: 0.7)
-        tool_threshold: Threshold for tool correctness (default: 0.75)
+        tool_threshold: Threshold for tool correctness (default: 1.0)
         tool_weights: Weights for tool correctness components (default: 0.25 each)
         **kwargs: Additional arguments passed to FairForge base class
 
@@ -107,16 +103,13 @@ class Agentic(FairForge):
         >>> from langchain_groq import ChatGroq
         >>> model = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
         >>> results = Agentic.run(MyRetriever, model=model, threshold=0.8)
-        >>> # Per-query metrics
         >>> for r in results:
-        ...     print(f"qa_id: {r.qa_id}, pass@{r.k}: {r.pass_at_k:.3f}")
-        >>> # Aggregated metrics (recommended for overall performance)
-        >>> # Option 1: Auto-infer K from most common value
-        >>> agg = Agentic.aggregate_metrics(results)
-        >>> print(f"Overall pass@{agg['k_used']}: {agg['pass_at_k']:.3f}")
-        >>> # Option 2: Specify K manually
-        >>> agg = Agentic.aggregate_metrics(results, k=3)
-        >>> print(f"Overall pass@3: {agg['pass_at_k']:.3f}")
+        ...     print(f"{r.session_id}: {r.correct_interactions}/{r.total_interactions}")
+        >>> # Compute aggregated metrics manually
+        >>> from fair_forge.metrics.agentic import pass_at_k, pass_pow_k
+        >>> n, c = len(results), sum(1 for r in results if r.is_fully_correct)
+        >>> print(f"pass@3: {pass_at_k(n, c, 3):.3f}")
+        >>> print(f"pass^3: {pass_pow_k(n, c, 3):.3f}")
     """
 
     def __init__(
@@ -449,65 +442,3 @@ Examples:
             f"({fully_correct_count/len(self.metrics)*100:.1f}%)"
         )
         return self.metrics
-
-    @staticmethod
-    def aggregate_metrics(metrics: list[AgenticMetric], k: int | None = None) -> dict[str, Any]:
-        """
-        Calculate aggregated pass@k and pass^k metrics across all conversations.
-
-        Computes conversation-level success probabilities:
-        - pass@K: Probability of ≥1 correct conversation when attempting K different conversations
-        - pass^K: Probability of K consecutive correct conversations
-
-        Args:
-            metrics: List of conversation-level AgenticMetric objects
-            k: K value for calculations (number of conversations to attempt). If None, uses default of 3.
-
-        Returns:
-            Dictionary with:
-                - total_conversations (n): Number of evaluated conversations
-                - fully_correct_conversations (c): Conversations where ALL interactions were correct
-                - conversation_success_rate: Percentage of fully correct conversations (c/n)
-                - k: K value used for calculations
-                - pass_at_k: Probability of ≥1 correct conversation in K attempts
-                - pass_pow_k: Probability of K consecutive correct conversations
-
-        Example:
-            >>> # 10 conversations evaluated, 4 fully correct (40% success rate)
-            >>> # K=3: What if I attempt 3 conversations?
-            >>> agg = Agentic.aggregate_metrics(results, k=3)
-            >>> agg["pass_at_k"]  # 0.784 → 78.4% prob. of ≥1 correct in 3 attempts
-            >>> agg["pass_pow_k"]  # 0.064 → 6.4% prob. of all 3 correct
-        """
-        if not metrics:
-            return {
-                "total_conversations": 0,
-                "fully_correct_conversations": 0,
-                "conversation_success_rate": 0.0,
-                "k": k or 3,
-                "pass_at_k": 0.0,
-                "pass_pow_k": 0.0,
-            }
-
-        n_conversations = len(metrics)
-        c_conversations = sum(1 for m in metrics if m.is_fully_correct)
-        success_rate = c_conversations / n_conversations if n_conversations > 0 else 0.0
-
-        # Use provided k or default to 3
-        k_used = k if k is not None else 3
-
-        # Validate k is not greater than n
-        k_used = min(k_used, n_conversations)
-
-        # Calculate aggregated metrics
-        agg_pass_at_k = pass_at_k(n_conversations, c_conversations, k_used)
-        agg_pass_pow_k = pass_pow_k(n_conversations, c_conversations, k_used)
-
-        return {
-            "total_conversations": n_conversations,
-            "fully_correct_conversations": c_conversations,
-            "conversation_success_rate": success_rate,
-            "k": k_used,
-            "pass_at_k": agg_pass_at_k,
-            "pass_pow_k": agg_pass_pow_k,
-        }
