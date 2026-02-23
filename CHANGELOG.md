@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.2.0 (2026-02-23)
+
+### Continuous Integration
+
+- **release**: Skip release on docs-only changes
+  ([`df28fd1`](https://github.com/Alquimia-ai/fair-forge/commit/df28fd13531696f7d0944cff870c33166041250e))
+
+### Documentation
+
+- Add fair forge logo and update branding
+  ([`5f014c2`](https://github.com/Alquimia-ai/fair-forge/commit/5f014c2505144e39ef082785dd5ee5ecd84135e5))
+
+
 ## v1.2.0-b.7 (2026-02-23)
 
 ### Bug Fixes
