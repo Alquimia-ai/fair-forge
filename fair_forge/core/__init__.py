@@ -1,4 +1,9 @@
-"""Core abstractions and base classes for Fair Forge."""
+"""Core abstractions and base classes for Fair Forge.
+
+Regulatory components (embedder, reranker) require torch and should be imported directly:
+    from fair_forge.core.embedder import RegulatoryEmbedder, EmbedderConfig
+    from fair_forge.core.reranker import RegulatoryReranker, RerankerConfig
+"""
 
 from .base import FairForge
 from .exceptions import (

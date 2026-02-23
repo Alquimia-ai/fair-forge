@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -194,7 +194,7 @@ wheels = [
 
 [[package]]
 name = "alquimia-fair-forge"
-version = "1.2.0b4"
+version = "1.2.0b5"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },
@@ -209,6 +209,7 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
+    { name = "accelerate" },
     { name = "aiosseclient" },
     { name = "alquimia-client" },
     { name = "boto3" },
@@ -267,6 +268,7 @@ humanity = [
     { name = "pandas" },
 ]
 metrics = [
+    { name = "accelerate" },
     { name = "hdbscan" },
     { name = "nltk" },
     { name = "numba" },
@@ -276,6 +278,10 @@ metrics = [
     { name = "sentence-transformers" },
     { name = "torch" },
     { name = "umap-learn" },
+]
+regulatory = [
+    { name = "accelerate" },
+    { name = "torch" },
 ]
 runners = [
     { name = "aiosseclient" },
@@ -319,10 +325,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "accelerate", marker = "extra == 'regulatory'", specifier = ">=0.25.0" },
     { name = "aiosseclient", marker = "extra == 'runners'", specifier = ">=0.1.8" },
     { name = "alquimia-client", marker = "extra == 'generators-alquimia'", specifier = ">=0.1.0" },
     { name = "alquimia-client", marker = "extra == 'runners'", specifier = ">=0.1.0" },
-    { name = "alquimia-fair-forge", extras = ["context", "conversational", "bestof", "agentic", "humanity", "toxicity", "bias"], marker = "extra == 'metrics'" },
+    { name = "alquimia-fair-forge", extras = ["context", "conversational", "bestof", "agentic", "humanity", "toxicity", "bias", "regulatory"], marker = "extra == 'metrics'" },
     { name = "alquimia-fair-forge", extras = ["metrics", "runners", "generators", "generators-alquimia", "cloud", "explainability"], marker = "extra == 'all'" },
     { name = "boto3", marker = "extra == 'cloud'", specifier = ">=1.28.0" },
     { name = "commitizen", marker = "extra == 'dev'", specifier = ">=4.0.0" },
@@ -362,6 +369,7 @@ requires-dist = [
     { name = "sphinx-rtd-theme", marker = "extra == 'dev'", specifier = ">=2.0.0" },
     { name = "torch", marker = "extra == 'bias'", specifier = ">=2.0.0" },
     { name = "torch", marker = "extra == 'explainability'", specifier = ">=2.0.0" },
+    { name = "torch", marker = "extra == 'regulatory'", specifier = ">=2.0.0" },
     { name = "torch", marker = "extra == 'toxicity'", specifier = ">=2.0.0" },
     { name = "tqdm", specifier = ">=4.65.0" },
     { name = "transformers", specifier = ">=4.35.0" },
@@ -370,7 +378,7 @@ requires-dist = [
     { name = "umap-learn", marker = "extra == 'toxicity'", specifier = ">=0.5.6,<0.6.0" },
     { name = "virtualenv", marker = "extra == 'dev'", specifier = ">=20.36.1" },
 ]
-provides-extras = ["context", "conversational", "bestof", "agentic", "humanity", "toxicity", "bias", "explainability", "metrics", "runners", "generators", "generators-alquimia", "cloud", "all", "dev"]
+provides-extras = ["context", "conversational", "bestof", "agentic", "humanity", "toxicity", "bias", "regulatory", "explainability", "metrics", "runners", "generators", "generators-alquimia", "cloud", "all", "dev"]
 
 [package.metadata.requires-dev]
 dev = [
