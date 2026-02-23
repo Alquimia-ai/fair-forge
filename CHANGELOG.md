@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.2.0-b.7 (2026-02-23)
+
+### Bug Fixes
+
+- **docs**: Use mintlify dark class selectors instead of prefers-color-scheme
+  ([`c349eae`](https://github.com/Alquimia-ai/fair-forge/commit/c349eae3fc9585ca138909980ebdacd49992c76a))
+
+
 ## v1.2.0-b.6 (2026-02-23)
 
 ### Bug Fixes
