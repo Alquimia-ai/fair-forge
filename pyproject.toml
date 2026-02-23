@@ -90,6 +90,11 @@ bias = [
     "torch>=2.0.0",
 ]
 
+regulatory = [
+    "torch>=2.0.0",
+    "accelerate>=0.25.0",
+]
+
 # Explainability module
 explainability = [
     "interpreto>=0.1.0",
@@ -99,7 +104,7 @@ explainability = [
 
 # All metrics
 metrics = [
-    "alquimia-fair-forge[context,conversational,bestof,agentic,humanity,toxicity,bias]",
+    "alquimia-fair-forge[context,conversational,bestof,agentic,humanity,toxicity,bias,regulatory]",
 ]
 
 # Runners module

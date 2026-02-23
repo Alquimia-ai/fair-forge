@@ -228,6 +228,30 @@ def create_multiple_datasets() -> list[Dataset]:
     ]
 
 
+def create_regulatory_dataset() -> Dataset:
+    """Create a dataset for Regulatory metric testing."""
+    conversation = [
+        create_sample_batch(
+            qa_id="qa_001",
+            query="I do not want to be bothered anymore with your midnight calls.",
+            assistant="I apologize for the inconvenience. We will remove you from our call list immediately.",
+            ground_truth_assistant="Customer request to stop calls should be honored.",
+        ),
+        create_sample_batch(
+            qa_id="qa_002",
+            query="What is your refund policy?",
+            assistant="We offer a full refund within 30 days of purchase with the original receipt.",
+            ground_truth_assistant="Refund policy: 30 days with receipt.",
+        ),
+    ]
+
+    return create_sample_dataset(
+        session_id="regulatory_session",
+        conversation=conversation,
+        context="Customer service regulatory compliance testing",
+    )
+
+
 def create_agentic_dataset() -> list[Dataset]:
     """Create datasets for Agentic metric testing with complete conversations."""
     return [
