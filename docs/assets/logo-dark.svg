@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 185" fill="none">
+  <style>
+    text {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 14px;
+      white-space: pre;
+      fill: #e6edf3;
+    }
+  </style>
+  <text x="5" y="16"> .d888         d8b          .d888</text>
+  <text x="5" y="32">d88P"          Y8P         d88P"</text>
+  <text x="5" y="48">888                        888</text>
+  <text x="5" y="64">888888 8888b.  888 888d888 888888 .d88b.  888d888 .d88b.   .d88b.</text>
+  <text x="5" y="80">888       "88b 888 888P"   888   d88""88b 888P"  d88P"88b d8P  Y8b</text>
+  <text x="5" y="96">888   .d888888 888 888     888   888  888 888    888  888 88888888</text>
+  <text x="5" y="112">888   888  888 888 888     888   Y88..88P 888    Y88b 888 Y8b.</text>
+  <text x="5" y="128">888   "Y888888 888 888     888    "Y88P"  888     "Y88888  "Y8888</text>
+  <text x="5" y="144">                                                      888</text>
+  <text x="5" y="160">                                                 Y8b d88P</text>
+  <text x="5" y="176">                                                  "Y88P"</text>
+</svg>

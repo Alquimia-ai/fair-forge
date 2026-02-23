@@ -226,3 +226,135 @@ def create_multiple_datasets() -> list[Dataset]:
         create_sample_dataset(session_id="session_002", assistant_id="assistant_001"),
         create_sample_dataset(session_id="session_003", assistant_id="assistant_002"),
     ]
+
+
+def create_regulatory_dataset() -> Dataset:
+    """Create a dataset for Regulatory metric testing."""
+    conversation = [
+        create_sample_batch(
+            qa_id="qa_001",
+            query="I do not want to be bothered anymore with your midnight calls.",
+            assistant="I apologize for the inconvenience. We will remove you from our call list immediately.",
+            ground_truth_assistant="Customer request to stop calls should be honored.",
+        ),
+        create_sample_batch(
+            qa_id="qa_002",
+            query="What is your refund policy?",
+            assistant="We offer a full refund within 30 days of purchase with the original receipt.",
+            ground_truth_assistant="Refund policy: 30 days with receipt.",
+        ),
+    ]
+
+    return create_sample_dataset(
+        session_id="regulatory_session",
+        conversation=conversation,
+        context="Customer service regulatory compliance testing",
+    )
+
+
+def create_agentic_dataset() -> list[Dataset]:
+    """Create datasets for Agentic metric testing with complete conversations."""
+    return [
+        # Conversation 1: Fully correct (all 3 interactions correct)
+        Dataset(
+            session_id="conversation_001",
+            assistant_id="agent_v1",
+            language="english",
+            context="Math calculation conversation",
+            conversation=[
+                create_sample_batch(
+                    qa_id="qa_001_1",
+                    query="What is 5 + 7?",
+                    assistant="The sum of 5 and 7 is 12.",
+                    ground_truth_assistant="12",
+                    agentic={
+                        "tools_used": [
+                            {"tool_name": "calculator", "parameters": {"a": 5, "b": 7}, "result": 12, "step": 1}
+                        ],
+                        "final_answer_uses_tools": True,
+                    },
+                    ground_truth_agentic={
+                        "expected_tools": [
+                            {"tool_name": "calculator", "parameters": {"a": 5, "b": 7}, "step": 1}
+                        ],
+                        "tool_sequence_matters": True,
+                    },
+                ),
+                create_sample_batch(
+                    qa_id="qa_001_2",
+                    query="What is 10 * 3?",
+                    assistant="10 times 3 equals 30.",
+                    ground_truth_assistant="30",
+                ),
+                create_sample_batch(
+                    qa_id="qa_001_3",
+                    query="What is 100 / 4?",
+                    assistant="100 divided by 4 is 25.",
+                    ground_truth_assistant="25",
+                ),
+            ],
+        ),
+        # Conversation 2: Partially correct (2 of 2 correct)
+        Dataset(
+            session_id="conversation_002",
+            assistant_id="agent_v1",
+            language="english",
+            context="Simple Q&A",
+            conversation=[
+                create_sample_batch(
+                    qa_id="qa_002_1",
+                    query="What is the capital of France?",
+                    assistant="The capital of France is Paris.",
+                    ground_truth_assistant="Paris",
+                ),
+                create_sample_batch(
+                    qa_id="qa_002_2",
+                    query="What is 2+2?",
+                    assistant="2 plus 2 equals 4.",
+                    ground_truth_assistant="4",
+                ),
+            ],
+        ),
+        # Conversation 3: Partially correct (1 of 3 correct - FAIL)
+        Dataset(
+            session_id="conversation_003",
+            assistant_id="agent_v1",
+            language="english",
+            context="Mixed questions",
+            conversation=[
+                create_sample_batch(
+                    qa_id="qa_003_1",
+                    query="What is 8 + 9?",
+                    assistant="8 plus 9 is 17.",
+                    ground_truth_assistant="17",
+                ),
+                create_sample_batch(
+                    qa_id="qa_003_2",
+                    query="What is 5 * 5?",
+                    assistant="5 times 5 is 20.",  # WRONG (should be 25)
+                    ground_truth_assistant="25",
+                ),
+                create_sample_batch(
+                    qa_id="qa_003_3",
+                    query="What is 16 / 2?",
+                    assistant="16 divided by 2 is 7.",  # WRONG (should be 8)
+                    ground_truth_assistant="8",
+                ),
+            ],
+        ),
+        # Conversation 4: Fully correct (1 interaction)
+        Dataset(
+            session_id="conversation_004",
+            assistant_id="agent_v1",
+            language="english",
+            context="Single question",
+            conversation=[
+                create_sample_batch(
+                    qa_id="qa_004_1",
+                    query="What is 6 + 6?",
+                    assistant="6 plus 6 equals 12.",
+                    ground_truth_assistant="12",
+                ),
+            ],
+        ),
+    ]

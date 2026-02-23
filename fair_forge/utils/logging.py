@@ -40,6 +40,11 @@ class VerboseLogger:
         if self.verbose:
             self.logger.error(message)
 
+    def exception(self, message: str):
+        """Log exception message with traceback if verbose is enabled"""
+        if self.verbose:
+            self.logger.exception(message)
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")

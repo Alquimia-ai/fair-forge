@@ -2,7 +2,11 @@ name: Release
 
 on:
   push:
-    branches: [develop, main]
+    branches: [main, develop]
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+      - ".github/workflows/docs-validate.yml"
 
 jobs:
   test:
@@ -24,7 +28,6 @@ jobs:
 
   semantic-release:
     needs: test
-    if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     concurrency: release
     permissions:
@@ -69,24 +72,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run semantic-release publish
 
-  pypi:
-    needs: test
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-
       - name: Build package
+        if: steps.release.outputs.released == 'true'
         run: uv build
 
       - name: Publish to PyPI
+        if: steps.release.outputs.released == 'true'
         run: uv publish --token ${{ secrets.PYPI_API_TOKEN }}

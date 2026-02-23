@@ -8,6 +8,7 @@ Import metrics directly from their modules:
     from fair_forge.metrics.bias import Bias
     from fair_forge.metrics.best_of import BestOf
     from fair_forge.metrics.agentic import Agentic
+    from fair_forge.metrics.regulatory import Regulatory
 """
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "Context",
     "Conversational",
     "Humanity",
+    "Regulatory",
     "Toxicity",
 ]

@@ -1,9 +1,10 @@
-# Fair Forge
-
 <p align="center">
-  <img src="https://www.alquimia.ai/logo-alquimia.svg" width="800" alt="Alquimia AI">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/logo-light.svg">
+    <img alt="Fair Forge" src="docs/assets/logo-light.svg" width="480">
+  </picture>
 </p>
-
 <p align="center">
   <strong>Performance-measurement library for evaluating AI models and assistants</strong>
 </p>
@@ -30,6 +31,7 @@ Fair Forge provides comprehensive metrics for evaluating AI systems:
 - **Conversational** - Evaluate dialogue quality using Grice's maxims
 - **Humanity** - Measure how natural responses are through emotional analysis
 - **BestOf** - Tournament-style comparison to find the best response
+- **Agentic** - Evaluate autonomous agent behavior and tool usage
 
 ## Quick Start
 
@@ -60,6 +62,65 @@ metrics = Toxicity.run(MyRetriever, verbose=True)
 For complete documentation, guides, and API reference visit:
 
 **[https://fairforge.alquimia.ai](https://fairforge.alquimia.ai)**
+
+## Contributing
+
+### Setup
+
+```bash
+# Clone and install dependencies
+git clone https://github.com/Alquimia-ai/fair-forge.git
+cd fair-forge
+uv sync
+
+# Install pre-commit hooks (required)
+uv run pre-commit install --hook-type pre-commit --hook-type commit-msg
+```
+
+### Pre-commit Hooks
+
+This project uses [pre-commit](https://pre-commit.com/) to enforce code quality and commit conventions. The following hooks run automatically:
+
+| Hook | Stage | Purpose |
+|------|-------|---------|
+| `trailing-whitespace` | pre-commit | Remove trailing whitespace |
+| `end-of-file-fixer` | pre-commit | Ensure files end with a newline |
+| `check-yaml` / `check-toml` | pre-commit | Validate config files |
+| `check-added-large-files` | pre-commit | Block files >1MB |
+| `detect-private-key` | pre-commit | Prevent accidental secret commits |
+| `ruff` | pre-commit | Lint and auto-fix Python code |
+| `ruff-format` | pre-commit | Format Python code |
+| `commitizen` | commit-msg | Enforce [Conventional Commits](https://www.conventionalcommits.org/) format |
+
+### Commit Convention
+
+All commits **must** follow the [Conventional Commits](https://www.conventionalcommits.org/) specification, enforced by [commitizen](https://commitizen-tools.github.io/commitizen/):
+
+```
+type(scope): description
+```
+
+**Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`
+
+**Scopes:** `metrics`, `runners`, `generators`, `storage`, `schemas`, `core`, `llm`, `guardians`, `deps`
+
+Examples:
+```
+feat(metrics): add agentic evaluation metric
+fix(toxicity): handle empty batches
+docs: update installation guide
+test(runners): add integration tests
+```
+
+### Claude Code Skills
+
+This project includes [Claude Code](https://claude.ai/code) skills to automate common workflows. If you use Claude Code as your development tool, the following skills are available:
+
+| Skill | Command | Description |
+|-------|---------|-------------|
+| **Commit** | `/commit` | Analyzes staged changes and generates a properly formatted Conventional Commit message |
+| **Docs** | `/docs [type] [name]` | Generates Mintlify MDX documentation for new modules (e.g., `/docs metric agentic`) |
+| **Lambda** | `/fair-forge-lambda` | Scaffolds AWS Lambda deployment boilerplate for Fair-Forge modules |
 
 ## License
 

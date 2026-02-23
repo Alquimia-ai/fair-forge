@@ -3,12 +3,14 @@
 from fair_forge.core.retriever import Retriever
 from fair_forge.schemas.common import Dataset
 from tests.fixtures.mock_data import (
+    create_agentic_dataset,
     create_bestof_dataset,
     create_bias_dataset,
     create_context_dataset,
     create_conversational_dataset,
     create_emotional_dataset,
     create_multiple_datasets,
+    create_regulatory_dataset,
     create_sample_dataset,
     create_toxicity_dataset,
 )
@@ -105,6 +107,22 @@ class BestOfDatasetRetriever(Retriever):
     def load_dataset(self) -> list[Dataset]:
         """Return best-of testing dataset."""
         return create_bestof_dataset()
+
+
+class AgenticDatasetRetriever(Retriever):
+    """Mock retriever for Agentic metric testing."""
+
+    def load_dataset(self) -> list[Dataset]:
+        """Return agentic testing dataset with K responses."""
+        return create_agentic_dataset()
+
+
+class RegulatoryDatasetRetriever(Retriever):
+    """Mock retriever for Regulatory metric testing."""
+
+    def load_dataset(self) -> list[Dataset]:
+        """Return regulatory testing dataset."""
+        return [create_regulatory_dataset()]
 
 
 class ErrorRetriever(Retriever):
