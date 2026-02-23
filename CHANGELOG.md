@@ -2,6 +2,30 @@
 
 <!-- version list -->
 
+## v1.2.0-b.6 (2026-02-23)
+
+### Bug Fixes
+
+- **regulatory**: Address PR review comments
+  ([`42f54d6`](https://github.com/Alquimia-ai/fair-forge/commit/42f54d66171cb7ff4e29ae10d64bd687d29be415))
+
+- **regulatory**: Set compliance_threshold in unit tests
+  ([`c4f7c48`](https://github.com/Alquimia-ai/fair-forge/commit/c4f7c48394921008f457c48df20afbf00b8f0ced))
+
+### Documentation
+
+- **regulatory**: Add documentation for regulatory compliance metric
+  ([`3814613`](https://github.com/Alquimia-ai/fair-forge/commit/3814613a4bd8b4728a1af79d423f8ec7e5cb1fd0))
+
+### Features
+
+- **regulatory**: Add regulatory compliance metric
+  ([`3472289`](https://github.com/Alquimia-ai/fair-forge/commit/3472289c2b6a004dbe7a8ff28961a5ca58b6e737))
+
+- **skills**: Add metric-creator skill for Claude Code
+  ([`0a87986`](https://github.com/Alquimia-ai/fair-forge/commit/0a87986b4018a6363a10d76703b6e24294b84f4f))
+
+
 ## v1.2.0-b.5 (2026-02-18)
 
 ### Bug Fixes
