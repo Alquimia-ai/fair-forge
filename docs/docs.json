@@ -70,7 +70,8 @@
               "metrics/conversational",
               "metrics/humanity",
               "metrics/best-of",
-              "metrics/agentic"
+              "metrics/agentic",
+              "metrics/regulatory"
             ]
           },
           {

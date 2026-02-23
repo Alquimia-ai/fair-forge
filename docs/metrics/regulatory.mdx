@@ -1,0 +1,469 @@
+---
+title: Regulatory
+description: Evaluate AI responses against regulatory compliance using RAG-based retrieval and reranking
+---
+
+# Regulatory Metric
+
+The Regulatory metric evaluates whether AI assistant responses comply with a regulatory corpus (e.g., company policies, legal frameworks, compliance documents). It uses embedding-based retrieval to find relevant regulations and a reranker to detect contradictions.
+
+## Overview
+
+This metric evaluates:
+
+- **Compliance Score**: Ratio of supporting vs. contradicting regulatory chunks (0.0-1.0)
+- **Verdict**: COMPLIANT, NON_COMPLIANT, or IRRELEVANT
+- **Chunk Analysis**: Detailed breakdown of which regulations support or contradict the response
+
+### How It Works
+
+```
+1. Load regulatory corpus (markdown files)
+2. Chunk documents with configurable size/overlap
+3. For each interaction:
+   a. Retrieve relevant chunks using embeddings (user query + agent response)
+   b. Rerank chunks to detect support/contradiction
+   c. Compute compliance score and verdict
+```
+
+<Note>
+The metric uses **Qwen3-Embedding** for semantic retrieval and **Qwen3-Reranker** for contradiction detection. Both models run locally using HuggingFace Transformers.
+</Note>
+
+## Installation
+
+```bash
+uv add "alquimia-fair-forge[regulatory]"
+```
+
+This installs PyTorch and Accelerate for running the embedding and reranker models.
+
+## Basic Usage
+
+```python
+from fair_forge.connectors import LocalCorpusConnector
+from fair_forge.metrics.regulatory import Regulatory
+from your_retriever import ConversationRetriever
+
+# Load regulatory corpus from local directory
+corpus_connector = LocalCorpusConnector("path/to/regulations/")
+
+# Run evaluation
+metrics = Regulatory.run(
+    ConversationRetriever,
+    corpus_connector=corpus_connector,
+    verbose=True,
+)
+
+# Analyze results
+for metric in metrics:
+    print(f"QA {metric.qa_id}: {metric.verdict}")
+    print(f"  Compliance: {metric.compliance_score:.1%}")
+    print(f"  Supporting: {metric.supporting_chunks}, Contradicting: {metric.contradicting_chunks}")
+    print(f"  Insight: {metric.insight}")
+```
+
+## Parameters
+
+### Required Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `retriever` | `Type[Retriever]` | Data source class returning conversations to evaluate |
+| `corpus_connector` | `CorpusConnector` | Connector for loading regulatory documents (local or LakeFS) |
+
+### Optional Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `embedding_model` | `str` | `"Qwen/Qwen3-Embedding-0.6B"` | HuggingFace model for embeddings |
+| `reranker_model` | `str` | `"Qwen/Qwen3-Reranker-0.6B"` | HuggingFace model for reranking |
+| `chunk_size` | `int` | `1000` | Characters per chunk |
+| `chunk_overlap` | `int` | `100` | Character overlap between chunks |
+| `top_k` | `int` | `10` | Maximum chunks to retrieve per query |
+| `similarity_threshold` | `float` | `0.3` | Minimum cosine similarity for retrieval (0-1) |
+| `contradiction_threshold` | `float` | `0.6` | Score below which a chunk contradicts (0-1) |
+| `max_length` | `int` | `8192` | Maximum token length for models |
+| `batch_size` | `int` | `32` | Batch size for embedding computation |
+| `verbose` | `bool` | `False` | Enable verbose logging |
+
+### Model Options
+
+You can use larger models for better quality:
+
+| Model Size | Embedding Model | Reranker Model |
+|------------|-----------------|----------------|
+| Small (0.6B) | `Qwen/Qwen3-Embedding-0.6B` | `Qwen/Qwen3-Reranker-0.6B` |
+| Medium (4B) | `Qwen/Qwen3-Embedding-4B` | `Qwen/Qwen3-Reranker-4B` |
+| Large (8B) | `Qwen/Qwen3-Embedding-8B` | `Qwen/Qwen3-Reranker-8B` |
+
+## Corpus Connectors
+
+### LocalCorpusConnector
+
+Load regulatory documents from a local directory:
+
+```python
+from fair_forge.connectors import LocalCorpusConnector
+
+# Load all .md files from directory
+connector = LocalCorpusConnector("path/to/corpus/")
+
+# Verify documents load correctly
+documents = connector.load_documents()
+print(f"Loaded {len(documents)} documents")
+for doc in documents:
+    print(f"  - {doc.source}: {len(doc.text)} chars")
+```
+
+### LakeFSCorpusConnector
+
+Load regulatory documents from LakeFS storage:
+
+```python
+from fair_forge.connectors.lakefs import LakeFSCorpusConnector
+
+connector = LakeFSCorpusConnector(
+    host="https://lakefs.example.com",
+    username="your-username",
+    password="your-password",
+    repo_id="regulations",
+    corpus_prefix="compliance/",
+    branch_name="main",
+)
+
+documents = connector.load_documents()
+```
+
+## Output Schema
+
+### RegulatoryMetric
+
+```python
+class RegulatoryMetric(BaseMetric):
+    session_id: str                    # Session identifier
+    assistant_id: str                  # Assistant identifier
+    qa_id: str                         # Interaction identifier
+    query: str                         # User query
+    assistant: str                     # Assistant response
+    compliance_score: float            # 0.0-1.0 (supporting / total chunks)
+    verdict: Literal["COMPLIANT", "NON_COMPLIANT", "IRRELEVANT"]
+    supporting_chunks: int             # Count of supporting chunks
+    contradicting_chunks: int          # Count of contradicting chunks
+    retrieved_chunks: list[RegulatoryChunk]  # Detailed chunk analysis
+    insight: str                       # Human-readable explanation
+```
+
+### RegulatoryChunk
+
+```python
+class RegulatoryChunk(BaseModel):
+    text: str              # Chunk content
+    source: str            # Source document filename
+    chunk_index: int       # Position in source document
+    similarity: float      # Cosine similarity from retrieval (0-1)
+    reranker_score: float  # Reranker score (0-1, higher = supports)
+    verdict: Literal["SUPPORTS", "CONTRADICTS"]
+```
+
+## Verdicts
+
+| Verdict | Condition | Compliance Score |
+|---------|-----------|------------------|
+| **COMPLIANT** | `compliance_score >= 0.5` | `supporting / (supporting + contradicting)` |
+| **NON_COMPLIANT** | `compliance_score < 0.5` or all contradicting | `supporting / (supporting + contradicting)` |
+| **IRRELEVANT** | No chunks retrieved | `0.5` (neutral) |
+
+## Data Requirements
+
+Create a Retriever that returns conversations to evaluate:
+
+```python
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Dataset, Batch
+
+class CustomerServiceRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        return [
+            Dataset(
+                session_id="session_001",
+                assistant_id="support_bot",
+                language="english",
+                context="Customer service compliance evaluation",
+                conversation=[
+                    Batch(
+                        qa_id="qa_001",
+                        query="Stop calling me at midnight!",
+                        assistant="I apologize for the inconvenience. I've added you to our do-not-call list.",
+                        ground_truth_assistant="Honor customer request to stop calls",
+                    ),
+                    Batch(
+                        qa_id="qa_002",
+                        query="I want a refund for my purchase from 2 months ago",
+                        assistant="Our policy allows refunds within 30 days. For older purchases, I can offer store credit.",
+                        ground_truth_assistant="Explain 30-day policy, offer alternatives",
+                    ),
+                ],
+            ),
+        ]
+```
+
+## Regulatory Corpus Format
+
+Create markdown files in your corpus directory. Each file should contain regulations, policies, or compliance rules:
+
+```markdown
+# Call Center Policy
+
+## Do-Not-Call Regulations
+
+### Customer Rights
+- All customers have the right to request removal from call lists at any time
+- Requests must be honored within 24 hours of receipt
+- No calls should be made between 9:00 PM and 8:00 AM local time
+
+### Record Keeping
+- All do-not-call requests must be logged with timestamp
+- Records must be maintained for a minimum of 5 years
+```
+
+<Note>
+Place multiple `.md` files in the corpus directory. The metric will load all of them, chunk the text, and use them for compliance checking.
+</Note>
+
+## Complete Example
+
+```python
+import os
+from pathlib import Path
+from fair_forge.connectors import LocalCorpusConnector
+from fair_forge.core.retriever import Retriever
+from fair_forge.metrics.regulatory import Regulatory
+from fair_forge.schemas.common import Dataset, Batch
+
+# Create retriever with test conversations
+class ComplianceRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        return [
+            Dataset(
+                session_id="compliance_test_001",
+                assistant_id="callcenter_bot",
+                language="english",
+                context="Call center regulatory compliance",
+                conversation=[
+                    Batch(
+                        qa_id="qa_001",
+                        query="I don't want any more calls from you!",
+                        assistant="I understand. I've immediately added your number to our do-not-call list. You won't receive any further calls from us.",
+                        ground_truth_assistant="Add to do-not-call list",
+                    ),
+                    Batch(
+                        qa_id="qa_002",
+                        query="Can I get a refund? I bought this 45 days ago.",
+                        assistant="Our standard refund policy is 30 days. Since your purchase is outside this window, I can offer you store credit or an exchange instead.",
+                        ground_truth_assistant="Explain 30-day limit, offer alternatives",
+                    ),
+                ],
+            ),
+        ]
+
+# Load regulatory corpus
+corpus_connector = LocalCorpusConnector("./regulations/")
+
+# Run evaluation with custom thresholds
+metrics = Regulatory.run(
+    ComplianceRetriever,
+    corpus_connector=corpus_connector,
+    embedding_model="Qwen/Qwen3-Embedding-0.6B",
+    reranker_model="Qwen/Qwen3-Reranker-0.6B",
+    chunk_size=500,
+    chunk_overlap=50,
+    top_k=5,
+    similarity_threshold=0.3,
+    contradiction_threshold=0.6,
+    verbose=True,
+)
+
+# Display results
+print("Regulatory Compliance Results")
+print("=" * 60)
+
+for metric in metrics:
+    status_icon = {"COMPLIANT": "✅", "NON_COMPLIANT": "❌", "IRRELEVANT": "⚠️"}
+    print(f"\n{status_icon[metric.verdict]} QA: {metric.qa_id}")
+    print(f"   Query: {metric.query[:50]}...")
+    print(f"   Verdict: {metric.verdict}")
+    print(f"   Score: {metric.compliance_score:.1%}")
+    print(f"   Chunks: {metric.supporting_chunks} supporting, {metric.contradicting_chunks} contradicting")
+    print(f"   Insight: {metric.insight}")
+
+    # Show retrieved chunks
+    if metric.retrieved_chunks:
+        print(f"   Retrieved chunks:")
+        for chunk in metric.retrieved_chunks[:3]:  # Show top 3
+            print(f"     [{chunk.verdict}] {chunk.source} (sim={chunk.similarity:.2f}, rerank={chunk.reranker_score:.2f})")
+            print(f"       {chunk.text[:80]}...")
+
+# Summary statistics
+compliant = sum(1 for m in metrics if m.verdict == "COMPLIANT")
+non_compliant = sum(1 for m in metrics if m.verdict == "NON_COMPLIANT")
+irrelevant = sum(1 for m in metrics if m.verdict == "IRRELEVANT")
+avg_score = sum(m.compliance_score for m in metrics) / len(metrics)
+
+print(f"\n{'=' * 60}")
+print(f"Summary: {compliant} compliant, {non_compliant} non-compliant, {irrelevant} irrelevant")
+print(f"Average compliance score: {avg_score:.1%}")
+```
+
+## Interpretation
+
+### Compliance Scores
+
+| Score Range | Interpretation |
+|-------------|----------------|
+| **0.9 - 1.0** | Excellent - Strong regulatory support |
+| **0.7 - 0.9** | Good - Mostly compliant |
+| **0.5 - 0.7** | Moderate - Mixed signals, review recommended |
+| **0.3 - 0.5** | Poor - Potential compliance issues |
+| **0.0 - 0.3** | Critical - Clear regulatory violations |
+
+### Threshold Tuning
+
+<AccordionGroup>
+  <Accordion title="Similarity Threshold (0.3 default)">
+    Controls which chunks are retrieved based on semantic similarity.
+
+    - **Lower (0.2)**: Retrieves more chunks, may include less relevant ones
+    - **Default (0.3)**: Balanced retrieval
+    - **Higher (0.5)**: Stricter, only highly relevant chunks
+
+    Lower this if you're getting too many IRRELEVANT verdicts.
+  </Accordion>
+
+  <Accordion title="Contradiction Threshold (0.6 default)">
+    Controls how the reranker classifies chunks as supporting or contradicting.
+
+    - **Lower (0.4)**: Stricter - more chunks classified as contradicting
+    - **Default (0.6)**: Balanced classification
+    - **Higher (0.8)**: Lenient - only clear contradictions flagged
+
+    Lower this for stricter compliance checking.
+  </Accordion>
+
+  <Accordion title="Chunk Size (1000 default)">
+    Controls the size of text chunks from regulatory documents.
+
+    - **Smaller (500)**: More granular matching, better for short regulations
+    - **Default (1000)**: Good balance
+    - **Larger (2000)**: Better context, but may mix multiple regulations
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Financial Compliance" icon="building-columns">
+    Verify AI responses comply with banking regulations, KYC requirements, and financial advice rules
+  </Card>
+  <Card title="Healthcare HIPAA" icon="hospital">
+    Ensure patient data handling follows HIPAA guidelines and medical advice stays within scope
+  </Card>
+  <Card title="Call Center Policies" icon="headset">
+    Check customer service responses against company policies and consumer protection laws
+  </Card>
+  <Card title="Legal Compliance" icon="scale-balanced">
+    Validate AI-generated legal content against jurisdiction-specific regulations
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Structure Your Regulatory Corpus">
+    - Use clear headings and sections in markdown files
+    - Group related regulations in the same file
+    - Use bullet points for specific rules
+    - Include both requirements and prohibited actions
+  </Accordion>
+
+  <Accordion title="Tune Chunk Size for Your Domain">
+    - Short, specific regulations: Use smaller chunks (500 chars)
+    - Long, contextual policies: Use larger chunks (1500-2000 chars)
+    - Overlap should be 10-20% of chunk size
+  </Accordion>
+
+  <Accordion title="Choose Appropriate Thresholds">
+    - **High-stakes compliance** (legal, medical): Lower contradiction threshold (0.4-0.5)
+    - **General policies**: Default thresholds work well
+    - **Broad guidelines**: Higher thresholds (0.7) to reduce false positives
+  </Accordion>
+
+  <Accordion title="Use Larger Models for Better Accuracy">
+    The 4B and 8B models provide better semantic understanding:
+    ```python
+    metrics = Regulatory.run(
+        retriever,
+        corpus_connector=connector,
+        embedding_model="Qwen/Qwen3-Embedding-4B",
+        reranker_model="Qwen/Qwen3-Reranker-4B",
+    )
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Getting Too Many IRRELEVANT Verdicts">
+    **Cause**: Similarity threshold too high or corpus doesn't cover the topics.
+
+    **Solution**:
+    - Lower `similarity_threshold` to 0.2 or 0.25
+    - Verify corpus contains relevant regulations
+    - Check corpus is being loaded: `connector.load_documents()`
+    - Try smaller chunk sizes for more granular matching
+  </Accordion>
+
+  <Accordion title="Most Responses Marked NON_COMPLIANT">
+    **Cause**: Contradiction threshold may be too high, or reranker is being overly strict.
+
+    **Solution**:
+    - Raise `contradiction_threshold` to 0.7 or 0.8
+    - Review the chunk verdicts to understand what's being flagged
+    - Ensure regulatory corpus is balanced (not just prohibitions)
+  </Accordion>
+
+  <Accordion title="Out of Memory Errors">
+    **Cause**: Large corpus or models don't fit in GPU memory.
+
+    **Solution**:
+    - Use smaller models (0.6B versions)
+    - Reduce `batch_size` to 16 or 8
+    - Process fewer documents at a time
+    - Use CPU fallback (slower but works)
+  </Accordion>
+
+  <Accordion title="Slow Processing">
+    **Cause**: Large corpus, many conversations, or no GPU.
+
+    **Solution**:
+    - Reduce corpus size by removing irrelevant documents
+    - Increase chunk size to reduce total chunks
+    - Ensure GPU is being used (check `device_map="auto"`)
+    - Use smaller models for faster inference
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Context Metric" icon="bullseye" href="/metrics/context">
+    Evaluate response alignment with provided context
+  </Card>
+  <Card title="Storage Backends" icon="hard-drive" href="/storage/overview">
+    Configure LakeFS or local storage for your corpus
+  </Card>
+  <Card title="AWS Lambda" icon="aws" href="/examples/aws-lambda">
+    Deploy Regulatory as a serverless function
+  </Card>
+</CardGroup>
