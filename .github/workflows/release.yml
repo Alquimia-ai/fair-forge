@@ -3,6 +3,10 @@ name: Release
 on:
   push:
     branches: [main, develop]
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+      - ".github/workflows/docs-validate.yml"
 
 jobs:
   test:
