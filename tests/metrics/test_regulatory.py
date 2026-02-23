@@ -385,6 +385,7 @@ class TestComplianceScoring:
         with patch.object(RegulatoryEmbedder, "load_corpus"):
             metric = Regulatory.__new__(Regulatory)
             metric.logger = MagicMock()
+            metric.compliance_threshold = 0.5
 
             verdict, score = metric._compute_verdict(supporting=5, contradicting=0)
 
@@ -411,6 +412,7 @@ class TestComplianceScoring:
         with patch.object(RegulatoryEmbedder, "load_corpus"):
             metric = Regulatory.__new__(Regulatory)
             metric.logger = MagicMock()
+            metric.compliance_threshold = 0.5
 
             verdict, score = metric._compute_verdict(supporting=3, contradicting=1)
 
@@ -424,6 +426,7 @@ class TestComplianceScoring:
         with patch.object(RegulatoryEmbedder, "load_corpus"):
             metric = Regulatory.__new__(Regulatory)
             metric.logger = MagicMock()
+            metric.compliance_threshold = 0.5
 
             verdict, score = metric._compute_verdict(supporting=0, contradicting=0)
 
