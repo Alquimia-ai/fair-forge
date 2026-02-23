@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
-from fair_forge.core import FairForge
+from fair_forge.connectors import CorpusConnector  # noqa: TC001
+from fair_forge.core import FairForge, Retriever
 from fair_forge.core.embedder import ChunkerConfig, EmbedderConfig, RegulatoryEmbedder
 from fair_forge.core.reranker import RegulatoryReranker, RerankerConfig
+from fair_forge.schemas import Batch  # noqa: TC001
 from fair_forge.schemas.regulatory import RegulatoryChunk, RegulatoryMetric
-
-if TYPE_CHECKING:
-    from fair_forge.connectors import CorpusConnector
-    from fair_forge.core import Retriever
-    from fair_forge.schemas.common import Batch
 
 
 class Regulatory(FairForge):
@@ -33,6 +30,7 @@ class Regulatory(FairForge):
         top_k: Maximum chunks to retrieve per query.
         similarity_threshold: Minimum cosine similarity for retrieval.
         contradiction_threshold: Score below which a chunk is considered contradicting.
+        compliance_threshold: Minimum compliance score to consider a response compliant.
         max_length: Maximum token length for models.
         batch_size: Batch size for embedding computation.
         **kwargs: Additional arguments passed to FairForge base class.
@@ -49,6 +47,7 @@ class Regulatory(FairForge):
         top_k: int = 10,
         similarity_threshold: float = 0.3,
         contradiction_threshold: float = 0.6,
+        compliance_threshold: float = 0.5,
         max_length: int = 8192,
         batch_size: int = 32,
         **kwargs,
@@ -78,6 +77,7 @@ class Regulatory(FairForge):
         self.reranker = RegulatoryReranker(reranker_config)
 
         self._corpus_loaded = False
+        self.compliance_threshold = compliance_threshold
 
         self.logger.info("--REGULATORY CONFIGURATION--")
         self.logger.info(f"Embedding model: {embedding_model}")
@@ -85,6 +85,7 @@ class Regulatory(FairForge):
         self.logger.info(f"Chunk size: {chunk_size}, Overlap: {chunk_overlap}")
         self.logger.info(f"Top-K: {top_k}, Similarity threshold: {similarity_threshold}")
         self.logger.info(f"Contradiction threshold: {contradiction_threshold}")
+        self.logger.info(f"Compliance threshold: {compliance_threshold}")
 
     def _ensure_corpus_loaded(self) -> None:
         """Load and index the regulatory corpus if not already done."""
@@ -110,14 +111,14 @@ class Regulatory(FairForge):
         total = supporting + contradicting
 
         if total == 0:
-            return "IRRELEVANT", 0.5
+            return "IRRELEVANT", self.compliance_threshold
 
         compliance_score = supporting / total
 
         if contradicting > 0 and supporting == 0:
             return "NON_COMPLIANT", compliance_score
 
-        if compliance_score >= 0.5:
+        if compliance_score >= self.compliance_threshold:
             return "COMPLIANT", compliance_score
 
         return "NON_COMPLIANT", compliance_score
@@ -135,15 +136,9 @@ class Regulatory(FairForge):
             return "No relevant regulatory chunks were retrieved for this interaction."
 
         if verdict == "COMPLIANT":
-            return (
-                f"Response is COMPLIANT. {supporting} of {total} relevant chunk(s) "
-                f"support the response."
-            )
+            return f"Response is COMPLIANT. {supporting} of {total} relevant chunk(s) support the response."
 
-        return (
-            f"Response is NON-COMPLIANT. {contradicting} of {total} relevant chunk(s) "
-            f"contradict the response."
-        )
+        return f"Response is NON-COMPLIANT. {contradicting} of {total} relevant chunk(s) contradict the response."
 
     def batch(
         self,
@@ -180,7 +175,7 @@ class Regulatory(FairForge):
                     qa_id=interaction.qa_id,
                     query=interaction.query,
                     assistant=interaction.assistant,
-                    compliance_score=0.5,
+                    compliance_score=self.compliance_threshold,
                     verdict="IRRELEVANT",
                     supporting_chunks=0,
                     contradicting_chunks=0,

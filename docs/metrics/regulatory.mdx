@@ -83,6 +83,7 @@ for metric in metrics:
 | `top_k` | `int` | `10` | Maximum chunks to retrieve per query |
 | `similarity_threshold` | `float` | `0.3` | Minimum cosine similarity for retrieval (0-1) |
 | `contradiction_threshold` | `float` | `0.6` | Score below which a chunk contradicts (0-1) |
+| `compliance_threshold` | `float` | `0.5` | Minimum compliance score to consider a response compliant (0-1) |
 | `max_length` | `int` | `8192` | Maximum token length for models |
 | `batch_size` | `int` | `32` | Batch size for embedding computation |
 | `verbose` | `bool` | `False` | Enable verbose logging |
@@ -170,9 +171,9 @@ class RegulatoryChunk(BaseModel):
 
 | Verdict | Condition | Compliance Score |
 |---------|-----------|------------------|
-| **COMPLIANT** | `compliance_score >= 0.5` | `supporting / (supporting + contradicting)` |
-| **NON_COMPLIANT** | `compliance_score < 0.5` or all contradicting | `supporting / (supporting + contradicting)` |
-| **IRRELEVANT** | No chunks retrieved | `0.5` (neutral) |
+| **COMPLIANT** | `compliance_score >= compliance_threshold` | `supporting / (supporting + contradicting)` |
+| **NON_COMPLIANT** | `compliance_score < compliance_threshold` or all contradicting | `supporting / (supporting + contradicting)` |
+| **IRRELEVANT** | No chunks retrieved | `compliance_threshold` (neutral) |
 
 ## Data Requirements
 
@@ -348,6 +349,16 @@ print(f"Average compliance score: {avg_score:.1%}")
     - **Higher (0.8)**: Lenient - only clear contradictions flagged
 
     Lower this for stricter compliance checking.
+  </Accordion>
+
+  <Accordion title="Compliance Threshold (0.5 default)">
+    Controls the minimum compliance score required to mark a response as COMPLIANT.
+
+    - **Lower (0.3)**: Lenient - responses with fewer supporting chunks still pass
+    - **Default (0.5)**: Balanced - at least half of retrieved chunks must support
+    - **Higher (0.7)**: Strict - requires clear majority of supporting chunks
+
+    Raise this for stricter compliance requirements.
   </Accordion>
 
   <Accordion title="Chunk Size (1000 default)">
