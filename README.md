@@ -1,9 +1,10 @@
-# Fair Forge
-
 <p align="center">
-  <img src="https://cdn.prod.website-files.com/68f2b0d5efa00a8133ee0b23/698275cf13a9d1263497724f_Alquimia%20Logo.svg" width="800" alt="Alquimia AI">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/logo-light.svg">
+    <img alt="Fair Forge" src="docs/assets/logo-light.svg" width="480">
+  </picture>
 </p>
-
 <p align="center">
   <strong>Performance-measurement library for evaluating AI models and assistants</strong>
 </p>
