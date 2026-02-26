@@ -70,7 +70,6 @@ class Toxicity(FairForge):
         group_reference_q: dict[str, float] | None = None,
         # Sentiment analyzer for ASB
         sentiment_analyzer: SentimentAnalyzer | None = None,
-        # Statistical mode (NEW!)
         statistical_mode: StatisticalMode | None = None,
         # DIDT weights
         w_DR: float = 1.0 / 3.0,
@@ -119,11 +118,9 @@ class Toxicity(FairForge):
         self.w_ASB = float(w_ASB)
         self.w_DTO = float(w_DTO)
 
-        # Statistical mode (Strategy pattern!)
         if statistical_mode is not None:
             self.statistical_mode = statistical_mode
         else:
-            # Default to frequentist mode
             self.statistical_mode = FrequentistMode()
 
         # Setup group extractor
@@ -145,6 +142,14 @@ class Toxicity(FairForge):
         self.logger.debug(f"Statistical mode: {self.statistical_mode.get_result_type()}")
         self.logger.debug(f"Weights: w_DR={self.w_DR}, w_ASB={self.w_ASB}, w_DTO={self.w_DTO}")
         self.logger.debug(f"Group extractor: {self.group_extractor}")
+
+        self._accumulated_metadata = []
+        self._accumulated_embeddings = []
+        self._accumulated_sentiments = []
+        self._accumulated_group_dets = []
+        self._accumulated_toxic_words = []
+        self._accumulated_total_words = []
+        self._accumulated_toxic_flags = []
 
     # -------------------------
     # Helpers (unchanged)
@@ -175,21 +180,9 @@ class Toxicity(FairForge):
     # -------------------------
     # ASB (Associated Sentiment Bias)
     # -------------------------
-    def _compute_asb(self, assistant_answers: list[str], group_dets: list, groups: list[str]) -> Any:
+    def _compute_asb(self, sentiments: list[float], group_dets: list, groups: list[str]) -> Any:
         """
-        ASB (Associated Sentiment Bias) using sentiment analyzer and statistical mode.
-
-        Computes:
-        - S_i: average sentiment for group g_i (in range [-1, 1])
-        - ASB = dispersion of S_i values (using statistical_mode.dispersion_metric)
-
-        Args:
-            assistant_answers: List of assistant responses
-            group_dets: List of group detections for each response
-            groups: List of group names
-
-        Returns:
-            float (frequentist) or dict (Bayesian) with ASB metric
+        ASB (Associated Sentiment Bias) using pre-computed sentiments.
         """
         if self.sentiment_analyzer is None:
             self.logger.warning("No sentiment analyzer provided. ASB will be 0.")
@@ -208,20 +201,6 @@ class Toxicity(FairForge):
             return {"mean": 0.0, "ci_low": 0.0, "ci_high": 0.0}
 
         self.logger.info("Computing ASB (Associated Sentiment Bias)...")
-
-        self.logger.debug(f"Analyzing sentiment for {len(assistant_answers)} responses...")
-        sentiments = []
-        for i, answer in enumerate(assistant_answers):
-            try:
-                sentiment_result = self.sentiment_analyzer.infer(answer)
-                sentiments.append(sentiment_result.score)
-                self.logger.debug(
-                    f"Response {i}: sentiment={sentiment_result.score:.4f}, "
-                    f"label={sentiment_result.label}, confidence={sentiment_result.confidence}"
-                )
-            except Exception as e:
-                self.logger.warning(f"Failed to analyze sentiment for response {i}: {e}. Using neutral (0.0)")
-                sentiments.append(0.0)
 
         # Group sentiments by demographic group
         group_sentiments: dict[str, list[float]] = defaultdict(list)
@@ -287,7 +266,7 @@ class Toxicity(FairForge):
         return (float(w[0]), float(w[1]), float(w[2]))
 
     # -------------------------
-    # DR using statistical mode
+    # DR
     # -------------------------
     def _compute_DR(self, N_i: dict[str, int], groups: list[str]) -> Any:
         """
@@ -310,15 +289,13 @@ class Toxicity(FairForge):
 
         # Use statistical primitive
         if self.statistical_mode.get_result_type() == "point_estimate":
-            # Frequentist: convert counts to proportions
             total = sum(N_i.values())
             observed = {g: N_i[g] / total if total > 0 else 0.0 for g in groups}
             return self.statistical_mode.distribution_divergence(observed, reference)
-        # Bayesian: pass counts directly
         return self.statistical_mode.distribution_divergence(N_i, reference)
 
     # -------------------------
-    # DTO using statistical mode
+    # DTO
     # -------------------------
     def _compute_DTO(self, N_i: dict[str, int], K_i: dict[str, int], groups: list[str]) -> Any:
         """
@@ -340,7 +317,7 @@ class Toxicity(FairForge):
         return self.statistical_mode.dispersion_metric(rates, center="mean")
 
     # -------------------------
-    # DIDT aggregation using statistical mode
+    # DIDT aggregation
     # -------------------------
     def _compute_DIDT(self, DR: Any, DTO: Any, ASB: Any) -> Any:
         """DIDT aggregation using aggregate_metrics primitive."""
@@ -351,48 +328,90 @@ class Toxicity(FairForge):
         return self.statistical_mode.aggregate_metrics(metrics, weights)
 
     # -------------------------
-    # Main profiling
+    # FairForge interface
     # -------------------------
-    def _profile(
+    def batch(
         self,
+        session_id: str,
+        assistant_id: str,
         batch: list[Batch],
-        language: str,
-    ) -> tuple[dict[float, float], Any, Any, Any, dict[str, Any]]:
-        assistant_answers = [i.assistant for i in batch]
+        language: str | None = "english",
+        context: str = "",
+    ):
+        assistant_answers = [i.assistant for i in batch if i.assistant]
+        if not assistant_answers:
+            return
 
-        # Embed responses (for clustering)
+        self._accumulated_metadata.append(
+            {
+                "session_id": session_id,
+                "assistant_id": assistant_id,
+            }
+        )
+
+        # Encode embeddings
         embeddings = self.embedding_model.encode(assistant_answers)
+        self._accumulated_embeddings.append(embeddings)
 
-        # Group detections (for DR/DTO/ASB)
+        # Detect groups
         group_dets = self.group_extractor.detect_batch(assistant_answers)
+        self._accumulated_group_dets.extend(group_dets)
+
+        # Compute toxicity counters and sentiment per text on the fly
+        toxic_set = self._build_toxic_set(language or "english")
+
+        for text in assistant_answers:
+            toks = self._tokenize(text)
+            cnt = Counter(toks)
+            toxic_w, total_w = self._count_toxic_in_counter(cnt, toxic_set)
+
+            self._accumulated_toxic_words.append(toxic_w)
+            self._accumulated_total_words.append(total_w)
+
+            toxic_flag = (toxic_w / total_w) > self.group_toxicity_threshold if total_w else False
+            self._accumulated_toxic_flags.append(toxic_flag)
+
+            if self.sentiment_analyzer is not None:
+                try:
+                    res = self.sentiment_analyzer.infer(text)
+                    self._accumulated_sentiments.append(res.score)
+                except Exception:
+                    self._accumulated_sentiments.append(0.0)
+            else:
+                self._accumulated_sentiments.append(0.0)
+
+    def on_process_complete(self):
+        if not self._accumulated_embeddings:
+            self.logger.info("No data accumulated for Toxicity metric.")
+            return
+
+        self.logger.info("Executing global Toxicity clustering and profiling on accumulated stream data...")
+
+        embeddings = np.vstack(self._accumulated_embeddings)
+        group_dets = self._accumulated_group_dets
         groups = list(group_dets[0].keys()) if group_dets else []
 
-        # Build toxic lexicon
-        toxic_set = self._build_toxic_set(language)
+        # N_i and K_i global calculation
+        N_i: dict[str, int] = defaultdict(int)
+        K_i: dict[str, int] = defaultdict(int)
 
-        # N_i/K_i at "case level" (per response)
-        N_i: dict[str, int] = defaultdict(int)  # how many texts mention group
-        K_i: dict[str, int] = defaultdict(int)  # how many of those texts are toxic
-
-        for text, det in zip(assistant_answers, group_dets, strict=False):
-            toxic = self._is_toxic_text(text, toxic_set, threshold=self.group_toxicity_threshold)
+        for toxic, det in zip(self._accumulated_toxic_flags, group_dets, strict=False):
             for g in groups:
                 if det[g].present:
                     N_i[g] += 1
                     if toxic:
                         K_i[g] += 1
 
-        # Compute components using statistical primitives!
+        # Statistical Profiling
         DR = self._compute_DR(N_i, groups)
         DTO = self._compute_DTO(N_i, K_i, groups)
-        ASB = self._compute_asb(assistant_answers, group_dets, groups)
+        ASB = self._compute_asb(self._accumulated_sentiments, group_dets, groups)
         DIDT = self._compute_DIDT(DR, DTO, ASB)
 
-        # Build group_profiling dict
         wR, wS, wT = self._normalize_weights()
-        # Map result type to schema-expected mode
         mode_map = {"point_estimate": "frequentist", "distribution": "bayesian"}
         mode_value = mode_map.get(self.statistical_mode.get_result_type(), "frequentist")
+
         group_profiling: dict[str, Any] = {
             "mode": mode_value,
             "weights": {"w_DR": wR, "w_ASB": wS, "w_DTO": wT},
@@ -402,9 +421,7 @@ class Toxicity(FairForge):
             "toxicity_threshold": float(self.group_toxicity_threshold),
         }
 
-        # Add results based on mode type
         if self.statistical_mode.get_result_type() == "point_estimate":
-            # Frequentist mode
             total = sum(N_i.values())
             p_i = {g: N_i[g] / total if total > 0 else 0.0 for g in groups}
             if self.group_reference_q is None:
@@ -420,54 +437,31 @@ class Toxicity(FairForge):
                     "p_i": p_i,
                     "q_i": q_i,
                     "T_i": T_i,
-                    "frequentist": {
-                        "DR": float(DR),
-                        "ASB": float(ASB),
-                        "DTO": float(DTO),
-                        "DIDT": float(DIDT),
-                    },
+                    "frequentist": {"DR": float(DR), "ASB": float(ASB), "DTO": float(DTO), "DIDT": float(DIDT)},
                     "bayesian": None,
                 }
             )
         else:
-            # Bayesian mode
             group_profiling.update(
                 {
-                    "p_i": {},  # Not directly computed in Bayesian (comes from posterior)
+                    "p_i": {},
                     "q_i": DR.get("q_i", {}),
-                    "T_i": {},  # Not directly computed in Bayesian (comes from posterior)
+                    "T_i": {},
                     "frequentist": None,
                     "bayesian": {
                         "priors": getattr(self.statistical_mode, "dirichlet_prior", 1.0),
                         "mc_samples": getattr(self.statistical_mode, "mc_samples", 5000),
                         "ci_level": getattr(self.statistical_mode, "ci_level", 0.95),
                         "summary": {
-                            "DR": {
-                                "mean": DR["mean"],
-                                "ci_low": DR["ci_low"],
-                                "ci_high": DR["ci_high"],
-                            },
-                            "DTO": {
-                                "mean": DTO["mean"],
-                                "ci_low": DTO["ci_low"],
-                                "ci_high": DTO["ci_high"],
-                            },
-                            "ASB": {
-                                "mean": ASB["mean"],
-                                "ci_low": ASB["ci_low"],
-                                "ci_high": ASB["ci_high"],
-                            },
-                            "DIDT": {
-                                "mean": DIDT["mean"],
-                                "ci_low": DIDT["ci_low"],
-                                "ci_high": DIDT["ci_high"],
-                            },
+                            "DR": {"mean": DR["mean"], "ci_low": DR["ci_low"], "ci_high": DR["ci_high"]},
+                            "DTO": {"mean": DTO["mean"], "ci_low": DTO["ci_low"], "ci_high": DTO["ci_high"]},
+                            "ASB": {"mean": ASB["mean"], "ci_low": ASB["ci_low"], "ci_high": ASB["ci_high"]},
+                            "DIDT": {"mean": DIDT["mean"], "ci_low": DIDT["ci_low"], "ci_high": DIDT["ci_high"]},
                         },
                     },
                 }
             )
 
-        # Clustering (unchanged)
         reducer = umap.UMAP(
             n_components=self.umap_n_components,
             random_state=self.umap_random_state,
@@ -485,56 +479,40 @@ class Toxicity(FairForge):
         )
         labels = clusterer.fit_predict(clusterable_embeddings if self.toxicity_cluster_use_latent_space else embeddings)
 
-        # Cluster toxicity score reusing the same toxic_set
+        # Cluster toxicity score
         score_cluster: dict[float, float] = {}
         for lbl in set(labels):
-            texts = [resp for resp, label in zip(assistant_answers, labels, strict=False) if label == lbl]
-            cnt = Counter(tok for t in texts for tok in self._tokenize(t))
-            toxic_words, total_words = self._count_toxic_in_counter(cnt, toxic_set)
-            score_cluster[lbl] = (toxic_words / total_words) if total_words else 0.0
+            lbl_toxic_words = sum(
+                tw for label, tw in zip(labels, self._accumulated_toxic_words, strict=False) if label == lbl
+            )
+            lbl_total_words = sum(
+                tw for label, tw in zip(labels, self._accumulated_total_words, strict=False) if label == lbl
+            )
+            score_cluster[lbl] = (lbl_toxic_words / lbl_total_words) if lbl_total_words else 0.0
 
-        return (
-            score_cluster,
-            clusterable_embeddings,
-            embeddings,
-            labels,
-            group_profiling,
+        cluster_scores_str = {int(k) if isinstance(k, np.integer) else k: float(v) for k, v in score_cluster.items()}
+
+        umap_serializable = (
+            clusterable_embeddings.tolist()
+            if isinstance(clusterable_embeddings, np.ndarray)
+            else clusterable_embeddings
         )
-
-    # -------------------------
-    # FairForge interface
-    # -------------------------
-    def batch(
-        self,
-        session_id: str,
-        assistant_id: str,
-        batch: list[Batch],
-        language: str | None = "english",
-        context: str = "",  # Added to match signature
-    ):
-        score_cluster, umap_embeddings, embeddings, labels, group_profiling = self._profile(batch, language)
-
-        # Serialize for JSON
-        cluster_scores_serializable = {
-            int(k) if isinstance(k, np.integer) else k: float(v) for k, v in score_cluster.items()
-        }
-
-        umap_embeddings_serializable = (
-            umap_embeddings.tolist() if isinstance(umap_embeddings, np.ndarray) else umap_embeddings
-        )
-        embeddings_serializable = embeddings.tolist() if isinstance(embeddings, np.ndarray) else embeddings
+        embeds_serializable = embeddings.tolist() if isinstance(embeddings, np.ndarray) else embeddings
         labels_serializable = labels.tolist() if isinstance(labels, np.ndarray) else labels
 
         assistant_space = ToxicityMetric.AssistantSpace(
-            latent_space=umap_embeddings_serializable,
-            embeddings=embeddings_serializable,
+            latent_space=umap_serializable,
+            embeddings=embeds_serializable,
             cluster_labels=labels_serializable,
         )
 
+        global_session = "global_stream"
+        global_assistant = self._accumulated_metadata[0]["assistant_id"] if self._accumulated_metadata else "unknown"
+
         toxicity_metric = ToxicityMetric(
-            session_id=session_id,
-            assistant_id=assistant_id,
-            cluster_profiling=cluster_scores_serializable,
+            session_id=global_session,
+            assistant_id=global_assistant,
+            cluster_profiling=cluster_scores_str,
             assistant_space=assistant_space,
             group_profiling=group_profiling,
         )

@@ -1,10 +1,11 @@
 """Retriever abstract base class for loading datasets."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from fair_forge.schemas.common import Dataset
+    from fair_forge.schemas.common import Dataset, IterationLevel, StreamedBatch
 
 
 class Retriever(ABC):
@@ -27,18 +28,12 @@ class Retriever(ABC):
         """
         self.kwargs = kwargs
 
+    @property
+    def iteration_level(self) -> "IterationLevel":
+        from fair_forge.schemas.common import IterationLevel
+
+        return IterationLevel.FULL_DATASET
+
     @abstractmethod
-    def load_dataset(self) -> list["Dataset"]:
-        """
-        Load dataset from cold storage.
-
-        This method should be implemented by subclasses to handle specific storage systems
-        and return the data in the required Dataset format.
-
-        Returns:
-            list[Dataset]: A list of Dataset objects containing the retrieved data.
-
-        Raises:
-            Exception: If the method is not implemented by a subclass.
-        """
+    def load_dataset(self) -> list["Dataset"] | Iterator["Dataset"] | Iterator["StreamedBatch"]:
         raise NotImplementedError("You should implement this method according to the type of storage you are using.")

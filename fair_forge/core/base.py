@@ -1,6 +1,7 @@
 """FairForge base class for metrics."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
 from fair_forge.utils.logging import VerboseLogger
@@ -34,13 +35,37 @@ class FairForge(ABC):
             verbose (bool): Whether to enable verbose logging.
             **kwargs: Additional configuration parameters.
         """
-        self.retriever = retriever
+        self.retriever_cls = retriever
+        self.retriever = self.retriever_cls(**kwargs)
         self.metrics = []
         self.verbose = verbose
         self.logger = VerboseLogger(verbose)
 
-        self.dataset = self.retriever(**kwargs).load_dataset()
-        self.logger.info(f"Loaded dataset with {len(self.dataset)} batches")
+        self.dataset = self.retriever.load_dataset()
+
+        if isinstance(self.dataset, Iterator):
+            self.level = getattr(self.retriever, "iteration_level", None)
+            if not self.level:
+                raise ValueError(
+                    "When using a generator, you must explicitly set 'iteration_level' ('stream_sessions' or 'stream_batches') in the Retriever."
+                )
+        else:
+            self.level = getattr(self.retriever, "iteration_level", "full_dataset")
+
+        strategies = {
+            "full_dataset": self._process_dataset,
+            "stream_sessions": self._process_dataset,
+            "stream_batches": self._process_qa,
+        }
+
+        if hasattr(self.level, "value"):
+            level_str = self.level.value
+        else:
+            level_str = self.level
+
+        self._iteration_processor = strategies.get(level_str)
+        if not self._iteration_processor:
+            raise ValueError(f"Unknown iteration_level: {self.level}")
 
     @abstractmethod
     def batch(
@@ -86,28 +111,43 @@ class FairForge(ABC):
         """
         return cls(retriever, **kwargs)._process()
 
+    def _process_dataset(self, data):
+        self.logger.info("Processing using dataset/session level parsing")
+        for element in data:
+            self.logger.info(f"Session ID: {element.session_id}, Assistant ID: {element.assistant_id}")
+            self.batch(
+                session_id=element.session_id,
+                context=element.context,
+                assistant_id=element.assistant_id,
+                batch=element.conversation,
+                language=element.language,
+            )
+
+    def _process_qa(self, data):
+        self.logger.info("Processing using QA batch level parsing")
+        for streamed in data:
+            self.logger.info(
+                f"Session ID: {streamed.metadata.session_id}, Assistant ID: {streamed.metadata.assistant_id}"
+            )
+            self.batch(
+                session_id=streamed.metadata.session_id,
+                context=streamed.metadata.context,
+                assistant_id=streamed.metadata.assistant_id,
+                batch=[streamed.batch],
+                language=streamed.metadata.language,
+            )
+
+    def on_process_complete(self):  # noqa: B027
+        """Optional hook evaluated after all dataset elements are processed. Useful for accumulator metrics."""
+
     def _process(self) -> list:
         """
-        Process the entire dataset and compute metrics.
-
-        This internal method iterates through the dataset and processes each batch
-        using the implemented batch method.
-
-        Returns:
-            list: The computed metrics for all batches in the dataset.
+        Process the entire dataset and compute metrics using the configured strategy.
         """
         self.logger.info("Starting to process dataset")
 
-        for batch in self.dataset:
-            self.logger.info(f"Session ID: {batch.session_id}, Assistant ID: {batch.assistant_id}")
+        self._iteration_processor(self.dataset)
+        self.on_process_complete()
 
-            self.batch(
-                session_id=batch.session_id,
-                context=batch.context,
-                assistant_id=batch.assistant_id,
-                batch=batch.conversation,
-                language=batch.language,
-            )
-
-        self.logger.info(f"Completed processing all batches. Total metrics collected: {len(self.metrics)}")
+        self.logger.info(f"Completed processing. Total metrics collected: {len(self.metrics)}")
         return self.metrics
