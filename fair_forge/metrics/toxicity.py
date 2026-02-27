@@ -150,6 +150,7 @@ class Toxicity(FairForge):
         self._accumulated_toxic_words = []
         self._accumulated_total_words = []
         self._accumulated_toxic_flags = []
+        self._seen_languages: set[str] = set()
 
     # -------------------------
     # Helpers (unchanged)
@@ -358,7 +359,9 @@ class Toxicity(FairForge):
         self._accumulated_group_dets.extend(group_dets)
 
         # Compute toxicity counters and sentiment per text on the fly
-        toxic_set = self._build_toxic_set(language or "english")
+        resolved_language = language or "english"
+        self._seen_languages.add(resolved_language)
+        toxic_set = self._build_toxic_set(resolved_language)
 
         for text in assistant_answers:
             toks = self._tokenize(text)
@@ -381,9 +384,23 @@ class Toxicity(FairForge):
                 self._accumulated_sentiments.append(0.0)
 
     def on_process_complete(self):
+        """Compute global clustering and group profiling over all accumulated batches.
+
+        Warning:
+            Mixed-language datasets are not supported. Toxic word sets differ per language,
+            so accumulating toxicity flags across languages produces unreliable results.
+            If multiple languages are detected, a warning is emitted but processing continues
+            using each batch's own toxic set (already applied during accumulation).
+        """
         if not self._accumulated_embeddings:
             self.logger.info("No data accumulated for Toxicity metric.")
             return
+
+        if len(self._seen_languages) > 1:
+            self.logger.warning(
+                f"[Toxicity] Mixed-language dataset detected: {self._seen_languages}. "
+                "Toxic word sets differ per language. Global profiling results may be unreliable."
+            )
 
         self.logger.info("Executing global Toxicity clustering and profiling on accumulated stream data...")
 
