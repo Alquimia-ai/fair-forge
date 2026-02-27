@@ -2,7 +2,7 @@
 
 <!-- version list -->
 
-## v1.2.0-b.8 (2026-02-27)
+## v1.3.0-b.1 (2026-02-27)
 
 ### Bug Fixes
 
@@ -65,6 +65,20 @@
 
 - **toxicity**: Call on_process_complete after batch in unit tests
   ([`58e8476`](https://github.com/Alquimia-ai/fair-forge/commit/58e84768cf40871d2b627d242a9f4d7edff71579))
+
+
+## v1.2.0 (2026-02-23)
+
+### Continuous Integration
+
+- **release**: Skip release on docs-only changes
+  ([`df28fd1`](https://github.com/Alquimia-ai/fair-forge/commit/df28fd13531696f7d0944cff870c33166041250e))
+
+### Documentation
+
+- Add fair forge logo and update branding
+  ([`5f014c2`](https://github.com/Alquimia-ai/fair-forge/commit/5f014c2505144e39ef082785dd5ee5ecd84135e5))
+
 
 
 ## v1.2.0-b.7 (2026-02-23)
