@@ -123,15 +123,9 @@ generators-alquimia = [
     "alquimia-client>=0.1.0",
 ]
 
-# Cloud storage support
-cloud = [
-    "boto3>=1.28.0",
-    "lakefs>=0.14.0",
-]
-
 # Everything
 all = [
-    "alquimia-fair-forge[metrics,runners,generators,generators-alquimia,cloud,explainability]",
+    "alquimia-fair-forge[metrics,runners,generators,generators-alquimia,explainability]",
 ]
 
 # Development tools
@@ -349,8 +343,6 @@ module = [
     "sentence_transformers.*",
     "hdbscan.*",
     "umap.*",
-    "lakefs.*",
-    "boto3.*",
     "alquimia_client.*",
     "interpreto.*",
 ]
