@@ -35,22 +35,18 @@ class FairForge(ABC):
             verbose (bool): Whether to enable verbose logging.
             **kwargs: Additional configuration parameters.
         """
-        self.retriever_cls = retriever
-        self.retriever = self.retriever_cls(**kwargs)
+        self.retriever = retriever(**kwargs)
         self.metrics = []
         self.verbose = verbose
         self.logger = VerboseLogger(verbose)
 
         self.dataset = self.retriever.load_dataset()
+        self.level = self.retriever.iteration_level
 
-        if isinstance(self.dataset, Iterator):
-            self.level = getattr(self.retriever, "iteration_level", None)
-            if not self.level:
-                raise ValueError(
-                    "When using a generator, you must explicitly set 'iteration_level' ('stream_sessions' or 'stream_batches') in the Retriever."
-                )
-        else:
-            self.level = getattr(self.retriever, "iteration_level", "full_dataset")
+        if isinstance(self.dataset, Iterator) and self.level.value == "full_dataset":
+            raise ValueError(
+                "When using a generator, you must explicitly set 'iteration_level' ('stream_sessions' or 'stream_batches') in the Retriever."
+            )
 
         strategies = {
             "full_dataset": self._process_dataset,
@@ -58,12 +54,7 @@ class FairForge(ABC):
             "stream_batches": self._process_qa,
         }
 
-        if hasattr(self.level, "value"):
-            level_str = self.level.value
-        else:
-            level_str = self.level
-
-        self._iteration_processor = strategies.get(level_str)
+        self._iteration_processor = strategies.get(self.level.value)
         if not self._iteration_processor:
             raise ValueError(f"Unknown iteration_level: {self.level}")
 
