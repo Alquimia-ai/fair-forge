@@ -11,7 +11,22 @@ from fair_forge.schemas.best_of import BestOfContest, BestOfMetric
 
 
 class BestOf(FairForge):
-    """Tournament-style metric for comparing multiple AI assistant responses.
+    """King-of-the-hill metric for comparing multiple AI assistant responses.
+
+    For each block of QA pairs (identified by their combined `qa_id` tuple), the first
+    assistant seen becomes the initial King. Each subsequent assistant challenges the current
+    King in a head-to-head LLM-judged comparison. The challenger replaces the King only if
+    the judge declares them the winner; otherwise the King retains the throne.
+
+    This means:
+    - **N-1 comparisons** are made for N assistants (not a full bracket).
+    - **Results are order-dependent**: the first assistant always starts as King and gets
+      multiple chances to defend, while later challengers get only one attempt.
+    - With `full_dataset` or `stream_sessions`, one result is produced per session (full
+      conversation as a single block). With `stream_batches`, one result is produced per
+      individual QA pair.
+    - Requires at least 2 assistants per block to produce a meaningful result. Blocks with
+      only one assistant are skipped with a warning.
 
     Args:
         retriever: Retriever class for loading datasets
@@ -127,12 +142,15 @@ class BestOf(FairForge):
         self.logger.info(f"[BestOf] Stream complete. Emitting {len(self._session_kings)} tournament results.")
 
         for block_key, (king_id, _, matches) in self._session_kings.items():
+            if not matches:
+                self.logger.warning(
+                    f"[BestOf] Block {block_key} had only one assistant ({king_id}). "
+                    "No comparison was made. Skipping metric."
+                )
+                continue
+
             qa_id_repr = block_key[0] if len(block_key) == 1 else f"batch_len_{len(block_key)}"
-            if matches:
-                final_match = matches[-1]
-                winner_id = final_match.winner_id
-            else:
-                winner_id = king_id
+            winner_id = matches[-1].winner_id
 
             metric = BestOfMetric(
                 session_id="bestof",
