@@ -13,7 +13,7 @@ from their modules to avoid loading unnecessary dependencies:
     from fair_forge.schemas.explainability import AttributionResult, AttributionMethod
 """
 
-from .common import Batch, Dataset, Logprobs
+from .common import Batch, Dataset, IterationLevel, Logprobs, SessionMetadata, StreamedBatch
 from .generators import (
     BaseContextLoader,
     BaseGenerator,
@@ -23,18 +23,19 @@ from .generators import (
 )
 from .metrics import BaseMetric
 from .runner import BaseRunner
-from .storage import BaseStorage
 
 __all__ = [
     # Common
     "Logprobs",
     "Batch",
     "Dataset",
+    "IterationLevel",
+    "SessionMetadata",
+    "StreamedBatch",
     # Base
     "BaseMetric",
-    # Runners and Storage
+    # Runners
     "BaseRunner",
-    "BaseStorage",
     # Generators
     "BaseGenerator",
     "BaseContextLoader",

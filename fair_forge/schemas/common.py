@@ -1,5 +1,7 @@
 """Common data models for Fair Forge."""
 
+from enum import Enum
+
 from pydantic import BaseModel
 
 
@@ -36,6 +38,24 @@ class Batch(BaseModel):
     agentic: dict | None = {}
     ground_truth_agentic: dict | None = {}
     qa_id: str
+
+
+class IterationLevel(str, Enum):
+    FULL_DATASET = "full_dataset"
+    STREAM_SESSIONS = "stream_sessions"
+    STREAM_BATCHES = "stream_batches"
+
+
+class SessionMetadata(BaseModel):
+    session_id: str
+    assistant_id: str
+    language: str | None = "english"
+    context: str
+
+
+class StreamedBatch(BaseModel):
+    metadata: SessionMetadata
+    batch: "Batch"
 
 
 class Dataset(BaseModel):
