@@ -68,6 +68,10 @@ class StreamingSessionRetriever(Retriever):
     def load_dataset(self) -> Iterator[Dataset]:
         """Yield Dataset sessions one at a time.
 
+        Note: json.load() reads the full file into memory before iterating.
+        For truly large files, replace with a streaming parser such as ijson:
+            for item in ijson.items(f, 'item'): yield Dataset.model_validate(item)
+
         Yields:
             Dataset objects parsed lazily from the JSON file.
         """
@@ -104,6 +108,10 @@ class StreamingBatchRetriever(Retriever):
 
     def load_dataset(self) -> Iterator[StreamedBatch]:
         """Yield individual QA pairs with their session metadata.
+
+        Note: json.load() reads the full file into memory before iterating.
+        For truly large files, replace with a streaming parser such as ijson:
+            for item in ijson.items(f, 'item'): yield Dataset.model_validate(item)
 
         Yields:
             StreamedBatch objects, one per QA interaction.
