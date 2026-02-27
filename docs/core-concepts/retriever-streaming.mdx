@@ -168,7 +168,7 @@ class QueueRetriever(Retriever):
 - You're building a real-time evaluation pipeline
 
 <Note>
-  BestOf works with all three modes, but the granularity changes. With `full_dataset` or `stream_sessions`, it compares full conversations as a block (one tournament per session). With `stream_batches`, it compares individual QA pairs (one tournament per question), producing one result per `qa_id` instead of per session.
+  BestOf works with all three modes, but the granularity follows how batches are formed. With `full_dataset` or `stream_sessions`, each batch contains all QA pairs in a session, so BestOf compares the entire conversation as a single block (one tournament per session / block of `qa_id`s). With `stream_batches`, each batch is a single QA pair, so BestOf runs a single king-of-the-hill comparison per question and produces exactly one result per `qa_id` instead of per session.
 </Note>
 
 ## Choosing the Right Mode
