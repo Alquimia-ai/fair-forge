@@ -2,6 +2,71 @@
 
 <!-- version list -->
 
+## v1.2.0-b.8 (2026-02-27)
+
+### Bug Fixes
+
+- **metrics**: Skip single-assistant blocks and document king-of-the-hill semantics
+  ([`c57a827`](https://github.com/Alquimia-ai/fair-forge/commit/c57a827c6a8e729459ffb862fb9851cc07f5dba7))
+
+- **metrics**: Warn on mixed-language datasets and document limitation
+  ([`52c7d95`](https://github.com/Alquimia-ai/fair-forge/commit/52c7d95c7b7aaafe036a0ad5a33e03a759d0b15e))
+
+### Chores
+
+- Remove cloud deps group and fix notebook cell source format
+  ([`e5b6f06`](https://github.com/Alquimia-ai/fair-forge/commit/e5b6f06c571a6a6e3aeafb9c142878aa519fa3d0))
+
+- Remove dep aenum
+  ([`6d07e37`](https://github.com/Alquimia-ai/fair-forge/commit/6d07e37fa921f8ebdbe8e72d6e93a5c12acd6df3))
+
+- **storage**: Remove storage module and docs
+  ([`174d31e`](https://github.com/Alquimia-ai/fair-forge/commit/174d31e833f8577c76a2ff59eeabae28c670bce1))
+
+### Continuous Integration
+
+- **release**: Skip release on docs-only changes
+  ([`df28fd1`](https://github.com/Alquimia-ai/fair-forge/commit/df28fd13531696f7d0944cff870c33166041250e))
+
+### Documentation
+
+- Add fair forge logo and update branding
+  ([`5f014c2`](https://github.com/Alquimia-ai/fair-forge/commit/5f014c2505144e39ef082785dd5ee5ecd84135e5))
+
+- **core-concepts**: Clarify BestOf granularity behavior with stream_batches
+  ([`5583f2c`](https://github.com/Alquimia-ai/fair-forge/commit/5583f2ce7aba80c2ae0bdc0c0e521323d3751623))
+
+- **core-concepts**: Rewrite retriever docs and add streaming retrievers page
+  ([`8a7731a`](https://github.com/Alquimia-ai/fair-forge/commit/8a7731a369f366ff69126ac13cf59a7b9f49c83c))
+
+- **examples**: Note json.load memory limitation in streaming retrievers
+  ([`adb44a1`](https://github.com/Alquimia-ai/fair-forge/commit/adb44a1fc31c3787e3e2cc889562abd2415106aa))
+
+### Features
+
+- **core**: Add streaming dataset support with iteration level strategy
+  ([`d76e461`](https://github.com/Alquimia-ai/fair-forge/commit/d76e461e43e58efe11de38b4350e9b1d8b1fff26))
+
+- **examples**: Add streaming retrievers and context notebook streaming section
+  ([`b092b2d`](https://github.com/Alquimia-ai/fair-forge/commit/b092b2d80cf2aef6c9afc952af166f9f2baeff45))
+
+- **schemas**: Add IterationLevel, SessionMetadata, and StreamedBatch types
+  ([`8eb8a02`](https://github.com/Alquimia-ai/fair-forge/commit/8eb8a02aaa0640f18a4232d6b4ef153a78cf9733))
+
+### Refactoring
+
+- **core**: Simplify iteration_level handling and remove retriever_cls
+  ([`3b71c13`](https://github.com/Alquimia-ai/fair-forge/commit/3b71c133a192361409c4d6a1f2ec8085d1714b7a))
+
+### Testing
+
+- **core**: Add streaming mode and iteration level detection tests
+  ([`e6a1f96`](https://github.com/Alquimia-ai/fair-forge/commit/e6a1f96850773077ded4296ce5a5344da05990cb))
+
+- **toxicity**: Call on_process_complete after batch in unit tests
+  ([`58e8476`](https://github.com/Alquimia-ai/fair-forge/commit/58e84768cf40871d2b627d242a9f4d7edff71579))
+
+
 ## v1.2.0-b.7 (2026-02-23)
 
 ### Bug Fixes
