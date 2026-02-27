@@ -463,6 +463,7 @@ class TestToxicityMetric:
                 batch=dataset.conversation,
                 language=dataset.language,
             )
+            toxicity.on_process_complete()
 
             assert len(toxicity.metrics) == 1
             metric = toxicity.metrics[0]
@@ -511,6 +512,7 @@ class TestToxicityMetric:
                 batch=dataset.conversation,
                 language=dataset.language,
             )
+            toxicity.on_process_complete()
 
             metric = toxicity.metrics[0]
 
