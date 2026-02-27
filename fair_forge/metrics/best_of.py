@@ -11,7 +11,22 @@ from fair_forge.schemas.best_of import BestOfContest, BestOfMetric
 
 
 class BestOf(FairForge):
-    """Tournament-style metric for comparing multiple AI assistant responses.
+    """King-of-the-hill metric for comparing multiple AI assistant responses.
+
+    For each block of QA pairs (identified by their combined `qa_id` tuple), the first
+    assistant seen becomes the initial King. Each subsequent assistant challenges the current
+    King in a head-to-head LLM-judged comparison. The challenger replaces the King only if
+    the judge declares them the winner; otherwise the King retains the throne.
+
+    This means:
+    - **N-1 comparisons** are made for N assistants (not a full bracket).
+    - **Results are order-dependent**: the first assistant always starts as King and gets
+      multiple chances to defend, while later challengers get only one attempt.
+    - With `full_dataset` or `stream_sessions`, one result is produced per session (full
+      conversation as a single block). With `stream_batches`, one result is produced per
+      individual QA pair.
+    - Requires at least 2 assistants per block to produce a meaningful result. Blocks with
+      only one assistant are skipped with a warning.
 
     Args:
         retriever: Retriever class for loading datasets
@@ -39,146 +54,109 @@ class BestOf(FairForge):
         self.bos_json_clause = bos_json_clause
         self.eos_json_clause = eos_json_clause
         self.criteria = criteria
-
-    def batch(
-        self,
-        session_id: str,
-        context: str,
-        agent_id: str,
-        batch: list[Batch],
-        language: str | None = "english",
-    ):
-        # BestOf processes in _process() instead of batch()
-        for interaction in batch:
-            self.logger.debug(f"QA ID: {interaction.qa_id}")
-
-    def _build_conversation_batch(self, assistant_id: str) -> str:
-        """Build a formatted string from conversations for a specific assistant."""
-        assistant_conversations = []
-        for dataset in self.dataset:
-            if dataset.assistant_id == assistant_id:
-                assistant_conversations.extend(dataset.conversation)
-
-        template = Template(bestOf_contestant_format)
-        return template.render(conversations=assistant_conversations)
-
-    def _process(self) -> list:
-        """Override base processing for tournament-style comparison."""
-        self.logger.info("[BestOf] Aggregating datasets by query for best-of comparisons")
-
-        judge = Judge(
+        self._session_kings = {}
+        self._judge = Judge(
             model=self.model,
             use_structured_output=self.use_structured_output,
             bos_json_clause=self.bos_json_clause,
             eos_json_clause=self.eos_json_clause,
         )
 
-        assistant_ids = sorted({dataset.assistant_id for dataset in self.dataset})
-        current_contestants = assistant_ids.copy()
+    def _build_single_contestant(self, batch: list[Batch]) -> str:
+        """Build a formatted string from a specific batch of conversations."""
+        template = Template(bestOf_contestant_format)
+        return template.render(conversations=batch)
 
-        round_number = 1
-        contests: list[BestOfContest] = []
+    def batch(
+        self,
+        session_id: str,
+        context: str,
+        assistant_id: str,
+        batch: list[Batch],
+        language: str | None = "english",
+    ):
+        if not batch:
+            return
 
-        while len(current_contestants) > 1:
-            self.logger.info(f"[BestOf] Round {round_number}: {len(current_contestants)} contestants remaining")
-            pairs = []
-            round_winners = []
-            num_contestants = len(current_contestants)
+        block_key = tuple(interaction.qa_id for interaction in batch)
+        incoming_text = self._build_single_contestant(batch)
 
-            if num_contestants % 2 == 1:
-                bye_contestant = current_contestants[-1]
-                self.logger.info(f"[BestOf] Round {round_number}: {bye_contestant} receives a bye")
-                round_winners.append(bye_contestant)
-                iterable_limit = num_contestants - 1
-            else:
-                iterable_limit = num_contestants
+        if block_key not in self._session_kings:
+            self.logger.debug(f"[BestOf] Setting {assistant_id} as initial King for block {block_key}")
+            self._session_kings[block_key] = (assistant_id, incoming_text, [])
+            return
 
-            for i in range(0, iterable_limit, 2):
-                pairs.append((current_contestants[i], current_contestants[i + 1]))
-            self.logger.info(f"[BestOf] Round {round_number}: Comparing {len(pairs)} pairs")
+        king_id, king_text, matches = self._session_kings[block_key]
 
-            for pair in pairs:
-                left_id, right_id = pair
+        self.logger.info(f"[BestOf] Challenging King {king_id} vs {assistant_id} for block {block_key}")
 
-                left_contestant = self._build_conversation_batch(left_id)
-                right_contestant = self._build_conversation_batch(right_id)
+        reasoning, result = self._judge.check(
+            bestOf_judge_prompt,
+            self.criteria,
+            {
+                "left_contestant": king_id,
+                "right_contestant": assistant_id,
+                "left_contestant_conv": king_text,
+                "right_contestant_conv": incoming_text,
+            },
+            output_schema=BestOfJudgeOutput,
+        )
 
-                self.logger.debug(f"Round {round_number}: Comparing {left_id} and {right_id} contestants")
-                reasoning, result = judge.check(
-                    bestOf_judge_prompt,
-                    self.criteria,
-                    {
-                        "left_contestant": left_id,
-                        "right_contestant": right_id,
-                        "left_contestant_conv": left_contestant,
-                        "right_contestant_conv": right_contestant,
-                    },
-                    output_schema=BestOfJudgeOutput,
-                )
+        if result is None:
+            raise ValueError(f"[FAIR FORGE/BESTOF] No valid response from judge for {king_id} vs {assistant_id}")
 
-                if result is None:
-                    raise ValueError(f"[FAIR FORGE/BESTOF] No valid response from judge for {left_id} vs {right_id}")
-
-                if self.use_structured_output:
-                    winner = result.winner
-                    confidence = result.confidence
-                    verdict = result.verdict
-                    result_reasoning = result.reasoning
-                else:
-                    winner = result.get("winner", "")
-                    confidence = result.get("confidence")
-                    verdict = result.get("verdict")
-                    result_reasoning = result.get("reasoning")
-
-                if winner == left_id:
-                    round_winners.append(left_id)
-                elif winner == right_id:
-                    round_winners.append(right_id)
-                elif isinstance(winner, str) and winner.lower() == "tie":
-                    round_winners.append(left_id)
-                    round_winners.append(right_id)
-                else:
-                    raise ValueError(f"[FAIR FORGE/BESTOF] Winner name doesn't match {winner} {left_id} {right_id}")
-
-                self.logger.debug(f"Round {round_number}: Winner is {winner}")
-                contests.append(
-                    BestOfContest(
-                        round=round_number,
-                        left_id=left_id,
-                        right_id=right_id,
-                        winner_id=winner if winner in (left_id, right_id) else "tie",
-                        confidence=confidence,
-                        verdict=verdict,
-                        reasoning=result_reasoning,
-                        thinkings=reasoning,
-                    )
-                )
-
-            self.logger.info(f"[BestOf] Round {round_number} winners: {round_winners}")
-
-            current_contestants = round_winners
-            round_number += 1
-
-        if len(current_contestants) == 1:
-            final_winner = current_contestants[0]
-            self.logger.info(f"[BestOf] Tournament complete! Final winner: {final_winner}")
-            tournament_metric = BestOfMetric(
-                session_id="bestof",
-                qa_id="bestof_tournament",
-                assistant_id=final_winner,
-                bestof_winner_id=final_winner,
-                bestof_contests=contests,
-            )
-            self.metrics.append(tournament_metric)
+        if self.use_structured_output:
+            winner = result.winner
+            confidence = result.confidence
+            verdict = result.verdict
+            result_reasoning = result.reasoning
         else:
-            self.logger.warning("[BestOf] Tournament ended in a tie or unresolved state")
-            tournament_metric = BestOfMetric(
-                session_id="bestof",
-                qa_id="bestof_tournament",
-                assistant_id="tie",
-                bestof_winner_id="tie",
-                bestof_contests=contests,
-            )
-            self.metrics.append(tournament_metric)
+            winner = result.get("winner", "")
+            confidence = result.get("confidence")
+            verdict = result.get("verdict")
+            result_reasoning = result.get("reasoning")
 
-        return self.metrics
+        match_record = BestOfContest(
+            round=len(matches) + 1,
+            left_id=king_id,
+            right_id=assistant_id,
+            winner_id=winner if winner in (king_id, assistant_id) else "tie",
+            confidence=confidence,
+            verdict=verdict,
+            reasoning=result_reasoning,
+            thinkings=reasoning,
+        )
+
+        if winner == assistant_id:
+            self.logger.info(f"[BestOf] New King! {assistant_id} dethrones {king_id}")
+            self._session_kings[block_key] = (assistant_id, incoming_text, [*matches, match_record])
+        elif winner == king_id:
+            self.logger.info(f"[BestOf] {king_id} defends the throne against {assistant_id}")
+            self._session_kings[block_key] = (king_id, king_text, [*matches, match_record])
+        else:
+            self.logger.warning(f"[BestOf] Match between {king_id} and {assistant_id} ended in a tie. King stays.")
+            self._session_kings[block_key] = (king_id, king_text, [*matches, match_record])
+
+    def on_process_complete(self):
+        """Evaluate the final kings and emit the metrics."""
+        self.logger.info(f"[BestOf] Stream complete. Emitting {len(self._session_kings)} tournament results.")
+
+        for block_key, (king_id, _, matches) in self._session_kings.items():
+            if not matches:
+                self.logger.warning(
+                    f"[BestOf] Block {block_key} had only one assistant ({king_id}). "
+                    "No comparison was made. Skipping metric."
+                )
+                continue
+
+            qa_id_repr = block_key[0] if len(block_key) == 1 else f"batch_len_{len(block_key)}"
+            winner_id = matches[-1].winner_id
+
+            metric = BestOfMetric(
+                session_id="bestof",
+                qa_id=qa_id_repr,
+                assistant_id=winner_id,
+                bestof_winner_id=winner_id,
+                bestof_contests=matches,
+            )
+            self.metrics.append(metric)

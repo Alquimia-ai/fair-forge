@@ -22,7 +22,7 @@ flowchart LR
 
 The core data flow in Fair Forge is:
 
-1. **Retriever** loads your conversation data as `list[Dataset]`
+1. **Retriever** loads your conversation data (`list[Dataset]`, `Iterator[Dataset]`, or `Iterator[StreamedBatch]`)
 2. **FairForge** base class iterates through datasets
 3. **Metric** implementations process each conversation batch
 4. **Results** are collected in `self.metrics`
@@ -85,8 +85,12 @@ class Retriever(ABC):
     def __init__(self, **kwargs):
         pass
 
+    @property
+    def iteration_level(self) -> IterationLevel:
+        return IterationLevel.FULL_DATASET  # default
+
     @abstractmethod
-    def load_dataset(self) -> list[Dataset]:
+    def load_dataset(self) -> list[Dataset] | Iterator[Dataset] | Iterator[StreamedBatch]:
         """Load and return datasets for evaluation."""
         pass
 ```
@@ -199,7 +203,6 @@ fair_forge/
 │   └── bayesian.py       # Bayesian implementation
 ├── generators/           # Test dataset generation
 ├── runners/              # Test execution
-├── storage/              # Storage backends
 ├── llm/                  # LLM integration (Judge)
 ├── guardians/            # Guardian implementations
 ├── extractors/           # Group extractor implementations
@@ -219,13 +222,15 @@ Fair Forge is designed for extensibility:
 | `BaseGroupExtractor` | `detect_one()` | Custom group detection |
 | `StatisticalMode` | Various methods | Custom statistical analysis |
 | `BaseRunner` | `run_batch()` | Custom test execution |
-| `BaseStorage` | `load_datasets()` | Custom storage backends |
 
 ## Next Steps
 
 <CardGroup cols={2}>
   <Card title="Retriever" icon="database" href="/core-concepts/retriever">
-    Learn how to create custom retrievers
+    Create custom retrievers for any data source
+  </Card>
+  <Card title="Streaming Retrievers" icon="arrow-right-arrow-left" href="/core-concepts/retriever-streaming">
+    Process large datasets with streaming modes
   </Card>
   <Card title="Dataset & Batch" icon="table" href="/core-concepts/dataset-batch">
     Understand data structures
