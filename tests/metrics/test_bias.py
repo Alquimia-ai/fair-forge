@@ -5,6 +5,7 @@ import pytest
 from fair_forge.core import Guardian
 from fair_forge.metrics.bias import Bias
 from fair_forge.schemas.bias import BiasMetric, GuardianBias, ProtectedAttribute
+from fair_forge.statistical import BayesianMode, FrequentistMode
 from tests.fixtures.mock_data import create_sample_batch
 from tests.fixtures.mock_retriever import MockRetriever
 
@@ -44,14 +45,14 @@ class TestBiasMetric:
         bias = Bias(retriever=MockRetriever, guardian=MockGuardian)
 
         assert bias.guardian is not None
-        assert bias.confidence_level == 0.95
+        assert isinstance(bias.statistical_mode, FrequentistMode)
         assert len(bias.protected_attributes) == 5
 
-    def test_initialization_custom_confidence(self):
-        """Test Bias initialization with custom confidence level."""
-        bias = Bias(retriever=MockRetriever, guardian=MockGuardian, confidence_level=0.80)
+    def test_initialization_custom_statistical_mode(self):
+        """Test Bias initialization with custom statistical mode."""
+        bias = Bias(retriever=MockRetriever, guardian=MockGuardian, statistical_mode=BayesianMode())
 
-        assert bias.confidence_level == 0.80
+        assert isinstance(bias.statistical_mode, BayesianMode)
 
     def test_protected_attributes_defined(self):
         """Test that all protected attributes are defined."""
@@ -68,41 +69,6 @@ class TestBiasMetric:
         actual_attributes = {attr.attribute for attr in bias.protected_attributes}
         assert actual_attributes == expected_attributes
 
-    def test_clopper_pearson_basic(self):
-        """Test Clopper-Pearson confidence interval calculation."""
-        bias = Bias(retriever=MockRetriever, guardian=MockGuardian, confidence_level=0.95)
-
-        result = bias._clopper_pearson_confidence_interval(samples=100, k_success=70)
-
-        assert result.samples == 100
-        assert result.k_success == 70
-        assert result.probability == pytest.approx(0.7, abs=0.001)
-        assert result.alpha == pytest.approx(0.05, abs=0.001)
-        assert result.lower_bound < result.probability
-        assert result.upper_bound > result.probability
-        assert 0 <= result.lower_bound <= 1
-        assert 0 <= result.upper_bound <= 1
-
-    def test_clopper_pearson_all_success(self):
-        """Test Clopper-Pearson when all samples are successes."""
-        bias = Bias(retriever=MockRetriever, guardian=MockGuardian)
-
-        result = bias._clopper_pearson_confidence_interval(samples=100, k_success=100)
-
-        assert result.probability == 1.0
-        assert result.upper_bound == 1.0
-
-    def test_clopper_pearson_no_success(self):
-        """Test Clopper-Pearson when no samples are successes."""
-        bias = Bias(retriever=MockRetriever, guardian=MockGuardian)
-
-        result = bias._clopper_pearson_confidence_interval(samples=100, k_success=0)
-
-        assert result.probability == 0.0
-        # When k_success=0, lower_bound can be NaN due to beta distribution behavior
-        # The important thing is that upper_bound is valid
-        assert result.upper_bound > 0
-
     def test_get_guardian_biased_attributes(self):
         """Test _get_guardian_biased_attributes method."""
         bias = Bias(retriever=MockRetriever, guardian=MockGuardian)
@@ -116,18 +82,15 @@ class TestBiasMetric:
             batch=batches, attributes=bias.protected_attributes, context="test context"
         )
 
-        # Should have entries for all protected attributes
         assert len(result) == 5
         for attr in bias.protected_attributes:
             assert attr.attribute.value in result
-            # Each attribute should have 2 interactions (one per batch)
             assert len(result[attr.attribute.value]) == 2
 
-    def test_calculate_confidence_intervals(self):
-        """Test _calculate_confidence_intervals method."""
+    def test_calculate_attribute_rates_frequentist(self):
+        """Test _calculate_attribute_rates with frequentist mode."""
         bias = Bias(retriever=MockRetriever, guardian=MockGuardian)
 
-        # Create mock biases_by_attributes
         biases_by_attributes = {}
         for attr in bias.protected_attributes:
             biases_by_attributes[attr.attribute.value] = [
@@ -139,14 +102,40 @@ class TestBiasMetric:
                 ),
             ]
 
-        result = bias._calculate_confidence_intervals(biases_by_attributes)
+        result = bias._calculate_attribute_rates(biases_by_attributes)
 
         assert len(result) == 5
-        for interval in result:
-            assert isinstance(interval, BiasMetric.ConfidenceInterval)
-            assert interval.samples == 2
-            assert interval.k_success == 2  # Both not biased
-            assert interval.confidence_level == 0.95
+        for rate in result:
+            assert isinstance(rate, BiasMetric.AttributeBiasRate)
+            assert rate.n_samples == 2
+            assert rate.k_biased == 0
+            assert rate.rate == 0.0
+            assert rate.ci_low is None
+            assert rate.ci_high is None
+
+    def test_calculate_attribute_rates_bayesian(self):
+        """Test _calculate_attribute_rates with Bayesian mode."""
+        bias = Bias(retriever=MockRetriever, guardian=MockGuardian, statistical_mode=BayesianMode(mc_samples=100))
+
+        biases_by_attributes = {}
+        for attr in bias.protected_attributes:
+            biases_by_attributes[attr.attribute.value] = [
+                BiasMetric.GuardianInteraction(
+                    qa_id="qa_001", is_biased=True, attribute=attr.attribute.value, certainty=0.9
+                ),
+                BiasMetric.GuardianInteraction(
+                    qa_id="qa_002", is_biased=False, attribute=attr.attribute.value, certainty=0.85
+                ),
+            ]
+
+        result = bias._calculate_attribute_rates(biases_by_attributes)
+
+        assert len(result) == 5
+        for rate in result:
+            assert isinstance(rate, BiasMetric.AttributeBiasRate)
+            assert rate.ci_low is not None
+            assert rate.ci_high is not None
+            assert rate.ci_low <= rate.rate <= rate.ci_high
 
     def test_batch_processing(self):
         """Test batch method processes correctly."""
@@ -164,7 +153,7 @@ class TestBiasMetric:
         assert isinstance(metric, BiasMetric)
         assert metric.session_id == "test_session"
         assert metric.assistant_id == "test_assistant"
-        assert len(metric.confidence_intervals) == 5
+        assert len(metric.attribute_rates) == 5
         assert len(metric.guardian_interactions) == 5
 
     def test_batch_multiple_interactions(self):
@@ -177,7 +166,6 @@ class TestBiasMetric:
 
         assert len(bias.metrics) == 1
         metric = bias.metrics[0]
-        # Each attribute should have 5 interactions
         for attr_key, interactions in metric.guardian_interactions.items():
             assert len(interactions) == 5
 
@@ -190,16 +178,14 @@ class TestBiasMetric:
         bias.batch(session_id="test_session", context="test context", assistant_id="test_assistant", batch=batches)
 
         metric = bias.metrics[0]
-        # Check that some interactions are biased and some are not
         for attr_key, interactions in metric.guardian_interactions.items():
             biased_count = sum(1 for i in interactions if i.is_biased)
             not_biased_count = sum(1 for i in interactions if not i.is_biased)
-            # With 4 batches and 5 attributes, we should have a mix
             assert biased_count + not_biased_count == 4
 
-    def test_confidence_interval_calculation_with_biased(self):
-        """Test confidence interval calculation when some responses are biased."""
-        bias = Bias(retriever=MockRetriever, guardian=MockGuardianAlternating, confidence_level=0.90)
+    def test_bias_rate_with_mixed_results(self):
+        """Test bias rate calculation when some responses are biased."""
+        bias = Bias(retriever=MockRetriever, guardian=MockGuardianAlternating)
 
         biases_by_attributes = {}
         for attr in bias.protected_attributes:
@@ -218,12 +204,12 @@ class TestBiasMetric:
                 ),
             ]
 
-        result = bias._calculate_confidence_intervals(biases_by_attributes)
+        result = bias._calculate_attribute_rates(biases_by_attributes)
 
-        for interval in result:
-            assert interval.samples == 4
-            assert interval.k_success == 2  # 2 not biased out of 4
-            assert interval.probability == pytest.approx(0.5, abs=0.001)
+        for rate in result:
+            assert rate.n_samples == 4
+            assert rate.k_biased == 2
+            assert rate.rate == pytest.approx(0.5, abs=0.001)
 
     def test_verbose_mode(self):
         """Test that verbose mode doesn't break initialization."""

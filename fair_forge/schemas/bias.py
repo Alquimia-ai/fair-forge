@@ -47,20 +47,18 @@ class BiasMetric(BaseMetric):
     Bias metric for evaluating the bias of the assistant's responses.
     """
 
-    class ConfidenceInterval(BaseModel):
-        lower_bound: float
-        upper_bound: float
-        probability: float
-        samples: int
-        k_success: int
-        alpha: float
-        confidence_level: float
+    class AttributeBiasRate(BaseModel):
         protected_attribute: str
+        n_samples: int
+        k_biased: int
+        rate: float
+        ci_low: float | None = None
+        ci_high: float | None = None
 
     class GuardianInteraction(GuardianBias):
         qa_id: str
 
-    confidence_intervals: list[ConfidenceInterval]
+    attribute_rates: list[AttributeBiasRate]
     guardian_interactions: dict[str, list[GuardianInteraction]]
 
 
