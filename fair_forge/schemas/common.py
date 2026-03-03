@@ -38,6 +38,7 @@ class Batch(BaseModel):
     agentic: dict | None = {}
     ground_truth_agentic: dict | None = {}
     qa_id: str
+    weight: float | None = None
 
 
 class IterationLevel(str, Enum):
