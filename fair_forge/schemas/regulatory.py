@@ -28,22 +28,8 @@ class RegulatoryChunk(BaseModel):
     verdict: Literal["SUPPORTS", "CONTRADICTS"]
 
 
-class RegulatoryMetric(BaseMetric):
-    """
-    Regulatory compliance metric for evaluating assistant responses against regulatory corpus.
-
-    Attributes:
-        qa_id: Unique identifier for the Q&A interaction.
-        query: The user query.
-        assistant: The assistant response.
-        compliance_score: Overall compliance score (0.0-1.0).
-            1.0 = fully supported, 0.0 = fully contradicted.
-        verdict: Overall verdict (COMPLIANT, NON_COMPLIANT, or IRRELEVANT).
-        supporting_chunks: Number of chunks that support the response.
-        contradicting_chunks: Number of chunks that contradict the response.
-        retrieved_chunks: List of retrieved and evaluated chunks.
-        insight: Explanation of the compliance evaluation.
-    """
+class RegulatoryInteraction(BaseModel):
+    """Per-interaction regulatory evaluation result embedded in the session-level metric."""
 
     qa_id: str
     query: str
@@ -56,4 +42,30 @@ class RegulatoryMetric(BaseMetric):
     insight: str
 
 
-__all__ = ["RegulatoryChunk", "RegulatoryMetric"]
+class RegulatoryMetric(BaseMetric):
+    """
+    Session-level regulatory compliance metric aggregating compliance scores
+    across all interactions.
+
+    Attributes:
+        n_interactions: Number of interactions evaluated in this session.
+        compliance_score: Weighted mean compliance score across all interactions (0.0-1.0).
+        compliance_score_ci_low: Lower credible bound — only set in Bayesian mode.
+        compliance_score_ci_high: Upper credible bound — only set in Bayesian mode.
+        verdict: Overall session verdict derived from the aggregated compliance score.
+        total_supporting_chunks: Sum of supporting chunks across all interactions.
+        total_contradicting_chunks: Sum of contradicting chunks across all interactions.
+        interactions: Per-interaction evaluation details.
+    """
+
+    n_interactions: int
+    compliance_score: float = Field(ge=0, le=1)
+    compliance_score_ci_low: float | None = None
+    compliance_score_ci_high: float | None = None
+    verdict: Literal["COMPLIANT", "NON_COMPLIANT", "IRRELEVANT"]
+    total_supporting_chunks: int = Field(ge=0)
+    total_contradicting_chunks: int = Field(ge=0)
+    interactions: list[RegulatoryInteraction]
+
+
+__all__ = ["RegulatoryChunk", "RegulatoryInteraction", "RegulatoryMetric"]

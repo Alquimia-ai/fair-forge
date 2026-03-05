@@ -88,6 +88,7 @@ batch = Batch(
 | `agentic` | `dict \| None` | No | Metadata about the interaction |
 | `ground_truth_agentic` | `dict \| None` | No | Expected metadata |
 | `logprobs` | `dict \| None` | No | Log probabilities from the model |
+| `weight` | `float \| None` | No | Relative importance when aggregating session-level scores |
 
 ### Field Details
 
@@ -154,6 +155,28 @@ batch = Batch(
         "token_logprobs": [-0.1, -0.05, -0.02, -0.01],
     }
     ```
+  </Accordion>
+
+  <Accordion title="weight">
+    Optional relative importance of this interaction when metrics aggregate scores at session level (Conversational, Context, Regulatory). Controls how much each QA pair contributes to the session mean.
+
+    ```python
+    # All provided and sum to 1 → used as-is
+    Batch(qa_id="q1", ..., weight=0.5),
+    Batch(qa_id="q2", ..., weight=0.3),
+    Batch(qa_id="q3", ..., weight=0.2),
+
+    # Some provided → remaining weight split equally among unweighted
+    Batch(qa_id="q1", ..., weight=0.6),
+    Batch(qa_id="q2", ...),   # gets 0.2
+    Batch(qa_id="q3", ...),   # gets 0.2
+
+    # None provided → equal weights (1/n each)
+    Batch(qa_id="q1", ...),
+    Batch(qa_id="q2", ...),
+    ```
+
+    If all weights are provided but do not sum to 1.0, a warning is emitted and equal weights are applied instead.
   </Accordion>
 </AccordionGroup>
 
@@ -245,14 +268,16 @@ print(batch.observation)  # None
 
 Different metrics use different fields:
 
-| Metric | Key Fields Used |
-|--------|----------------|
-| **Toxicity** | `assistant`, `session_id`, `assistant_id` |
-| **Bias** | `query`, `assistant`, `context` |
-| **Context** | `query`, `assistant`, `context`, `ground_truth_assistant` |
-| **Conversational** | `query`, `assistant`, `observation`, `ground_truth_assistant` |
-| **Humanity** | `assistant`, `ground_truth_assistant` |
-| **BestOf** | `query`, `assistant` (across multiple datasets) |
+| Metric | Key Fields Used | Output Granularity |
+|--------|----------------|-------------------|
+| **Toxicity** | `assistant`, `session_id`, `assistant_id` | Global stream |
+| **Bias** | `query`, `assistant`, `context` | Per session |
+| **Context** | `query`, `assistant`, `context`, `ground_truth_assistant`, `weight` | Per session |
+| **Conversational** | `query`, `assistant`, `observation`, `ground_truth_assistant`, `weight` | Per session |
+| **Regulatory** | `query`, `assistant`, `weight` | Per session |
+| **Humanity** | `assistant`, `ground_truth_assistant` | Per interaction |
+| **BestOf** | `query`, `assistant` | Per block |
+| **Agentic** | `query`, `assistant`, `ground_truth_assistant`, `agentic`, `ground_truth_agentic` | Per conversation |
 
 ## Best Practices
 

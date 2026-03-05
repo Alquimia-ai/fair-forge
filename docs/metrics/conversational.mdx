@@ -1,11 +1,11 @@
 ---
 title: Conversational
-description: Evaluate dialogue quality using Grice's Maxims
+description: Evaluate dialogue quality using Grice's Maxims with session-level aggregation and pluggable statistical modes
 ---
 
 # Conversational Metric
 
-The Conversational metric evaluates dialogue quality using **Grice's Maxims** - principles of cooperative conversation that define effective communication.
+The Conversational metric evaluates dialogue quality using **Grice's Maxims** — principles of cooperative conversation that define effective communication. It accumulates scores across all interactions in a session and emits one session-level result, with optional uncertainty quantification via Bayesian mode.
 
 ## Overview
 
@@ -21,6 +21,8 @@ The metric assesses seven dimensions:
 | **Language** | Appropriateness of language style | 0-10 |
 | **Sensibleness** | Overall coherence and logic | 0-10 |
 
+Each dimension produces a session-level `ConversationalScore` with a `mean` and optional credible interval (`ci_low`, `ci_high`) in Bayesian mode. The `interactions` list preserves per-QA scores for debugging.
+
 ## Installation
 
 ```bash
@@ -30,37 +32,46 @@ uv add langchain-groq  # Or your preferred LLM provider
 
 ## Basic Usage
 
-```python
+<CodeGroup>
+```python Frequentist (default)
 from fair_forge.metrics.conversational import Conversational
 from langchain_groq import ChatGroq
 from your_retriever import MyRetriever
 
-# Initialize the judge model
-judge_model = ChatGroq(
-    model="llama-3.3-70b-versatile",
-    api_key="your-api-key",
-    temperature=0.0,
-)
+judge_model = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key", temperature=0.0)
 
-# Run the metric
+metrics = Conversational.run(MyRetriever, model=judge_model)
+
+for metric in metrics:
+    print(f"Session: {metric.session_id}  ({metric.n_interactions} interactions)")
+    print(f"  Quality:      {metric.conversational_quality_maxim.mean:.1f}/10")
+    print(f"  Memory:       {metric.conversational_memory.mean:.1f}/10")
+    print(f"  Sensibleness: {metric.conversational_sensibleness.mean:.1f}/10")
+
+    # Per-interaction breakdown
+    for interaction in metric.interactions:
+        print(f"  [{interaction.qa_id}] quality={interaction.quality_maxim:.1f} memory={interaction.memory:.1f}")
+```
+
+```python Bayesian
+from fair_forge.metrics.conversational import Conversational
+from fair_forge.statistical import BayesianMode
+from langchain_groq import ChatGroq
+from your_retriever import MyRetriever
+
+judge_model = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key", temperature=0.0)
+
 metrics = Conversational.run(
     MyRetriever,
     model=judge_model,
-    use_structured_output=True,
-    verbose=True,
+    statistical_mode=BayesianMode(mc_samples=5000, ci_level=0.95),
 )
 
-# Analyze results
 for metric in metrics:
-    print(f"QA ID: {metric.qa_id}")
-    print(f"Quality: {metric.conversational_quality_maxim}/10")
-    print(f"Quantity: {metric.conversational_quantity_maxim}/10")
-    print(f"Relation: {metric.conversational_relation_maxim}/10")
-    print(f"Manner: {metric.conversational_manner_maxim}/10")
-    print(f"Memory: {metric.conversational_memory}/10")
-    print(f"Language: {metric.conversational_language}/10")
-    print(f"Sensibleness: {metric.conversational_sensibleness}/10")
+    q = metric.conversational_quality_maxim
+    print(f"Quality: {q.mean:.1f}  [{q.ci_low:.1f}, {q.ci_high:.1f}]")
 ```
+</CodeGroup>
 
 ## Parameters
 
@@ -75,10 +86,50 @@ for metric in metrics:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
+| `statistical_mode` | `StatisticalMode` | `FrequentistMode()` | Statistical computation mode |
 | `use_structured_output` | `bool` | `False` | Use LangChain structured output |
 | `bos_json_clause` | `str` | `"```json"` | JSON block start marker |
 | `eos_json_clause` | `str` | `"```"` | JSON block end marker |
 | `verbose` | `bool` | `False` | Enable verbose logging |
+
+## Statistical Modes
+
+<Tabs>
+  <Tab title="Frequentist">
+    Returns a weighted mean per dimension. `ci_low` and `ci_high` are `None`.
+
+    ```python
+    metric.conversational_quality_maxim.mean   # 7.8
+    metric.conversational_quality_maxim.ci_low  # None
+    ```
+  </Tab>
+  <Tab title="Bayesian">
+    Bootstraps the weighted mean across interactions to produce a credible interval — useful when you have few interactions and want to express uncertainty honestly.
+
+    ```python
+    metric.conversational_quality_maxim.mean   # 7.8
+    metric.conversational_quality_maxim.ci_low  # 6.2
+    metric.conversational_quality_maxim.ci_high # 9.1
+    ```
+  </Tab>
+</Tabs>
+
+## Interaction Weights
+
+Each `Batch` can carry an optional `weight` to control its contribution to the session aggregate:
+
+```python
+Batch(qa_id="q1", query="...", assistant="...", ground_truth_assistant="...", weight=0.5),
+Batch(qa_id="q2", query="...", assistant="...", ground_truth_assistant="...", weight=0.3),
+Batch(qa_id="q3", query="...", assistant="...", ground_truth_assistant="...", weight=0.2),
+```
+
+| Case | Behavior |
+|------|----------|
+| All weights provided, sum = 1.0 | Used as-is |
+| All weights provided, sum ≠ 1.0 | Warning emitted, equal weights applied |
+| Some weights provided | Remaining weight split equally among unweighted interactions |
+| No weights provided | Equal weights (1/n each) |
 
 ## Output Schema
 
@@ -88,89 +139,76 @@ for metric in metrics:
 class ConversationalMetric(BaseMetric):
     session_id: str
     assistant_id: str
+    n_interactions: int                                    # Number of interactions evaluated
+    conversational_memory: ConversationalScore
+    conversational_language: ConversationalScore
+    conversational_quality_maxim: ConversationalScore
+    conversational_quantity_maxim: ConversationalScore
+    conversational_relation_maxim: ConversationalScore
+    conversational_manner_maxim: ConversationalScore
+    conversational_sensibleness: ConversationalScore
+    interactions: list[ConversationalInteraction]          # Per-QA scores
+```
+
+### ConversationalScore
+
+```python
+class ConversationalScore(BaseModel):
+    mean: float           # Session-level weighted mean
+    ci_low: float | None  # Lower credible bound — Bayesian mode only
+    ci_high: float | None # Upper credible bound — Bayesian mode only
+```
+
+### ConversationalInteraction
+
+```python
+class ConversationalInteraction(BaseModel):
     qa_id: str
-    conversational_memory: float          # 0-10
-    conversational_language: float        # 0-10
-    conversational_quality_maxim: float   # 0-10
-    conversational_quantity_maxim: float  # 0-10
-    conversational_relation_maxim: float  # 0-10
-    conversational_manner_maxim: float    # 0-10
-    conversational_sensibleness: float    # 0-10
-    conversational_insight: str           # Explanation
-    conversational_thinkings: str         # Judge reasoning
+    memory: float
+    language: float
+    quality_maxim: float
+    quantity_maxim: float
+    relation_maxim: float
+    manner_maxim: float
+    sensibleness: float
 ```
 
 ## Understanding Grice's Maxims
 
 ### Quality Maxim
-
 **Be truthful**: Don't say what you believe to be false or lack evidence for.
-
 ```
-High Score (8-10): "The capital of France is Paris." (Verifiable fact)
-Low Score (0-4): "France doesn't have a capital." (False information)
+High (8-10): "The capital of France is Paris." (Verifiable fact)
+Low  (0-4):  "France doesn't have a capital." (False)
 ```
 
 ### Quantity Maxim
-
 **Be informative**: Provide enough information, but not more than required.
-
 ```
-High Score (8-10): "Paris is the capital of France." (Just right)
-Low Score (0-4): "Paris." (Too brief) or "Paris is the capital, founded in 3rd century..." (Too much)
+High (8-10): "Paris is the capital of France."
+Low  (0-4):  "Paris." (Too brief) or a 3-paragraph essay (Too much)
 ```
 
 ### Relation Maxim
-
 **Be relevant**: Make your contribution relevant to the conversation.
-
 ```
-High Score (8-10): Q: "What's your return policy?" A: "Returns accepted within 30 days."
-Low Score (0-4): Q: "What's your return policy?" A: "Our company was founded in 1998."
+High (8-10): Q: "What's your return policy?" A: "Returns accepted within 30 days."
+Low  (0-4):  Q: "What's your return policy?" A: "Our company was founded in 1998."
 ```
 
 ### Manner Maxim
-
-**Be clear**: Avoid obscurity and ambiguity. Be brief and orderly.
-
+**Be clear**: Avoid obscurity and ambiguity.
 ```
-High Score (8-10): "You can return items within 30 days at any store location."
-Low Score (0-4): "So basically, if you want to, you could possibly maybe return the thing..."
-```
-
-### Memory
-
-**Recall context**: Reference previous parts of the conversation appropriately.
-
-```
-High Score (8-10): References customer's earlier question or stated preferences
-Low Score (0-4): Asks for information already provided in the conversation
-```
-
-### Language
-
-**Appropriate style**: Match language register to the context.
-
-```
-High Score (8-10): Professional tone for business, friendly for casual
-Low Score (0-4): Overly casual in formal context, or overly stiff in casual
-```
-
-### Sensibleness
-
-**Overall coherence**: Response makes logical sense in context.
-
-```
-High Score (8-10): Logically connected, coherent response
-Low Score (0-4): Non-sequiturs, contradictions, or nonsensical content
+High (8-10): "You can return items within 30 days at any store location."
+Low  (0-4):  "So basically, if you want to, you could possibly maybe return the thing..."
 ```
 
 ## Complete Example
 
 ```python
 import os
-import numpy as np
 from fair_forge.metrics.conversational import Conversational
+from fair_forge.statistical import BayesianMode
 from fair_forge.core.retriever import Retriever
 from fair_forge.schemas.common import Dataset, Batch
 from langchain_groq import ChatGroq
@@ -187,135 +225,82 @@ class ConversationalRetriever(Retriever):
                     Batch(
                         qa_id="q1",
                         query="Hi, I need help with my order.",
-                        assistant="Hello! I'd be happy to help with your order. Could you please provide your order number?",
+                        assistant="Hello! I'd be happy to help. Could you share your order number?",
                         ground_truth_assistant="Greet and ask for order number.",
                         observation="Opening interaction - should be professional and helpful",
                     ),
                     Batch(
                         qa_id="q2",
                         query="It's ORDER-12345. I haven't received it yet.",
-                        assistant="Thank you! I found order ORDER-12345. It was shipped on Monday and is currently in transit. Expected delivery is Friday.",
+                        assistant="Thank you! ORDER-12345 was shipped Monday, expected Friday.",
                         ground_truth_assistant="Find order, provide shipping status and ETA.",
-                        observation="Should remember the order number and provide relevant info",
                     ),
                     Batch(
                         qa_id="q3",
                         query="Can you change the delivery address?",
-                        assistant="I'd be glad to help with that. For security, please confirm your email address first.",
+                        assistant="For security, please confirm your email address first.",
                         ground_truth_assistant="Offer to help, verify identity first.",
-                        observation="Should acknowledge request and follow security protocol",
                     ),
                 ]
             )
         ]
 
-# Initialize judge
-judge = ChatGroq(
-    model="llama-3.3-70b-versatile",
-    api_key=os.getenv("GROQ_API_KEY"),
-    temperature=0.0,
-)
+judge = ChatGroq(model="llama-3.3-70b-versatile", api_key=os.getenv("GROQ_API_KEY"), temperature=0.0)
 
-# Run evaluation
 metrics = Conversational.run(
     ConversationalRetriever,
     model=judge,
+    statistical_mode=BayesianMode(mc_samples=5000, ci_level=0.95),
     use_structured_output=True,
-    verbose=True,
 )
 
-# Analyze results
-print("Conversational Quality Evaluation")
-print("=" * 60)
-
 for metric in metrics:
-    print(f"\nQA ID: {metric.qa_id}")
-    print(f"  Memory: {metric.conversational_memory}/10")
-    print(f"  Language: {metric.conversational_language}/10")
-    print(f"  Quality: {metric.conversational_quality_maxim}/10")
-    print(f"  Quantity: {metric.conversational_quantity_maxim}/10")
-    print(f"  Relation: {metric.conversational_relation_maxim}/10")
-    print(f"  Manner: {metric.conversational_manner_maxim}/10")
-    print(f"  Sensibleness: {metric.conversational_sensibleness}/10")
-    print(f"  Insight: {metric.conversational_insight[:100]}...")
+    print(f"Session: {metric.session_id}  ({metric.n_interactions} interactions)")
+    print()
 
-# Summary statistics
-print("\n" + "=" * 60)
-print("Summary Statistics")
-print("=" * 60)
+    dimensions = [
+        ("Quality",      metric.conversational_quality_maxim),
+        ("Quantity",     metric.conversational_quantity_maxim),
+        ("Relation",     metric.conversational_relation_maxim),
+        ("Manner",       metric.conversational_manner_maxim),
+        ("Memory",       metric.conversational_memory),
+        ("Language",     metric.conversational_language),
+        ("Sensibleness", metric.conversational_sensibleness),
+    ]
 
-dimensions = [
-    ('Quality', [m.conversational_quality_maxim for m in metrics]),
-    ('Quantity', [m.conversational_quantity_maxim for m in metrics]),
-    ('Relation', [m.conversational_relation_maxim for m in metrics]),
-    ('Manner', [m.conversational_manner_maxim for m in metrics]),
-    ('Memory', [m.conversational_memory for m in metrics]),
-    ('Language', [m.conversational_language for m in metrics]),
-    ('Sensibleness', [m.conversational_sensibleness for m in metrics]),
-]
+    for name, score in dimensions:
+        ci = f"  [{score.ci_low:.1f}, {score.ci_high:.1f}]" if score.ci_low is not None else ""
+        print(f"  {name:<14} {score.mean:.1f}/10{ci}")
 
-for name, scores in dimensions:
-    print(f"{name}: Mean={np.mean(scores):.2f}, Min={np.min(scores):.0f}, Max={np.max(scores):.0f}")
-```
-
-## Visualization
-
-### Radar Chart
-
-```python
-import matplotlib.pyplot as plt
-import numpy as np
-
-categories = ['Quality', 'Quantity', 'Relation', 'Manner', 'Memory', 'Language', 'Sensibleness']
-
-# Calculate averages
-avg_scores = {
-    'Quality': np.mean([m.conversational_quality_maxim for m in metrics]),
-    'Quantity': np.mean([m.conversational_quantity_maxim for m in metrics]),
-    'Relation': np.mean([m.conversational_relation_maxim for m in metrics]),
-    'Manner': np.mean([m.conversational_manner_maxim for m in metrics]),
-    'Memory': np.mean([m.conversational_memory for m in metrics]),
-    'Language': np.mean([m.conversational_language for m in metrics]),
-    'Sensibleness': np.mean([m.conversational_sensibleness for m in metrics]),
-}
-
-values = [avg_scores[cat] / 10 for cat in categories]  # Normalize to 0-1
-values += values[:1]  # Close the polygon
-
-angles = [n / float(len(categories)) * 2 * np.pi for n in range(len(categories))]
-angles += angles[:1]
-
-fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(polar=True))
-ax.plot(angles, values, 'o-', linewidth=2, color='steelblue')
-ax.fill(angles, values, alpha=0.25, color='steelblue')
-ax.set_xticks(angles[:-1])
-ax.set_xticklabels(categories)
-ax.set_ylim(0, 1)
-ax.set_title('Conversational Quality Scores')
-plt.show()
+    print()
+    print("  Per-interaction breakdown:")
+    for interaction in metric.interactions:
+        print(f"    [{interaction.qa_id}] quality={interaction.quality_maxim:.1f}  memory={interaction.memory:.1f}  manner={interaction.manner_maxim:.1f}")
 ```
 
 ## Score Interpretation
 
 | Score Range | Interpretation |
 |-------------|----------------|
-| 8-10 | Excellent - High-quality dialogue |
-| 6-8 | Good - Meets expectations with minor issues |
-| 4-6 | Moderate - Noticeable quality issues |
-| 2-4 | Poor - Significant problems |
-| 0-2 | Very Poor - Fails basic criteria |
+| 8-10 | Excellent — high-quality dialogue |
+| 6-8 | Good — meets expectations with minor issues |
+| 4-6 | Moderate — noticeable quality issues |
+| 2-4 | Poor — significant problems |
+| 0-2 | Very poor — fails basic criteria |
 
 ## Best Practices
 
 <AccordionGroup>
+  <Accordion title="Use Bayesian Mode for Small Sessions">
+    If a session has fewer than 5-10 interactions, the frequentist mean can be misleading. Bayesian mode shows a CI, making it clear when more data is needed.
+  </Accordion>
+
   <Accordion title="Include Observations">
-    Add `observation` field to guide evaluation:
+    Add `observation` to guide the judge on what to evaluate:
     ```python
     Batch(
-        qa_id="q1",
-        query="...",
-        assistant="...",
-        observation="This is a follow-up question - assistant should remember previous context",
+        qa_id="q2",
+        observation="Follow-up — assistant should remember the order number from q1",
     )
     ```
   </Accordion>
@@ -323,29 +308,22 @@ plt.show()
   <Accordion title="Test Multi-Turn Conversations">
     Include sequences that test memory:
     ```python
-    [
-        Batch(qa_id="q1", query="My name is John...", ...),
-        Batch(qa_id="q2", query="What's my name?", ...),  # Should remember
-    ]
+    Batch(qa_id="q1", query="My name is John..."),
+    Batch(qa_id="q2", query="What's my name?"),  # Should remember
     ```
-  </Accordion>
-
-  <Accordion title="Vary Conversation Types">
-    Include different interaction styles:
-    - Factual questions
-    - Clarification requests
-    - Complex multi-part queries
-    - Follow-up questions
   </Accordion>
 </AccordionGroup>
 
 ## Next Steps
 
-<CardGroup cols={2}>
-  <Card title="Humanity Metric" icon="heart" href="/metrics/humanity">
-    Learn about emotional analysis
+<CardGroup cols={3}>
+  <Card title="Statistical Modes" icon="chart-line" href="/core-concepts/statistical-modes">
+    Frequentist vs Bayesian — when each matters
   </Card>
-  <Card title="BestOf Metric" icon="trophy" href="/metrics/best-of">
-    Learn about assistant comparison
+  <Card title="Context Metric" icon="bullseye" href="/metrics/context">
+    Evaluate context alignment
+  </Card>
+  <Card title="Humanity Metric" icon="heart" href="/metrics/humanity">
+    Emotional analysis of responses
   </Card>
 </CardGroup>

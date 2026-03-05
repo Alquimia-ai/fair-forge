@@ -12,7 +12,7 @@ from fair_forge.connectors import LocalCorpusConnector, RegulatoryDocument
 from fair_forge.core.embedder import EmbedderConfig, RegulatoryEmbedder, RetrievedChunk
 from fair_forge.core.reranker import RankedChunk, RerankerConfig, RegulatoryReranker
 from fair_forge.metrics.regulatory import Regulatory
-from fair_forge.schemas.regulatory import RegulatoryChunk, RegulatoryMetric
+from fair_forge.schemas.regulatory import RegulatoryChunk, RegulatoryInteraction, RegulatoryMetric
 
 
 class MockCorpusConnector:
@@ -53,9 +53,7 @@ class TestRegulatoryMetricSchema:
         assert chunk.verdict == "SUPPORTS"
 
     def test_regulatory_metric_creation(self):
-        metric = RegulatoryMetric(
-            session_id="test_session",
-            assistant_id="test_assistant",
+        interaction = RegulatoryInteraction(
             qa_id="qa_001",
             query="Test query",
             assistant="Test response",
@@ -66,8 +64,19 @@ class TestRegulatoryMetricSchema:
             retrieved_chunks=[],
             insight="Test insight",
         )
+        metric = RegulatoryMetric(
+            session_id="test_session",
+            assistant_id="test_assistant",
+            n_interactions=1,
+            compliance_score=0.8,
+            verdict="COMPLIANT",
+            total_supporting_chunks=2,
+            total_contradicting_chunks=0,
+            interactions=[interaction],
+        )
         assert metric.compliance_score == 0.8
         assert metric.verdict == "COMPLIANT"
+        assert metric.interactions[0].qa_id == "qa_001"
 
 
 class TestLocalCorpusConnector:
@@ -185,13 +194,15 @@ class TestRegulatoryMetric:
             batch=dataset.conversation,
             language=dataset.language,
         )
+        metric.on_process_complete()
 
-        assert len(metric.metrics) == len(dataset.conversation)
-
-        for m in metric.metrics:
-            assert isinstance(m, RegulatoryMetric)
-            assert hasattr(m, "compliance_score")
-            assert hasattr(m, "verdict")
+        assert len(metric.metrics) == 1
+        m = metric.metrics[0]
+        assert isinstance(m, RegulatoryMetric)
+        assert m.n_interactions == len(dataset.conversation)
+        assert hasattr(m, "compliance_score")
+        assert hasattr(m, "verdict")
+        assert len(m.interactions) == len(dataset.conversation)
 
     @patch.object(RegulatoryEmbedder, "retrieve_merged")
     @patch.object(RegulatoryReranker, "check_contradictions")
@@ -241,10 +252,11 @@ class TestRegulatoryMetric:
             batch=dataset.conversation[:1],
             language=dataset.language,
         )
+        metric.on_process_complete()
 
         assert len(metric.metrics) == 1
         assert metric.metrics[0].verdict == "NON_COMPLIANT"
-        assert metric.metrics[0].contradicting_chunks == 1
+        assert metric.metrics[0].total_contradicting_chunks == 1
 
     @patch.object(RegulatoryEmbedder, "retrieve_merged")
     @patch.object(RegulatoryEmbedder, "load_corpus")
@@ -273,10 +285,11 @@ class TestRegulatoryMetric:
             batch=dataset.conversation[:1],
             language=dataset.language,
         )
+        metric.on_process_complete()
 
         assert len(metric.metrics) == 1
         assert metric.metrics[0].verdict == "IRRELEVANT"
-        assert metric.metrics[0].compliance_score == 0.5
+        assert metric.metrics[0].interactions[0].compliance_score == 0.5
 
     @patch.object(RegulatoryEmbedder, "retrieve_merged")
     @patch.object(RegulatoryReranker, "check_contradictions")
@@ -360,19 +373,22 @@ class TestRegulatoryMetric:
                     required_attributes = [
                         "session_id",
                         "assistant_id",
-                        "qa_id",
-                        "query",
-                        "assistant",
+                        "n_interactions",
                         "compliance_score",
                         "verdict",
-                        "supporting_chunks",
-                        "contradicting_chunks",
-                        "retrieved_chunks",
-                        "insight",
+                        "total_supporting_chunks",
+                        "total_contradicting_chunks",
+                        "interactions",
                     ]
 
                     for attr in required_attributes:
                         assert hasattr(m, attr), f"Missing attribute: {attr}"
+
+                    assert len(m.interactions) > 0
+                    interaction = m.interactions[0]
+                    for attr in ["qa_id", "query", "assistant", "compliance_score", "verdict",
+                                 "supporting_chunks", "contradicting_chunks", "retrieved_chunks", "insight"]:
+                        assert hasattr(interaction, attr), f"Missing interaction attribute: {attr}"
 
 
 class TestComplianceScoring:

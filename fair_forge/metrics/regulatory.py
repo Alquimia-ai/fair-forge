@@ -9,20 +9,23 @@ from fair_forge.core import FairForge, Retriever
 from fair_forge.core.embedder import ChunkerConfig, EmbedderConfig, RegulatoryEmbedder
 from fair_forge.core.reranker import RegulatoryReranker, RerankerConfig
 from fair_forge.schemas import Batch  # noqa: TC001
-from fair_forge.schemas.regulatory import RegulatoryChunk, RegulatoryMetric
+from fair_forge.schemas.regulatory import RegulatoryChunk, RegulatoryInteraction, RegulatoryMetric
+from fair_forge.statistical import FrequentistMode, StatisticalMode
 
 
 class Regulatory(FairForge):
     """
     Evaluates AI assistant responses against a regulatory corpus.
 
-    Uses embedding-based retrieval to find relevant regulatory chunks,
-    then applies a reranker to detect contradictions between the response
-    and applicable regulations.
+    Accumulates per-interaction compliance scores and emits one session-level
+    RegulatoryMetric in on_process_complete(). The aggregated compliance score
+    uses the configured StatisticalMode — frequentist returns a weighted mean,
+    Bayesian returns a bootstrapped credible interval.
 
     Args:
         retriever: Retriever class for loading conversation datasets.
         corpus_connector: Connector for loading regulatory documents.
+        statistical_mode: Statistical computation mode (defaults to FrequentistMode).
         embedding_model: Name of the embedding model to use.
         reranker_model: Name of the reranker model to use.
         chunk_size: Character size for text chunks.
@@ -40,6 +43,7 @@ class Regulatory(FairForge):
         self,
         retriever: type[Retriever],
         corpus_connector: CorpusConnector,
+        statistical_mode: StatisticalMode | None = None,
         embedding_model: str = "Qwen/Qwen3-Embedding-0.6B",
         reranker_model: str = "Qwen/Qwen3-Reranker-0.6B",
         chunk_size: int = 1000,
@@ -55,6 +59,8 @@ class Regulatory(FairForge):
         super().__init__(retriever, **kwargs)
 
         self.corpus_connector = corpus_connector
+        self.statistical_mode = statistical_mode if statistical_mode is not None else FrequentistMode()
+        self.compliance_threshold = compliance_threshold
 
         embedder_config = EmbedderConfig(
             model_name=embedding_model,
@@ -77,7 +83,7 @@ class Regulatory(FairForge):
         self.reranker = RegulatoryReranker(reranker_config)
 
         self._corpus_loaded = False
-        self.compliance_threshold = compliance_threshold
+        self._session_data: dict[str, dict] = {}
 
         self.logger.info("--REGULATORY CONFIGURATION--")
         self.logger.info(f"Embedding model: {embedding_model}")
@@ -86,12 +92,11 @@ class Regulatory(FairForge):
         self.logger.info(f"Top-K: {top_k}, Similarity threshold: {similarity_threshold}")
         self.logger.info(f"Contradiction threshold: {contradiction_threshold}")
         self.logger.info(f"Compliance threshold: {compliance_threshold}")
+        self.logger.info(f"Statistical mode: {self.statistical_mode.get_result_type()}")
 
     def _ensure_corpus_loaded(self) -> None:
-        """Load and index the regulatory corpus if not already done."""
         if self._corpus_loaded:
             return
-
         documents = self.corpus_connector.load_documents()
         num_chunks = self.embedder.load_corpus(documents)
         self.logger.info(f"Loaded corpus: {len(documents)} documents -> {num_chunks} chunks")
@@ -102,12 +107,6 @@ class Regulatory(FairForge):
         supporting: int,
         contradicting: int,
     ) -> tuple[Literal["COMPLIANT", "NON_COMPLIANT", "IRRELEVANT"], float]:
-        """
-        Compute overall verdict and compliance score.
-
-        Returns:
-            Tuple of (verdict, compliance_score).
-        """
         total = supporting + contradicting
 
         if total == 0:
@@ -123,13 +122,7 @@ class Regulatory(FairForge):
 
         return "NON_COMPLIANT", compliance_score
 
-    def _generate_insight(
-        self,
-        verdict: str,
-        supporting: int,
-        contradicting: int,
-    ) -> str:
-        """Generate human-readable insight about the compliance evaluation."""
+    def _generate_insight(self, verdict: str, supporting: int, contradicting: int) -> str:
         total = supporting + contradicting
 
         if verdict == "IRRELEVANT":
@@ -148,17 +141,15 @@ class Regulatory(FairForge):
         batch: list[Batch],
         language: str | None = "english",
     ):
-        """
-        Process a batch of conversations for regulatory compliance.
-
-        Args:
-            session_id: Unique session identifier.
-            context: Context information for the conversation.
-            assistant_id: ID of the assistant being evaluated.
-            batch: List of Q&A interactions to evaluate.
-            language: Language of the conversation.
-        """
         self._ensure_corpus_loaded()
+
+        if session_id not in self._session_data:
+            self._session_data[session_id] = {
+                "assistant_id": assistant_id,
+                "batches": [],
+                "scores": [],
+                "interactions": [],
+            }
 
         for interaction in batch:
             self.logger.debug(f"QA ID: {interaction.qa_id}")
@@ -169,9 +160,7 @@ class Regulatory(FairForge):
             )
 
             if not retrieved:
-                metric = RegulatoryMetric(
-                    session_id=session_id,
-                    assistant_id=assistant_id,
+                interaction_result = RegulatoryInteraction(
                     qa_id=interaction.qa_id,
                     query=interaction.query,
                     assistant=interaction.assistant,
@@ -182,46 +171,75 @@ class Regulatory(FairForge):
                     retrieved_chunks=[],
                     insight="No relevant regulatory chunks were retrieved for this interaction.",
                 )
-                self.metrics.append(metric)
-                continue
+            else:
+                ranked = self.reranker.check_contradictions(
+                    agent_response=interaction.assistant,
+                    retrieved_chunks=retrieved,
+                )
 
-            ranked = self.reranker.check_contradictions(
-                agent_response=interaction.assistant,
-                retrieved_chunks=retrieved,
+                supporting = sum(1 for r in ranked if r.verdict == "SUPPORTS")
+                contradicting = sum(1 for r in ranked if r.verdict == "CONTRADICTS")
+                verdict, compliance_score = self._compute_verdict(supporting, contradicting)
+                insight = self._generate_insight(verdict, supporting, contradicting)
+
+                interaction_result = RegulatoryInteraction(
+                    qa_id=interaction.qa_id,
+                    query=interaction.query,
+                    assistant=interaction.assistant,
+                    compliance_score=round(compliance_score, 4),
+                    verdict=verdict,
+                    supporting_chunks=supporting,
+                    contradicting_chunks=contradicting,
+                    retrieved_chunks=[
+                        RegulatoryChunk(
+                            text=r.text,
+                            source=r.source,
+                            chunk_index=r.chunk_index,
+                            similarity=r.similarity,
+                            reranker_score=r.reranker_score,
+                            verdict=r.verdict,
+                        )
+                        for r in ranked
+                    ],
+                    insight=insight,
+                )
+
+            self._session_data[session_id]["batches"].append(interaction)
+            self._session_data[session_id]["scores"].append(interaction_result.compliance_score)
+            self._session_data[session_id]["interactions"].append(interaction_result)
+
+    def on_process_complete(self):
+        for session_id, data in self._session_data.items():
+            batches = data["batches"]
+            interactions = data["interactions"]
+            weights = self._resolve_weights(batches)
+
+            mean, ci_low, ci_high = self._aggregate_scores(
+                data["scores"], batches, weights, self.statistical_mode
             )
 
-            supporting = sum(1 for r in ranked if r.verdict == "SUPPORTS")
-            contradicting = sum(1 for r in ranked if r.verdict == "CONTRADICTS")
+            total_supporting = sum(i.supporting_chunks for i in interactions)
+            total_contradicting = sum(i.contradicting_chunks for i in interactions)
 
-            verdict, compliance_score = self._compute_verdict(supporting, contradicting)
-            insight = self._generate_insight(verdict, supporting, contradicting)
-
-            regulatory_chunks = [
-                RegulatoryChunk(
-                    text=r.text,
-                    source=r.source,
-                    chunk_index=r.chunk_index,
-                    similarity=r.similarity,
-                    reranker_score=r.reranker_score,
-                    verdict=r.verdict,
-                )
-                for r in ranked
-            ]
+            if all(i.verdict == "IRRELEVANT" for i in interactions):
+                session_verdict = "IRRELEVANT"
+            elif mean >= self.compliance_threshold:
+                session_verdict = "COMPLIANT"
+            else:
+                session_verdict = "NON_COMPLIANT"
 
             metric = RegulatoryMetric(
                 session_id=session_id,
-                assistant_id=assistant_id,
-                qa_id=interaction.qa_id,
-                query=interaction.query,
-                assistant=interaction.assistant,
-                compliance_score=round(compliance_score, 4),
-                verdict=verdict,
-                supporting_chunks=supporting,
-                contradicting_chunks=contradicting,
-                retrieved_chunks=regulatory_chunks,
-                insight=insight,
+                assistant_id=data["assistant_id"],
+                n_interactions=len(batches),
+                compliance_score=round(mean, 4),
+                compliance_score_ci_low=round(ci_low, 4) if ci_low is not None else None,
+                compliance_score_ci_high=round(ci_high, 4) if ci_high is not None else None,
+                verdict=session_verdict,
+                total_supporting_chunks=total_supporting,
+                total_contradicting_chunks=total_contradicting,
+                interactions=interactions,
             )
-
             self.metrics.append(metric)
 
 

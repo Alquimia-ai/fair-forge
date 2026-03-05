@@ -4,11 +4,14 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from fair_forge.utils.logging import VerboseLogger
 
 if TYPE_CHECKING:
     from fair_forge.core.retriever import Retriever
     from fair_forge.schemas.common import Batch
+    from fair_forge.statistical.base import StatisticalMode
 
 
 class FairForge(ABC):
@@ -127,6 +130,72 @@ class FairForge(ABC):
                 batch=[streamed.batch],
                 language=streamed.metadata.language,
             )
+
+    def _resolve_weights(self, batch: list["Batch"]) -> dict[str, float]:
+        n = len(batch)
+        if n == 0:
+            return {}
+
+        weighted = {b.qa_id: b.weight for b in batch if b.weight is not None}
+        unweighted_ids = [b.qa_id for b in batch if b.weight is None]
+
+        if not weighted:
+            return {b.qa_id: 1.0 / n for b in batch}
+
+        if not unweighted_ids:
+            total = sum(weighted.values())
+            if abs(total - 1.0) > 1e-6:
+                self.logger.warning(f"Provided weights sum to {total:.4f}, not 1.0. Falling back to equal weights.")
+                return {b.qa_id: 1.0 / n for b in batch}
+            return weighted
+
+        assigned = sum(weighted.values())
+        if assigned >= 1.0:
+            self.logger.warning(
+                f"Provided weights sum to {assigned:.4f} >= 1.0 with {len(unweighted_ids)} unweighted "
+                "interaction(s). Falling back to equal weights."
+            )
+            return {b.qa_id: 1.0 / n for b in batch}
+        remaining = 1.0 - assigned
+        per_unweighted = remaining / len(unweighted_ids)
+        return {**weighted, **{qa_id: per_unweighted for qa_id in unweighted_ids}}
+
+    def _aggregate_scores(
+        self,
+        scores: list[float],
+        batches: list["Batch"],
+        weights: dict[str, float],
+        statistical_mode: "StatisticalMode",
+    ) -> tuple[float, float | None, float | None]:
+        if statistical_mode.get_result_type() == "point_estimate":
+            metrics_dict = {b.qa_id: score for b, score in zip(batches, scores, strict=False)}
+            result = statistical_mode.aggregate_metrics(metrics_dict, weights)
+            return float(result), None, None
+
+        mc_samples = getattr(statistical_mode, "mc_samples", 5000)
+        ci_level = getattr(statistical_mode, "ci_level", 0.95)
+        rng = getattr(statistical_mode, "rng", np.random.default_rng())
+        np_scores = np.array(scores)
+        np_weights = np.array([weights[b.qa_id] for b in batches])
+        total_weight = np_weights.sum()
+        if total_weight <= 0.0:
+            self.logger.warning(
+                "Non-positive total weight encountered during aggregation. Falling back to equal weights."
+            )
+            np_weights = np.ones_like(np_weights, dtype=float) / len(np_weights)
+        else:
+            np_weights = np_weights / total_weight
+
+        n_scores = len(scores)
+        bootstrap_indices = rng.choice(n_scores, size=(mc_samples, n_scores), replace=True, p=np_weights)
+        bootstrap_means = np_scores[bootstrap_indices].mean(axis=1)
+
+        alpha = (1.0 - ci_level) / 2.0
+        return (
+            float(np.mean(bootstrap_means)),
+            float(np.quantile(bootstrap_means, alpha)),
+            float(np.quantile(bootstrap_means, 1.0 - alpha)),
+        )
 
     def on_process_complete(self):  # noqa: B027
         """Optional hook evaluated after all dataset elements are processed. Useful for accumulator metrics."""

@@ -2,7 +2,7 @@
 
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Logprobs(BaseModel):
@@ -38,6 +38,7 @@ class Batch(BaseModel):
     agentic: dict | None = {}
     ground_truth_agentic: dict | None = {}
     qa_id: str
+    weight: float | None = Field(default=None, ge=0)
 
 
 class IterationLevel(str, Enum):
