@@ -2,6 +2,46 @@
 
 <!-- version list -->
 
+## v2.0.0-b.1 (2026-03-05)
+
+### Bug Fixes
+
+- **core**: Use statistical_mode rng and guard zero-weight in bootstrap
+  ([`4ae7810`](https://github.com/Alquimia-ai/fair-forge/commit/4ae78104c4c9c25164e69502a5929d651dc79de6))
+
+- **core**: Validate assigned weights sum in _resolve_weights
+  ([`3e80edf`](https://github.com/Alquimia-ai/fair-forge/commit/3e80edf5e0f2fe5c4a7bc51573a423daefdbbcd5))
+
+- **schemas**: Enforce non-negative constraint on Batch.weight
+  ([`9a48fb9`](https://github.com/Alquimia-ai/fair-forge/commit/9a48fb91a12b3a8f2114ad040ebff44d1e5a9aa1))
+
+### Chores
+
+- **deps**: Update uv.lock
+  ([`c2df7b3`](https://github.com/Alquimia-ai/fair-forge/commit/c2df7b33f57d0bd702729460c0e9ec55b9efc676))
+
+### Continuous Integration
+
+- Downgrade node to 18 to fix katex __VERSION__ error in mintlify
+  ([`b5e1c0e`](https://github.com/Alquimia-ai/fair-forge/commit/b5e1c0e6afa622766b1f2d265b17098e96004680))
+
+- Pin mintlify to 4.0.5 to avoid katex __VERSION__ build bug
+  ([`8421784`](https://github.com/Alquimia-ai/fair-forge/commit/8421784452aa329cf0f189d7ae85f7bd46e83f4a))
+
+### Features
+
+- **metrics**: Add statistical mode support to bias and agentic
+  ([`5d7e760`](https://github.com/Alquimia-ai/fair-forge/commit/5d7e76015a7d940a3acfeaffb993fc92a1724aaf))
+
+- **metrics**: Add statistical mode to conversational, context, regulatory
+  ([`7102533`](https://github.com/Alquimia-ai/fair-forge/commit/7102533e4568e1d3001c1bef377a28f7eaa69f34))
+
+### Performance Improvements
+
+- **core**: Vectorize bayesian bootstrap sampling in _aggregate_scores
+  ([`0083643`](https://github.com/Alquimia-ai/fair-forge/commit/008364309a30862fb28b92c6dd9a338e96d1595e))
+
+
 ## v1.3.0-b.1 (2026-02-27)
 
 ### Bug Fixes
