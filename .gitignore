@@ -5,6 +5,7 @@ venv/
 .venv/
 env/
 ENV/
+.env
 test_runner/.env
 
 # Build artifacts
@@ -36,6 +37,10 @@ test_runner/__pycache__/
 .ipynb_checkpoints
 *.ipynb_checkpoints/
 examples/pipeline/.virtual_documents/
+
+# Generated files from notebooks
+examples/**/topic.md
+examples/**/*.json
 
 # IDEs
 .vscode/
