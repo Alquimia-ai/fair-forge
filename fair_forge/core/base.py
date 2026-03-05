@@ -174,13 +174,21 @@ class FairForge(ABC):
 
         mc_samples = getattr(statistical_mode, "mc_samples", 5000)
         ci_level = getattr(statistical_mode, "ci_level", 0.95)
+        rng = getattr(statistical_mode, "rng", np.random.default_rng())
         np_scores = np.array(scores)
         np_weights = np.array([weights[b.qa_id] for b in batches])
-        np_weights = np_weights / np_weights.sum()
+        total_weight = np_weights.sum()
+        if total_weight <= 0.0:
+            self.logger.warning(
+                "Non-positive total weight encountered during aggregation. Falling back to equal weights."
+            )
+            np_weights = np.ones_like(np_weights, dtype=float) / len(np_weights)
+        else:
+            np_weights = np_weights / total_weight
 
         bootstrap_means = np.array(
             [
-                float(np.mean(np_scores[np.random.choice(len(scores), size=len(scores), replace=True, p=np_weights)]))
+                float(np.mean(np_scores[rng.choice(len(scores), size=len(scores), replace=True, p=np_weights)]))
                 for _ in range(mc_samples)
             ]
         )
