@@ -145,14 +145,18 @@ class FairForge(ABC):
         if not unweighted_ids:
             total = sum(weighted.values())
             if abs(total - 1.0) > 1e-6:
-                self.logger.warning(
-                    f"Provided weights sum to {total:.4f}, not 1.0. Falling back to equal weights."
-                )
+                self.logger.warning(f"Provided weights sum to {total:.4f}, not 1.0. Falling back to equal weights.")
                 return {b.qa_id: 1.0 / n for b in batch}
             return weighted
 
         assigned = sum(weighted.values())
-        remaining = max(0.0, 1.0 - assigned)
+        if assigned >= 1.0:
+            self.logger.warning(
+                f"Provided weights sum to {assigned:.4f} >= 1.0 with {len(unweighted_ids)} unweighted "
+                "interaction(s). Falling back to equal weights."
+            )
+            return {b.qa_id: 1.0 / n for b in batch}
+        remaining = 1.0 - assigned
         per_unweighted = remaining / len(unweighted_ids)
         return {**weighted, **{qa_id: per_unweighted for qa_id in unweighted_ids}}
 
@@ -174,10 +178,12 @@ class FairForge(ABC):
         np_weights = np.array([weights[b.qa_id] for b in batches])
         np_weights = np_weights / np_weights.sum()
 
-        bootstrap_means = np.array([
-            float(np.mean(np_scores[np.random.choice(len(scores), size=len(scores), replace=True, p=np_weights)]))
-            for _ in range(mc_samples)
-        ])
+        bootstrap_means = np.array(
+            [
+                float(np.mean(np_scores[np.random.choice(len(scores), size=len(scores), replace=True, p=np_weights)]))
+                for _ in range(mc_samples)
+            ]
+        )
 
         alpha = (1.0 - ci_level) / 2.0
         return (
