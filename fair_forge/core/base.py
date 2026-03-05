@@ -186,12 +186,9 @@ class FairForge(ABC):
         else:
             np_weights = np_weights / total_weight
 
-        bootstrap_means = np.array(
-            [
-                float(np.mean(np_scores[rng.choice(len(scores), size=len(scores), replace=True, p=np_weights)]))
-                for _ in range(mc_samples)
-            ]
-        )
+        n_scores = len(scores)
+        bootstrap_indices = rng.choice(n_scores, size=(mc_samples, n_scores), replace=True, p=np_weights)
+        bootstrap_means = np_scores[bootstrap_indices].mean(axis=1)
 
         alpha = (1.0 - ci_level) / 2.0
         return (
