@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v2.0.0-b.2 (2026-03-06)
+
+### Features
+
+- **examples**: Add Heretic generator notebook for vLLM HuggingFace endpoint
+  ([`0fcaeb1`](https://github.com/Alquimia-ai/fair-forge/commit/0fcaeb12f58e6d8d6fb2d62bcd18469bc24f1c08))
+
+
 ## v2.0.0-b.1 (2026-03-05)
 
 ### Bug Fixes
