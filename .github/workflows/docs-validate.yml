@@ -24,7 +24,7 @@ jobs:
           node-version: "20"
 
       - name: Install Mintlify CLI
-        run: npm install -g mintlify@4.0.5
+        run: npm install -g mintlify@4.2.419
 
       - name: Validate docs
         run: mintlify validate
