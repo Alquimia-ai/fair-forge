@@ -4,6 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pytest
 
 from fair_forge.connectors import LocalCorpusConnector, RegulatoryDocument
@@ -38,8 +39,8 @@ class MockCorpusConnector:
 class MockEmbedder(Embedder):
     """Mock embedder for testing."""
 
-    def encode(self, sentences: list[str]) -> list[list[float]]:
-        return [[0.1] * 10 for _ in sentences]
+    def encode(self, sentences: list[str]) -> np.ndarray:
+        return np.array([[0.1] * 10 for _ in sentences])
 
 
 class MockReranker(Reranker):

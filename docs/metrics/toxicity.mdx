@@ -363,9 +363,9 @@ group_prototypes = {
 # Run with Frequentist mode
 freq_embedder = SentenceTransformerEmbedder("all-MiniLM-L6-v2")
 
-metrics = Toxicity.run(
+freq_metrics = Toxicity.run(
     MyRetriever,
-    embedder=embedder,
+    embedder=freq_embedder,
     group_prototypes=group_prototypes,
     group_default_threshold=0.40,
     statistical_mode=FrequentistMode(),
@@ -374,9 +374,11 @@ metrics = Toxicity.run(
 )
 
 # Run with Bayesian mode
+bayes_embedder = SentenceTransformerEmbedder("all-MiniLM-L6-v2")
+
 bayes_metrics = Toxicity.run(
     MyRetriever,
-    embedder=embedder,
+    embedder=bayes_embedder,
     group_prototypes=group_prototypes,
     group_default_threshold=0.40,
     statistical_mode=BayesianMode(mc_samples=5000, ci_level=0.95),
