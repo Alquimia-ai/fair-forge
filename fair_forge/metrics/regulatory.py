@@ -6,36 +6,39 @@ from typing import Literal
 
 from fair_forge.connectors import CorpusConnector  # noqa: TC001
 from fair_forge.core import FairForge, Retriever
-from fair_forge.core.embedder import ChunkerConfig, EmbedderConfig, RegulatoryEmbedder
-from fair_forge.core.reranker import RegulatoryReranker, RerankerConfig
+from fair_forge.core.contradiction_checker import ContradictionChecker
+from fair_forge.core.document_retriever import (
+    ChunkerConfig,
+    DocumentRetriever,
+    DocumentRetrieverConfig,
+)
+from fair_forge.core.embedder import Embedder  # noqa: TC001
+from fair_forge.core.reranker import Reranker  # noqa: TC001
 from fair_forge.schemas import Batch  # noqa: TC001
 from fair_forge.schemas.regulatory import RegulatoryChunk, RegulatoryInteraction, RegulatoryMetric
 from fair_forge.statistical import FrequentistMode, StatisticalMode
 
 
 class Regulatory(FairForge):
-    """
-    Evaluates AI assistant responses against a regulatory corpus.
+    """Evaluates AI assistant responses against a regulatory corpus.
 
     Accumulates per-interaction compliance scores and emits one session-level
     RegulatoryMetric in on_process_complete(). The aggregated compliance score
-    uses the configured StatisticalMode — frequentist returns a weighted mean,
+    uses the configured StatisticalMode -- frequentist returns a weighted mean,
     Bayesian returns a bootstrapped credible interval.
 
     Args:
         retriever: Retriever class for loading conversation datasets.
         corpus_connector: Connector for loading regulatory documents.
+        embedder: Embedder for encoding documents and queries.
+        reranker: Reranker for scoring document-response alignment.
         statistical_mode: Statistical computation mode (defaults to FrequentistMode).
-        embedding_model: Name of the embedding model to use.
-        reranker_model: Name of the reranker model to use.
         chunk_size: Character size for text chunks.
         chunk_overlap: Character overlap between chunks.
         top_k: Maximum chunks to retrieve per query.
         similarity_threshold: Minimum cosine similarity for retrieval.
         contradiction_threshold: Score below which a chunk is considered contradicting.
         compliance_threshold: Minimum compliance score to consider a response compliant.
-        max_length: Maximum token length for models.
-        batch_size: Batch size for embedding computation.
         **kwargs: Additional arguments passed to FairForge base class.
     """
 
@@ -43,17 +46,15 @@ class Regulatory(FairForge):
         self,
         retriever: type[Retriever],
         corpus_connector: CorpusConnector,
+        embedder: Embedder,
+        reranker: Reranker,
         statistical_mode: StatisticalMode | None = None,
-        embedding_model: str = "Qwen/Qwen3-Embedding-0.6B",
-        reranker_model: str = "Qwen/Qwen3-Reranker-0.6B",
         chunk_size: int = 1000,
         chunk_overlap: int = 100,
         top_k: int = 10,
         similarity_threshold: float = 0.3,
         contradiction_threshold: float = 0.6,
         compliance_threshold: float = 0.5,
-        max_length: int = 8192,
-        batch_size: int = 32,
         **kwargs,
     ):
         super().__init__(retriever, **kwargs)
@@ -62,10 +63,7 @@ class Regulatory(FairForge):
         self.statistical_mode = statistical_mode if statistical_mode is not None else FrequentistMode()
         self.compliance_threshold = compliance_threshold
 
-        embedder_config = EmbedderConfig(
-            model_name=embedding_model,
-            max_length=max_length,
-            batch_size=batch_size,
+        retriever_config = DocumentRetrieverConfig(
             top_k=top_k,
             similarity_threshold=similarity_threshold,
             chunker=ChunkerConfig(
@@ -73,21 +71,15 @@ class Regulatory(FairForge):
                 chunk_overlap=chunk_overlap,
             ),
         )
-        self.embedder = RegulatoryEmbedder(embedder_config)
-
-        reranker_config = RerankerConfig(
-            model_name=reranker_model,
-            max_length=max_length,
-            contradiction_threshold=contradiction_threshold,
-        )
-        self.reranker = RegulatoryReranker(reranker_config)
+        self.document_retriever = DocumentRetriever(embedder, retriever_config)
+        self.contradiction_checker = ContradictionChecker(reranker, contradiction_threshold)
 
         self._corpus_loaded = False
         self._session_data: dict[str, dict] = {}
 
         self.logger.info("--REGULATORY CONFIGURATION--")
-        self.logger.info(f"Embedding model: {embedding_model}")
-        self.logger.info(f"Reranker model: {reranker_model}")
+        self.logger.info(f"Embedder: {type(embedder).__name__}")
+        self.logger.info(f"Reranker: {type(reranker).__name__}")
         self.logger.info(f"Chunk size: {chunk_size}, Overlap: {chunk_overlap}")
         self.logger.info(f"Top-K: {top_k}, Similarity threshold: {similarity_threshold}")
         self.logger.info(f"Contradiction threshold: {contradiction_threshold}")
@@ -98,7 +90,7 @@ class Regulatory(FairForge):
         if self._corpus_loaded:
             return
         documents = self.corpus_connector.load_documents()
-        num_chunks = self.embedder.load_corpus(documents)
+        num_chunks = self.document_retriever.load_corpus(documents)
         self.logger.info(f"Loaded corpus: {len(documents)} documents -> {num_chunks} chunks")
         self._corpus_loaded = True
 
@@ -154,7 +146,7 @@ class Regulatory(FairForge):
         for interaction in batch:
             self.logger.debug(f"QA ID: {interaction.qa_id}")
 
-            retrieved = self.embedder.retrieve_merged(
+            retrieved = self.document_retriever.retrieve_merged(
                 user_query=interaction.query,
                 agent_response=interaction.assistant,
             )
@@ -172,7 +164,7 @@ class Regulatory(FairForge):
                     insight="No relevant regulatory chunks were retrieved for this interaction.",
                 )
             else:
-                ranked = self.reranker.check_contradictions(
+                ranked = self.contradiction_checker.check(
                     agent_response=interaction.assistant,
                     retrieved_chunks=retrieved,
                 )
@@ -214,9 +206,7 @@ class Regulatory(FairForge):
             interactions = data["interactions"]
             weights = self._resolve_weights(batches)
 
-            mean, ci_low, ci_high = self._aggregate_scores(
-                data["scores"], batches, weights, self.statistical_mode
-            )
+            mean, ci_low, ci_high = self._aggregate_scores(data["scores"], batches, weights, self.statistical_mode)
 
             total_supporting = sum(i.supporting_chunks for i in interactions)
             total_contradicting = sum(i.contradicting_chunks for i in interactions)

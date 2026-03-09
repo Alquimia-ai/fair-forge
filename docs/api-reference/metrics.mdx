@@ -27,7 +27,7 @@ def run(
     group_extractor: BaseGroupExtractor | None = None,
 
     # Embedding
-    embedding_model: str = "all-MiniLM-L6-v2",
+    embedder: Embedder,  # e.g., SentenceTransformerEmbedder("all-MiniLM-L6-v2")
 
     # Clustering (HDBSCAN)
     toxicity_min_cluster_size: int = 5,

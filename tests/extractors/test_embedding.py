@@ -3,40 +3,21 @@
 import numpy as np
 import pytest
 
+from fair_forge.core.embedder import Embedder
 from fair_forge.extractors.embedding import EmbeddingGroupExtractor
 from fair_forge.schemas.toxicity import GroupDetection
 
 
-class MockEmbedder:
+class MockEmbedder(Embedder):
     """Mock embedder for testing."""
 
     def __init__(self, embedding_dim=384):
         self.embedding_dim = embedding_dim
         self._call_count = 0
 
-    def encode(self, texts, batch_size=64, normalize_embeddings=True, show_progress_bar=False):
-        """Generate mock embeddings based on text content."""
+    def encode(self, sentences: list[str]) -> np.ndarray:
         embeddings = []
-        for text in texts:
-            # Generate consistent embeddings based on text hash
-            np.random.seed(hash(text) % (2**32))
-            emb = np.random.randn(self.embedding_dim).astype(np.float32)
-            if normalize_embeddings:
-                emb = emb / np.linalg.norm(emb)
-            embeddings.append(emb)
-        return np.array(embeddings)
-
-
-class MockEmbedderNoNormalize:
-    """Mock embedder that doesn't support normalize_embeddings parameter."""
-
-    def __init__(self, embedding_dim=384):
-        self.embedding_dim = embedding_dim
-
-    def encode(self, texts):
-        """Generate mock embeddings without normalization support."""
-        embeddings = []
-        for text in texts:
+        for text in sentences:
             np.random.seed(hash(text) % (2**32))
             emb = np.random.randn(self.embedding_dim).astype(np.float32)
             embeddings.append(emb)
@@ -57,7 +38,6 @@ class TestEmbeddingGroupExtractor:
         extractor = EmbeddingGroupExtractor(embedder=embedder, group_prototypes=group_prototypes)
 
         assert extractor.default_threshold == 0.50
-        assert extractor.batch_size == 64
         assert extractor.normalize_embeddings is True
         assert len(extractor._proto_embs) == 2
         assert "gender" in extractor._proto_embs
@@ -74,12 +54,10 @@ class TestEmbeddingGroupExtractor:
             group_prototypes=group_prototypes,
             thresholds=thresholds,
             default_threshold=0.6,
-            batch_size=32,
             normalize_embeddings=False,
         )
 
         assert extractor.default_threshold == 0.6
-        assert extractor.batch_size == 32
         assert extractor.normalize_embeddings is False
         assert extractor.thresholds == {"category": 0.7}
 
@@ -107,7 +85,7 @@ class TestEmbeddingGroupExtractor:
         extractor = EmbeddingGroupExtractor(
             embedder=embedder,
             group_prototypes=group_prototypes,
-            default_threshold=0.0,  # Low threshold to ensure detection
+            default_threshold=0.0,
         )
 
         result = extractor.detect_one("The man walked to the store")
@@ -137,18 +115,15 @@ class TestEmbeddingGroupExtractor:
             "race": ["white", "black"],
         }
         thresholds = {
-            "gender": 0.9,  # High threshold
-            "race": -1.0,  # Very low threshold (always detect)
+            "gender": 0.9,
+            "race": -1.0,
         }
 
         extractor = EmbeddingGroupExtractor(embedder=embedder, group_prototypes=group_prototypes, thresholds=thresholds)
 
         result = extractor.detect_one("some text")
 
-        # Race should be detected (very low threshold)
         assert result["race"].present is True
-        # Gender might not be detected (high threshold)
-        # The actual result depends on embeddings
 
     def test_detect_batch_basic(self):
         """Test detect_batch with basic input."""
@@ -204,27 +179,25 @@ class TestEmbeddingGroupExtractor:
         embedder = MockEmbedder()
         group_prototypes = {"test": ["single"]}
 
-        # Create an extractor with a single prototype
         extractor = EmbeddingGroupExtractor(
             embedder=embedder, group_prototypes=group_prototypes, normalize_embeddings=True
         )
 
-        # The initialization should handle the prototype encoding
         assert "test" in extractor._proto_embs
         assert extractor._proto_embs["test"].shape[0] == 1
 
-    def test_encode_fallback_no_normalize_param(self):
-        """Test _encode falls back when embedder doesn't support normalize param."""
-        embedder = MockEmbedderNoNormalize()
+    def test_encode_with_non_normalizing_embedder(self):
+        """Test that extractor normalizes even when embedder returns raw vectors."""
+        embedder = MockEmbedder()
         group_prototypes = {"test": ["prototype1", "prototype2"]}
 
         extractor = EmbeddingGroupExtractor(
             embedder=embedder, group_prototypes=group_prototypes, normalize_embeddings=True
         )
 
-        # Should still work via fallback
         result = extractor.detect_one("test text")
         assert "test" in result
+        assert -1.0 <= result["test"].score <= 1.0
 
     def test_group_detection_score_range(self):
         """Test that detection scores are in valid range."""
@@ -235,7 +208,6 @@ class TestEmbeddingGroupExtractor:
 
         result = extractor.detect_one("test sentence")
 
-        # Score should be between -1 and 1 for cosine similarity
         assert -1.0 <= result["category"].score <= 1.0
 
     def test_best_prototype_index_valid(self):
@@ -279,5 +251,4 @@ class TestEmbeddingGroupExtractor:
         single_results = [extractor.detect_one(t) for t in texts]
 
         for i in range(len(texts)):
-            # Scores should be the same
             assert batch_results[i]["category"].score == pytest.approx(single_results[i]["category"].score, abs=0.01)

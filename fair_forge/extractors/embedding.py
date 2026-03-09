@@ -1,15 +1,14 @@
 """Embedding-based group extractor."""
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
 
+from fair_forge.core.embedder import Embedder
 from fair_forge.core.extractor import BaseGroupExtractor
 from fair_forge.schemas.toxicity import GroupDetection
 
 
 class EmbeddingGroupExtractor(BaseGroupExtractor):
-    """
-    Detects whether a text mentions each group using embedding cosine similarity
+    """Detects whether a text mentions each group using embedding cosine similarity
     against per-group prototype phrases.
 
     - Precompute prototype embeddings per group.
@@ -17,43 +16,36 @@ class EmbeddingGroupExtractor(BaseGroupExtractor):
     - For each group: score = max cosine(text, prototypes[group])
     - present = score >= threshold[group] (or default_threshold)
 
-    Important: when normalize_embeddings=True, we L2-normalize vectors so dot product == cosine.
+    Important: when normalize_embeddings=True, vectors are L2-normalized so dot product == cosine.
+
+    Args:
+        embedder: Embedder instance for encoding text.
+        group_prototypes: Dict mapping group name to list of prototype phrases.
+        thresholds: Optional dict of per-group detection thresholds.
+        default_threshold: Default threshold for groups without a specific one.
+        normalize_embeddings: Whether to L2-normalize embeddings after encoding.
     """
 
     def __init__(
         self,
-        embedder: SentenceTransformer,
+        embedder: Embedder,
         group_prototypes: dict[str, list[str]],
         thresholds: dict[str, float] | None = None,
         default_threshold: float = 0.50,
-        batch_size: int = 64,
         normalize_embeddings: bool = True,
     ):
-        """
-        Initialize the embedding group extractor.
-
-        Args:
-            embedder: SentenceTransformer model for encoding text
-            group_prototypes: Dict mapping group name to list of prototype phrases
-            thresholds: Optional dict of per-group thresholds
-            default_threshold: Default threshold for groups without specific threshold
-            batch_size: Batch size for encoding
-            normalize_embeddings: Whether to L2-normalize embeddings
-        """
         if not group_prototypes:
             raise ValueError("group_prototypes must be non-empty.")
         for g, ps in group_prototypes.items():
             if not ps:
                 raise ValueError(f"group_prototypes['{g}'] is empty; each group needs at least 1 prototype.")
 
-        self.embedder = embedder
+        self._embedder = embedder
         self.group_prototypes = group_prototypes
         self.thresholds = thresholds or {}
         self.default_threshold = float(default_threshold)
-        self.batch_size = int(batch_size)
         self.normalize_embeddings = bool(normalize_embeddings)
 
-        # Precompute embeddings for prototypes
         self._proto_embs: dict[str, np.ndarray] = {}
         for g, protos in self.group_prototypes.items():
             embs = self._encode(protos)
@@ -62,17 +54,7 @@ class EmbeddingGroupExtractor(BaseGroupExtractor):
             self._proto_embs[g] = embs
 
     def _encode(self, texts: list[str]) -> np.ndarray:
-        """Encode texts to embeddings."""
-        try:
-            embs = self.embedder.encode(
-                texts,
-                batch_size=self.batch_size,
-                normalize_embeddings=self.normalize_embeddings,
-                show_progress_bar=False,
-            )
-        except TypeError:
-            embs = self.embedder.encode(texts)
-
+        embs = self._embedder.encode(texts)
         embs = np.asarray(embs)
 
         if self.normalize_embeddings:
@@ -85,14 +67,13 @@ class EmbeddingGroupExtractor(BaseGroupExtractor):
         return embs
 
     def detect_one(self, text: str) -> dict[str, GroupDetection]:
-        """
-        Detect group mentions in a single text.
+        """Detect group mentions in a single text.
 
         Args:
-            text: The text to analyze
+            text: The text to analyze.
 
         Returns:
-            Dict mapping group names to detection results
+            Dict mapping group names to detection results.
         """
         if not isinstance(text, str):
             raise TypeError("text must be a string")
@@ -101,7 +82,7 @@ class EmbeddingGroupExtractor(BaseGroupExtractor):
 
         results: dict[str, GroupDetection] = {}
         for g, P in self._proto_embs.items():
-            sims = P @ e  # cosine if normalized
+            sims = P @ e
             best_idx = int(np.argmax(sims))
             best_sim = float(sims[best_idx])
             thr = float(self.thresholds.get(g, self.default_threshold))
@@ -114,14 +95,13 @@ class EmbeddingGroupExtractor(BaseGroupExtractor):
         return results
 
     def detect_batch(self, texts: list[str]) -> list[dict[str, GroupDetection]]:
-        """
-        Detect group mentions in a batch of texts.
+        """Detect group mentions in a batch of texts.
 
         Args:
-            texts: List of texts to analyze
+            texts: List of texts to analyze.
 
         Returns:
-            List of dicts, one per text, mapping group names to detection results
+            List of dicts, one per text, mapping group names to detection results.
         """
         if not isinstance(texts, list) or not all(isinstance(t, str) for t in texts):
             raise TypeError("texts must be a list[str]")

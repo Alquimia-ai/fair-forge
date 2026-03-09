@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING, Any
 import hdbscan
 import numpy as np
 import umap
-from sentence_transformers import SentenceTransformer
 
 from fair_forge.core.base import FairForge
+from fair_forge.core.embedder import Embedder  # noqa: TC001
 from fair_forge.extractors import EmbeddingGroupExtractor
 from fair_forge.loaders import HurtlexLoader
 from fair_forge.schemas.toxicity import ToxicityMetric
@@ -45,7 +45,7 @@ class Toxicity(FairForge):
     def __init__(
         self,
         retriever: type[Retriever],
-        embedding_model: str = "all-MiniLM-L6-v2",
+        embedder: Embedder,
         toxicity_loader: type[ToxicityLoader] = HurtlexLoader,
         # Clustering config
         toxicity_min_cluster_size: int = 5,
@@ -63,7 +63,6 @@ class Toxicity(FairForge):
         group_prototypes: dict[str, list[str]] | None = None,
         group_thresholds: dict[str, float] | None = None,
         group_default_threshold: float = 0.50,
-        group_extractor_batch_size: int = 64,
         group_extractor_normalize_embeddings: bool = True,
         # Group profiling config
         group_toxicity_threshold: float = 0.0,
@@ -82,7 +81,7 @@ class Toxicity(FairForge):
 
         Args:
             retriever: Data retriever class
-            embedding_model: Name of SentenceTransformer model
+            embedder: Embedder instance for encoding text
             toxicity_loader: Toxicity dataset loader class
             sentiment_analyzer: Sentiment analyzer for ASB calculation (optional)
             statistical_mode: Statistical computation mode (defaults to FrequentistMode)
@@ -90,7 +89,7 @@ class Toxicity(FairForge):
         """
         super().__init__(retriever, **kwargs)
 
-        self.embedding_model = SentenceTransformer(embedding_model)
+        self.embedder = embedder
         self.toxicity_loader = toxicity_loader()
 
         # Clustering config
@@ -130,11 +129,10 @@ class Toxicity(FairForge):
             if group_prototypes is None:
                 raise ValueError("group_prototypes must be provided if group_extractor is None")
             self.group_extractor = EmbeddingGroupExtractor(
-                embedder=self.embedding_model,
+                embedder=self.embedder,
                 group_prototypes=group_prototypes,
                 thresholds=group_thresholds,
                 default_threshold=group_default_threshold,
-                batch_size=group_extractor_batch_size,
                 normalize_embeddings=group_extractor_normalize_embeddings,
             )
 
@@ -351,7 +349,7 @@ class Toxicity(FairForge):
         )
 
         # Encode embeddings
-        embeddings = self.embedding_model.encode(assistant_answers)
+        embeddings = self.embedder.encode(assistant_answers)
         self._accumulated_embeddings.append(embeddings)
 
         # Detect groups
