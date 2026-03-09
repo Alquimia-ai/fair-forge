@@ -113,13 +113,13 @@ for metric in metrics:
 |-----------|------|-------------|
 | `retriever` | `Type[Retriever]` | Data source class returning conversations to evaluate |
 | `corpus_connector` | `CorpusConnector` | Connector for loading regulatory documents |
+| `embedder` | `Embedder` | Embedder instance for encoding documents and queries (e.g., `QwenEmbedder`) |
+| `reranker` | `Reranker` | Reranker instance for scoring document-response alignment (e.g., `QwenReranker`) |
 
 ### Optional Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `embedder` | `Embedder` | *(required)* | Embedder instance for encoding documents and queries (e.g., `QwenEmbedder`) |
-| `reranker` | `Reranker` | *(required)* | Reranker instance for scoring document-response alignment (e.g., `QwenReranker`) |
 | `statistical_mode` | `StatisticalMode` | `FrequentistMode()` | Statistical computation mode |
 | `chunk_size` | `int` | `1000` | Characters per chunk |
 | `chunk_overlap` | `int` | `100` | Character overlap between chunks |
