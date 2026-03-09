@@ -6,11 +6,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-torch = pytest.importorskip("torch", reason="torch required for regulatory tests")
-
 from fair_forge.connectors import LocalCorpusConnector, RegulatoryDocument
-from fair_forge.core.embedder import EmbedderConfig, RegulatoryEmbedder, RetrievedChunk
-from fair_forge.core.reranker import RankedChunk, RerankerConfig, RegulatoryReranker
+from fair_forge.core.contradiction_checker import ContradictionChecker, RankedChunk
+from fair_forge.core.document_retriever import DocumentRetriever, RetrievedChunk
+from fair_forge.core.embedder import Embedder
+from fair_forge.core.reranker import Reranker
 from fair_forge.metrics.regulatory import Regulatory
 from fair_forge.schemas.regulatory import RegulatoryChunk, RegulatoryInteraction, RegulatoryMetric
 
@@ -33,6 +33,28 @@ class MockCorpusConnector:
                 source="refund_policy.md",
             ),
         ]
+
+
+class MockEmbedder(Embedder):
+    """Mock embedder for testing."""
+
+    def encode(self, sentences: list[str]) -> list[list[float]]:
+        return [[0.1] * 10 for _ in sentences]
+
+
+class MockReranker(Reranker):
+    """Mock reranker for testing."""
+
+    def score(self, query: str, documents: list[str]) -> list[float]:
+        return [0.8] * len(documents)
+
+
+def _make_mock_embedder() -> Embedder:
+    return MockEmbedder()
+
+
+def _make_mock_reranker() -> Reranker:
+    return MockReranker()
 
 
 class TestRegulatoryMetricSchema:
@@ -108,51 +130,48 @@ class TestLocalCorpusConnector:
             assert len(documents) == 0
 
 
-class TestRegulatoryEmbedder:
-    """Test suite for RegulatoryEmbedder."""
+class TestDocumentRetriever:
+    """Test suite for DocumentRetriever."""
 
-    def test_embedder_initialization(self):
-        config = EmbedderConfig(
-            model_name="test-model",
+    def test_retriever_initialization(self):
+        from fair_forge.core.document_retriever import DocumentRetrieverConfig
+
+        config = DocumentRetrieverConfig(
             top_k=5,
             similarity_threshold=0.5,
         )
-        embedder = RegulatoryEmbedder(config)
-        assert embedder.config.top_k == 5
-        assert embedder.config.similarity_threshold == 0.5
+        retriever = DocumentRetriever(_make_mock_embedder(), config)
+        assert retriever._config.top_k == 5
+        assert retriever._config.similarity_threshold == 0.5
 
     def test_load_corpus(self):
-        embedder = RegulatoryEmbedder()
+        retriever = DocumentRetriever(_make_mock_embedder())
         documents = [
             RegulatoryDocument(text="First document content", source="doc1.md"),
             RegulatoryDocument(text="Second document content", source="doc2.md"),
         ]
-        num_chunks = embedder.load_corpus(documents)
+        num_chunks = retriever.load_corpus(documents)
         assert num_chunks >= 2
 
 
-class TestRegulatoryReranker:
-    """Test suite for RegulatoryReranker."""
+class TestContradictionChecker:
+    """Test suite for ContradictionChecker."""
 
-    def test_reranker_initialization(self):
-        config = RerankerConfig(
-            model_name="test-model",
-            contradiction_threshold=0.5,
-        )
-        reranker = RegulatoryReranker(config)
-        assert reranker.config.contradiction_threshold == 0.5
+    def test_checker_initialization(self):
+        checker = ContradictionChecker(_make_mock_reranker(), contradiction_threshold=0.5)
+        assert checker._contradiction_threshold == 0.5
 
 
 class TestRegulatoryMetric:
     """Test suite for Regulatory metric."""
 
-    @patch.object(RegulatoryEmbedder, "retrieve_merged")
-    @patch.object(RegulatoryReranker, "check_contradictions")
-    @patch.object(RegulatoryEmbedder, "load_corpus")
+    @patch.object(DocumentRetriever, "retrieve_merged")
+    @patch.object(ContradictionChecker, "check")
+    @patch.object(DocumentRetriever, "load_corpus")
     def test_batch_processing_compliant(
         self,
         mock_load_corpus,
-        mock_check_contradictions,
+        mock_check,
         mock_retrieve,
         regulatory_dataset_retriever,
         regulatory_dataset,
@@ -168,7 +187,7 @@ class TestRegulatoryMetric:
             ),
         ]
 
-        mock_check_contradictions.return_value = [
+        mock_check.return_value = [
             RankedChunk(
                 text="Customers can request removal from call lists",
                 source="policy.md",
@@ -183,6 +202,8 @@ class TestRegulatoryMetric:
         metric = Regulatory(
             regulatory_dataset_retriever,
             corpus_connector=connector,
+            embedder=_make_mock_embedder(),
+            reranker=_make_mock_reranker(),
             verbose=False,
         )
 
@@ -204,13 +225,13 @@ class TestRegulatoryMetric:
         assert hasattr(m, "verdict")
         assert len(m.interactions) == len(dataset.conversation)
 
-    @patch.object(RegulatoryEmbedder, "retrieve_merged")
-    @patch.object(RegulatoryReranker, "check_contradictions")
-    @patch.object(RegulatoryEmbedder, "load_corpus")
+    @patch.object(DocumentRetriever, "retrieve_merged")
+    @patch.object(ContradictionChecker, "check")
+    @patch.object(DocumentRetriever, "load_corpus")
     def test_batch_processing_non_compliant(
         self,
         mock_load_corpus,
-        mock_check_contradictions,
+        mock_check,
         mock_retrieve,
         regulatory_dataset_retriever,
         regulatory_dataset,
@@ -226,7 +247,7 @@ class TestRegulatoryMetric:
             ),
         ]
 
-        mock_check_contradictions.return_value = [
+        mock_check.return_value = [
             RankedChunk(
                 text="No calls should be made at night",
                 source="policy.md",
@@ -241,6 +262,8 @@ class TestRegulatoryMetric:
         metric = Regulatory(
             regulatory_dataset_retriever,
             corpus_connector=connector,
+            embedder=_make_mock_embedder(),
+            reranker=_make_mock_reranker(),
             verbose=False,
         )
 
@@ -258,8 +281,8 @@ class TestRegulatoryMetric:
         assert metric.metrics[0].verdict == "NON_COMPLIANT"
         assert metric.metrics[0].total_contradicting_chunks == 1
 
-    @patch.object(RegulatoryEmbedder, "retrieve_merged")
-    @patch.object(RegulatoryEmbedder, "load_corpus")
+    @patch.object(DocumentRetriever, "retrieve_merged")
+    @patch.object(DocumentRetriever, "load_corpus")
     def test_batch_processing_irrelevant(
         self,
         mock_load_corpus,
@@ -274,6 +297,8 @@ class TestRegulatoryMetric:
         metric = Regulatory(
             regulatory_dataset_retriever,
             corpus_connector=connector,
+            embedder=_make_mock_embedder(),
+            reranker=_make_mock_reranker(),
             verbose=False,
         )
 
@@ -291,13 +316,13 @@ class TestRegulatoryMetric:
         assert metric.metrics[0].verdict == "IRRELEVANT"
         assert metric.metrics[0].interactions[0].compliance_score == 0.5
 
-    @patch.object(RegulatoryEmbedder, "retrieve_merged")
-    @patch.object(RegulatoryReranker, "check_contradictions")
-    @patch.object(RegulatoryEmbedder, "load_corpus")
+    @patch.object(DocumentRetriever, "retrieve_merged")
+    @patch.object(ContradictionChecker, "check")
+    @patch.object(DocumentRetriever, "load_corpus")
     def test_run_method(
         self,
         mock_load_corpus,
-        mock_check_contradictions,
+        mock_check,
         mock_retrieve,
         regulatory_dataset_retriever,
     ):
@@ -312,7 +337,7 @@ class TestRegulatoryMetric:
             ),
         ]
 
-        mock_check_contradictions.return_value = [
+        mock_check.return_value = [
             RankedChunk(
                 text="Test chunk",
                 source="test.md",
@@ -327,6 +352,8 @@ class TestRegulatoryMetric:
         metrics = Regulatory.run(
             regulatory_dataset_retriever,
             corpus_connector=connector,
+            embedder=_make_mock_embedder(),
+            reranker=_make_mock_reranker(),
             verbose=False,
         )
 
@@ -337,9 +364,9 @@ class TestRegulatoryMetric:
             assert isinstance(m, RegulatoryMetric)
 
     def test_metric_attributes(self, regulatory_dataset_retriever):
-        with patch.object(RegulatoryEmbedder, "retrieve_merged") as mock_retrieve:
-            with patch.object(RegulatoryReranker, "check_contradictions") as mock_check:
-                with patch.object(RegulatoryEmbedder, "load_corpus") as mock_load:
+        with patch.object(DocumentRetriever, "retrieve_merged") as mock_retrieve:
+            with patch.object(ContradictionChecker, "check") as mock_check:
+                with patch.object(DocumentRetriever, "load_corpus") as mock_load:
                     mock_load.return_value = 5
                     mock_retrieve.return_value = [
                         RetrievedChunk(
@@ -364,6 +391,8 @@ class TestRegulatoryMetric:
                     metrics = Regulatory.run(
                         regulatory_dataset_retriever,
                         corpus_connector=connector,
+                        embedder=_make_mock_embedder(),
+                        reranker=_make_mock_reranker(),
                         verbose=False,
                     )
 
@@ -386,65 +415,49 @@ class TestRegulatoryMetric:
 
                     assert len(m.interactions) > 0
                     interaction = m.interactions[0]
-                    for attr in ["qa_id", "query", "assistant", "compliance_score", "verdict",
-                                 "supporting_chunks", "contradicting_chunks", "retrieved_chunks", "insight"]:
+                    for attr in [
+                        "qa_id",
+                        "query",
+                        "assistant",
+                        "compliance_score",
+                        "verdict",
+                        "supporting_chunks",
+                        "contradicting_chunks",
+                        "retrieved_chunks",
+                        "insight",
+                    ]:
                         assert hasattr(interaction, attr), f"Missing interaction attribute: {attr}"
 
 
 class TestComplianceScoring:
     """Test suite for compliance score computation."""
 
+    def _make_metric(self) -> Regulatory:
+        metric = Regulatory.__new__(Regulatory)
+        metric.logger = MagicMock()
+        metric.compliance_threshold = 0.5
+        return metric
+
     def test_compute_verdict_all_supporting(self):
-        connector = MagicMock()
-        connector.load_documents.return_value = []
-
-        with patch.object(RegulatoryEmbedder, "load_corpus"):
-            metric = Regulatory.__new__(Regulatory)
-            metric.logger = MagicMock()
-            metric.compliance_threshold = 0.5
-
-            verdict, score = metric._compute_verdict(supporting=5, contradicting=0)
-
-            assert verdict == "COMPLIANT"
-            assert score == 1.0
+        metric = self._make_metric()
+        verdict, score = metric._compute_verdict(supporting=5, contradicting=0)
+        assert verdict == "COMPLIANT"
+        assert score == 1.0
 
     def test_compute_verdict_all_contradicting(self):
-        connector = MagicMock()
-        connector.load_documents.return_value = []
-
-        with patch.object(RegulatoryEmbedder, "load_corpus"):
-            metric = Regulatory.__new__(Regulatory)
-            metric.logger = MagicMock()
-
-            verdict, score = metric._compute_verdict(supporting=0, contradicting=3)
-
-            assert verdict == "NON_COMPLIANT"
-            assert score == 0.0
+        metric = self._make_metric()
+        verdict, score = metric._compute_verdict(supporting=0, contradicting=3)
+        assert verdict == "NON_COMPLIANT"
+        assert score == 0.0
 
     def test_compute_verdict_mixed(self):
-        connector = MagicMock()
-        connector.load_documents.return_value = []
-
-        with patch.object(RegulatoryEmbedder, "load_corpus"):
-            metric = Regulatory.__new__(Regulatory)
-            metric.logger = MagicMock()
-            metric.compliance_threshold = 0.5
-
-            verdict, score = metric._compute_verdict(supporting=3, contradicting=1)
-
-            assert verdict == "COMPLIANT"
-            assert score == 0.75
+        metric = self._make_metric()
+        verdict, score = metric._compute_verdict(supporting=3, contradicting=1)
+        assert verdict == "COMPLIANT"
+        assert score == 0.75
 
     def test_compute_verdict_irrelevant(self):
-        connector = MagicMock()
-        connector.load_documents.return_value = []
-
-        with patch.object(RegulatoryEmbedder, "load_corpus"):
-            metric = Regulatory.__new__(Regulatory)
-            metric.logger = MagicMock()
-            metric.compliance_threshold = 0.5
-
-            verdict, score = metric._compute_verdict(supporting=0, contradicting=0)
-
-            assert verdict == "IRRELEVANT"
-            assert score == 0.5
+        metric = self._make_metric()
+        verdict, score = metric._compute_verdict(supporting=0, contradicting=0)
+        assert verdict == "IRRELEVANT"
+        assert score == 0.5

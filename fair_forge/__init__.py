@@ -7,8 +7,10 @@ A modular framework for measuring fairness, quality, and safety of AI assistant 
 # Core abstractions
 from .core import (
     BaseGroupExtractor,
+    Embedder,
     FairForge,
     Guardian,
+    Reranker,
     Retriever,
     ToxicityLoader,
 )
@@ -33,6 +35,8 @@ __all__ = [
     "Guardian",
     "ToxicityLoader",
     "BaseGroupExtractor",
+    "Embedder",
+    "Reranker",
     # Schemas
     "Batch",
     "Dataset",

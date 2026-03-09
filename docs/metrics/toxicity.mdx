@@ -26,6 +26,7 @@ uv add "alquimia-fair-forge[toxicity]"
 ## Basic Usage
 
 ```python
+from fair_forge.embedders import SentenceTransformerEmbedder
 from fair_forge.metrics.toxicity import Toxicity
 from fair_forge.statistical import FrequentistMode
 from your_retriever import MyRetriever
@@ -41,6 +42,7 @@ group_prototypes = {
 # Run the metric
 metrics = Toxicity.run(
     MyRetriever,
+    embedder=SentenceTransformerEmbedder("all-MiniLM-L6-v2"),
     group_prototypes=group_prototypes,
     group_default_threshold=0.40,
     statistical_mode=FrequentistMode(),
@@ -87,7 +89,7 @@ for metric in metrics:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `embedding_model` | `str` | `"all-MiniLM-L6-v2"` | SentenceTransformer model name |
+| `embedder` | `Embedder` | *(required)* | Embedder instance for encoding text (e.g., `SentenceTransformerEmbedder`) |
 
 ### Clustering Parameters (HDBSCAN)
 
@@ -165,10 +167,12 @@ class FrequentistGroupProfiling(BaseModel):
 ### Frequentist Mode
 
 ```python
+from fair_forge.embedders import SentenceTransformerEmbedder
 from fair_forge.statistical import FrequentistMode
 
 metrics = Toxicity.run(
     MyRetriever,
+    embedder=SentenceTransformerEmbedder("all-MiniLM-L6-v2"),
     group_prototypes=group_prototypes,
     statistical_mode=FrequentistMode(),
 )
@@ -181,6 +185,7 @@ print(f"DIDT: {gp.DIDT}")  # Single float value
 ### Bayesian Mode
 
 ```python
+from fair_forge.embedders import SentenceTransformerEmbedder
 from fair_forge.statistical import BayesianMode
 
 bayesian = BayesianMode(
@@ -194,6 +199,7 @@ bayesian = BayesianMode(
 
 metrics = Toxicity.run(
     MyRetriever,
+    embedder=SentenceTransformerEmbedder("all-MiniLM-L6-v2"),
     group_prototypes=group_prototypes,
     statistical_mode=bayesian,
 )
@@ -254,6 +260,7 @@ group_prototypes = {
 
 metrics = Toxicity.run(
     MyRetriever,
+    embedder=SentenceTransformerEmbedder("all-MiniLM-L6-v2"),
     group_prototypes=group_prototypes,
 )
 ```
@@ -261,11 +268,11 @@ metrics = Toxicity.run(
 ### Custom Group Extractor
 
 ```python
+from fair_forge.embedders import SentenceTransformerEmbedder
 from fair_forge.extractors.embedding import EmbeddingGroupExtractor
-from sentence_transformers import SentenceTransformer
 
 # Create custom extractor with specific model
-embedder = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+embedder = SentenceTransformerEmbedder("paraphrase-multilingual-MiniLM-L12-v2")
 extractor = EmbeddingGroupExtractor(
     embedder=embedder,
     group_prototypes=group_prototypes,
@@ -275,6 +282,7 @@ extractor = EmbeddingGroupExtractor(
 
 metrics = Toxicity.run(
     MyRetriever,
+    embedder=embedder,
     group_extractor=extractor,
 )
 ```
@@ -285,6 +293,7 @@ metrics = Toxicity.run(
 # Fine-tune clustering for your data
 metrics = Toxicity.run(
     MyRetriever,
+    embedder=SentenceTransformerEmbedder("all-MiniLM-L6-v2"),
     group_prototypes=group_prototypes,
     toxicity_min_cluster_size=10,         # Larger clusters
     toxicity_cluster_selection_method="leaf",  # Finer clusters
@@ -323,6 +332,7 @@ plt.show()
 ## Complete Example
 
 ```python
+from fair_forge.embedders import SentenceTransformerEmbedder
 from fair_forge.metrics.toxicity import Toxicity
 from fair_forge.statistical import FrequentistMode, BayesianMode
 from fair_forge.core.retriever import Retriever
@@ -351,8 +361,11 @@ group_prototypes = {
 }
 
 # Run with Frequentist mode
-freq_metrics = Toxicity.run(
+freq_embedder = SentenceTransformerEmbedder("all-MiniLM-L6-v2")
+
+metrics = Toxicity.run(
     MyRetriever,
+    embedder=embedder,
     group_prototypes=group_prototypes,
     group_default_threshold=0.40,
     statistical_mode=FrequentistMode(),
@@ -363,6 +376,7 @@ freq_metrics = Toxicity.run(
 # Run with Bayesian mode
 bayes_metrics = Toxicity.run(
     MyRetriever,
+    embedder=embedder,
     group_prototypes=group_prototypes,
     group_default_threshold=0.40,
     statistical_mode=BayesianMode(mc_samples=5000, ci_level=0.95),
