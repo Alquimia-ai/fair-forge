@@ -52,11 +52,16 @@ class TestContextMetric:
     def test_batch_processing(self, mock_judge_class, mock_model):
         mock_judge = MagicMock()
         mock_judge_class.return_value = mock_judge
-        mock_judge.check.return_value = ("I analyzed the context...", {"insight": "Good context awareness", "score": 0.85})
+        mock_judge.check.return_value = (
+            "I analyzed the context...",
+            {"insight": "Good context awareness", "score": 0.85},
+        )
 
         context = Context(retriever=MockRetriever, model=mock_model)
         batches = [create_sample_batch(qa_id="qa_001"), create_sample_batch(qa_id="qa_002")]
-        context.batch(session_id="test_session", context="Healthcare AI context", assistant_id="test_assistant", batch=batches)
+        context.batch(
+            session_id="test_session", context="Healthcare AI context", assistant_id="test_assistant", batch=batches
+        )
         context.on_process_complete()
 
         assert len(context.metrics) == 1
@@ -115,7 +120,10 @@ class TestContextMetric:
     def test_batch_without_observation(self, mock_judge_class, mock_model):
         mock_judge = MagicMock()
         mock_judge_class.return_value = mock_judge
-        mock_judge.check.return_value = ("Analysis without observation...", {"insight": "Without observation", "score": 0.8})
+        mock_judge.check.return_value = (
+            "Analysis without observation...",
+            {"insight": "Without observation", "score": 0.8},
+        )
 
         context = Context(retriever=MockRetriever, model=mock_model)
         batch = create_sample_batch(qa_id="qa_001", observation=None)
@@ -168,6 +176,7 @@ class TestContextMetric:
         mock_judge_class.assert_called_once_with(
             model=mock_model,
             use_structured_output=False,
+            strict=True,
             bos_json_clause="[",
             eos_json_clause="]",
             verbose=False,
@@ -195,7 +204,12 @@ class TestContextMetric:
         mock_judge.check.return_value = ("", expected_result)
 
         context = Context(retriever=MockRetriever, model=mock_model, use_structured_output=True)
-        context.batch(session_id="test_session", context="Test context", assistant_id="test_assistant", batch=[create_sample_batch(qa_id="qa_001")])
+        context.batch(
+            session_id="test_session",
+            context="Test context",
+            assistant_id="test_assistant",
+            batch=[create_sample_batch(qa_id="qa_001")],
+        )
         context.on_process_complete()
 
         assert len(context.metrics) == 1
