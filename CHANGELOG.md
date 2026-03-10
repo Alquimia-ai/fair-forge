@@ -2,6 +2,44 @@
 
 <!-- version list -->
 
+## v2.0.0-b.3 (2026-03-10)
+
+### Bug Fixes
+
+- **ci**: Update mintlify CLI to version with validate command
+  ([`5496680`](https://github.com/Alquimia-ai/fair-forge/commit/5496680884d9e68fa15ba884f2912d9d00e508fb))
+
+- **docs**: Address PR review comments
+  ([`241f277`](https://github.com/Alquimia-ai/fair-forge/commit/241f277851a0e0f9b9f7c80e3d825ed4f7390f73))
+
+- **guardians**: Handle API error responses in OpenAIGuardianProvider
+  ([`795e028`](https://github.com/Alquimia-ai/fair-forge/commit/795e028a1a220bbaa33105f01b00e61ab7c0cabe))
+
+- **llm**: Move ChatPromptTemplate to module level and update structured mode tests
+  ([`875d278`](https://github.com/Alquimia-ai/fair-forge/commit/875d27889c572f05582f6d67a856d203587c2097))
+
+### Continuous Integration
+
+- Restrict release trigger to fair_forge directory changes
+  ([`f0d592e`](https://github.com/Alquimia-ai/fair-forge/commit/f0d592eeb041b027b8c53b348cb09a8598ea7749))
+
+### Refactoring
+
+- Move experiments directory outside fair_forge package
+  ([`27a2874`](https://github.com/Alquimia-ai/fair-forge/commit/27a2874fa2f0a61be7c246415fe864a6a6e3fda9))
+
+- **core**: Extract Embedder and Reranker ABCs for dependency inversion
+  ([`ae09be1`](https://github.com/Alquimia-ai/fair-forge/commit/ae09be166382670f8c2af66f6482be62aeb792e3))
+
+- **llm**: Migrate Judge to create_agent with ProviderStrategy
+  ([`2411cbd`](https://github.com/Alquimia-ai/fair-forge/commit/2411cbdca43fb30ee63a02155624ae7639be9b6c))
+
+### Testing
+
+- **metrics**: Add missing strict param to Judge initialization assertions
+  ([`0d18989`](https://github.com/Alquimia-ai/fair-forge/commit/0d18989611a8dd4bc504eccc7722a652505705c2))
+
+
 ## v2.0.0-b.2 (2026-03-06)
 
 ### Features
