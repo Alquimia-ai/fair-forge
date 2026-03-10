@@ -8,6 +8,7 @@ from typing import TypeVar
 from langchain.agents import create_agent
 from langchain.agents.factory import ProviderStrategy
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel
 
 from fair_forge.utils.logging import VerboseLogger
@@ -155,8 +156,6 @@ Do not include any additional text after the JSON.
         data: dict,
         output_schema: type[BaseModel] | None = None,
     ) -> tuple[str, dict | None]:
-        from langchain_core.prompts import ChatPromptTemplate
-
         if output_schema:
             schema_instruction = self._get_json_schema_for_prompt(output_schema)
             enhanced_prompt = system_prompt + schema_instruction
