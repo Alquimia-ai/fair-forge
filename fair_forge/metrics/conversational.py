@@ -32,7 +32,15 @@ class Conversational(FairForge):
         **kwargs: Additional arguments passed to FairForge base class
     """
 
-    _DIMENSIONS = ("memory", "language", "quality_maxim", "quantity_maxim", "relation_maxim", "manner_maxim", "sensibleness")
+    _DIMENSIONS = (
+        "memory",
+        "language",
+        "quality_maxim",
+        "quantity_maxim",
+        "relation_maxim",
+        "manner_maxim",
+        "sensibleness",
+    )
 
     def __init__(
         self,
@@ -40,6 +48,7 @@ class Conversational(FairForge):
         model: BaseChatModel,
         statistical_mode: StatisticalMode | None = None,
         use_structured_output: bool = False,
+        strict: bool = True,
         bos_json_clause: str = "```json",
         eos_json_clause: str = "```",
         **kwargs,
@@ -48,6 +57,7 @@ class Conversational(FairForge):
         self.model = model
         self.statistical_mode = statistical_mode if statistical_mode is not None else FrequentistMode()
         self.use_structured_output = use_structured_output
+        self.strict = strict
         self.bos_json_clause = bos_json_clause
         self.eos_json_clause = eos_json_clause
         self._session_data: dict[str, dict] = {}
@@ -68,6 +78,7 @@ class Conversational(FairForge):
         judge = Judge(
             model=self.model,
             use_structured_output=self.use_structured_output,
+            strict=self.strict,
             bos_json_clause=self.bos_json_clause,
             eos_json_clause=self.eos_json_clause,
         )
@@ -105,6 +116,10 @@ class Conversational(FairForge):
                     f"[FAIR FORGE/CONVERSATIONAL] No valid response from judge for QA ID: {interaction.qa_id}"
                 )
 
+            insight = result["insight"] if isinstance(result, dict) else result.insight
+            self.logger.debug(f"Conversational insight: {insight}")
+            if reasoning:
+                self.logger.debug(f"Conversational reasoning: {reasoning}")
             scores = self._extract_scores(result)
             self._session_data[session_id]["batches"].append(interaction)
             for dim, score in scores.items():
