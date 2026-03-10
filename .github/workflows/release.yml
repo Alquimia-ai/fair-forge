@@ -3,10 +3,8 @@ name: Release
 on:
   push:
     branches: [main, develop]
-    paths-ignore:
-      - "docs/**"
-      - "*.md"
-      - ".github/workflows/docs-validate.yml"
+    paths:
+      - "fair_forge/**"
 
 jobs:
   test:
