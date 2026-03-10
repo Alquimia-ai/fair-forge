@@ -3,10 +3,9 @@
 from collections import defaultdict
 from typing import Any
 
-from langchain_core.language_models.chat_models import BaseChatModel
-from pydantic import BaseModel, Field
-
 import numpy as np
+from langchain_core.language_models.chat_models import BaseChatModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from fair_forge.core import FairForge, Retriever
 from fair_forge.llm import Judge
@@ -17,6 +16,8 @@ from fair_forge.statistical import FrequentistMode, StatisticalMode
 
 class AnswerCorrectnessOutput(BaseModel):
     """Structured output for answer correctness evaluation."""
+
+    model_config = ConfigDict(extra="forbid")
 
     correctness_score: float = Field(ge=0.0, le=1.0, description="Correctness score (0.0-1.0)")
     reasoning: str = Field(description="Brief explanation of the evaluation")
@@ -118,6 +119,7 @@ class Agentic(FairForge):
         model: BaseChatModel,
         k: int,
         use_structured_output: bool = True,
+        strict: bool = True,
         bos_json_clause: str = "```json",
         eos_json_clause: str = "```",
         threshold: float = 0.7,
@@ -131,6 +133,7 @@ class Agentic(FairForge):
         self.model = model
         self.k = k
         self.use_structured_output = use_structured_output
+        self.strict = strict
         self.bos_json_clause = bos_json_clause
         self.eos_json_clause = eos_json_clause
         self.threshold = threshold
@@ -208,9 +211,7 @@ Examples:
         data = {"answer": answer, "ground_truth": ground_truth}
 
         try:
-            _reasoning, result = judge.check(
-                system_prompt, query, data, output_schema=AnswerCorrectnessOutput
-            )
+            _reasoning, result = judge.check(system_prompt, query, data, output_schema=AnswerCorrectnessOutput)
 
             self.logger.debug(f"Judge returned - reasoning: {_reasoning[:100] if _reasoning else 'None'}...")
 
@@ -232,8 +233,8 @@ Examples:
             self.logger.debug(f"✓ Extracted score from object: {score}")
             return score
 
-        except Exception as e:
-            self.logger.exception(f"❌ Error evaluating answer correctness: {e}")
+        except Exception:
+            self.logger.exception("❌ Error evaluating answer correctness")
             return 0.0
 
     def _evaluate_tool_correctness(
@@ -370,6 +371,7 @@ Examples:
         judge = Judge(
             model=self.model,
             use_structured_output=self.use_structured_output,
+            strict=self.strict,
             bos_json_clause=self.bos_json_clause,
             eos_json_clause=self.eos_json_clause,
             verbose=self.verbose,
@@ -427,13 +429,14 @@ Examples:
             correct_interactions = len(correct_indices)
             is_fully_correct = correct_interactions == total_interactions
 
-            status = "✅ FULLY CORRECT" if is_fully_correct else f"❌ PARTIAL ({correct_interactions}/{total_interactions})"
+            status = (
+                "✅ FULLY CORRECT" if is_fully_correct else f"❌ PARTIAL ({correct_interactions}/{total_interactions})"
+            )
             self.logger.info(f"  Conversation result: {status}")
 
             p_result = self.statistical_mode.rate_estimation(correct_interactions, total_interactions)
 
             if self.statistical_mode.get_result_type() == "point_estimate":
-                p = float(p_result)
                 metric = AgenticMetric(
                     session_id=dataset.session_id,
                     assistant_id=dataset.assistant_id,

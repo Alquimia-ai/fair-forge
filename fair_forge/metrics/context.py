@@ -37,6 +37,7 @@ class Context(FairForge):
         model: BaseChatModel,
         statistical_mode: StatisticalMode | None = None,
         use_structured_output: bool = False,
+        strict: bool = True,
         bos_json_clause: str = "```json",
         eos_json_clause: str = "```",
         **kwargs,
@@ -45,6 +46,7 @@ class Context(FairForge):
         self.model = model
         self.statistical_mode = statistical_mode if statistical_mode is not None else FrequentistMode()
         self.use_structured_output = use_structured_output
+        self.strict = strict
         self.bos_json_clause = bos_json_clause
         self.eos_json_clause = eos_json_clause
         self._session_data: dict[str, dict] = {}
@@ -60,6 +62,7 @@ class Context(FairForge):
         judge = Judge(
             model=self.model,
             use_structured_output=self.use_structured_output,
+            strict=self.strict,
             bos_json_clause=self.bos_json_clause,
             eos_json_clause=self.eos_json_clause,
             verbose=self.verbose,
@@ -94,11 +97,14 @@ class Context(FairForge):
                 )
 
             if result is None:
-                raise ValueError(
-                    f"[FAIR FORGE/CONTEXT] No valid response from judge for QA ID: {interaction.qa_id}"
-                )
+                raise ValueError(f"[FAIR FORGE/CONTEXT] No valid response from judge for QA ID: {interaction.qa_id}")
 
             score = float(result["score"] if isinstance(result, dict) else result.score)
+            insight = result["insight"] if isinstance(result, dict) else result.insight
+            self.logger.debug(f"Context insight: {insight}")
+            if reasoning:
+                self.logger.debug(f"Context reasoning: {reasoning}")
+            self.logger.debug(f"Context awareness: {score}")
             self._session_data[session_id]["batches"].append(interaction)
             self._session_data[session_id]["scores"].append(score)
             self._session_data[session_id]["interactions"].append(
@@ -110,9 +116,7 @@ class Context(FairForge):
             batches = data["batches"]
             weights = self._resolve_weights(batches)
 
-            mean, ci_low, ci_high = self._aggregate_scores(
-                data["scores"], batches, weights, self.statistical_mode
-            )
+            mean, ci_low, ci_high = self._aggregate_scores(data["scores"], batches, weights, self.statistical_mode)
 
             metric = ContextMetric(
                 session_id=session_id,
