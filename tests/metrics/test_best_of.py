@@ -120,6 +120,7 @@ class TestBestOfMetric:
         mock_judge_class.assert_called_once_with(
             model=mock_model,
             use_structured_output=True,
+            strict=True,
             bos_json_clause="[",
             eos_json_clause="]",
         )
