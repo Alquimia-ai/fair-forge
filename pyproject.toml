@@ -58,6 +58,7 @@ dependencies = [
     "loguru>=0.7.3",
     # Tokenizers (required for schemas)
     "transformers>=4.35.0",
+    "optuna>=4.7.0",
 ]
 
 [project.optional-dependencies]
@@ -115,6 +116,11 @@ runners = [
     "aiosseclient>=0.1.8",
 ]
 
+# Prompt optimizer module
+prompt-optimizer = [
+    "optuna>=3.0.0",
+]
+
 # Generators module (base - requires user to install their LLM provider)
 generators = []
 
@@ -125,7 +131,7 @@ generators-alquimia = [
 
 # Everything
 all = [
-    "alquimia-fair-forge[metrics,runners,generators,generators-alquimia,explainability]",
+    "alquimia-fair-forge[metrics,runners,generators,generators-alquimia,explainability,prompt-optimizer]",
 ]
 
 # Development tools

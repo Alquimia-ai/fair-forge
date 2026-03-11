@@ -41,6 +41,7 @@ examples/pipeline/.virtual_documents/
 # Generated files from notebooks
 examples/**/topic.md
 examples/**/*.json
+!examples/**/data/*.json
 
 # IDEs
 .vscode/
