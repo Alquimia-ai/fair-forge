@@ -1,0 +1,224 @@
+---
+title: MIPROv2
+description: Optimize instruction and few-shot examples together using Bayesian search
+---
+
+# MIPROv2
+
+**MIPROv2 (Multiprompt Instruction PRoposal Optimizer v2)** optimizes two things simultaneously: the system prompt instruction and the few-shot examples embedded in it. It uses Bayesian Optimization (Optuna/TPE) to efficiently search through combinations without testing all of them.
+
+## How it works
+
+**Phase 1 — Proposal**
+
+- `InstructionProposer` generates N instruction variants from the seed prompt, each emphasizing a different aspect (conciseness, format, grounding, tone, etc.)
+- `DemoBootstrapper` creates M sets of few-shot examples by sampling from the dataset
+
+**Phase 2 — Bayesian Search**
+
+- Each trial picks a combination: `(instruction_i, demo_set_j)`
+- Evaluates it on a minibatch of the dataset
+- Optuna/TPE models which combinations are most promising and prioritizes those
+
+**Output**: the best `(instruction, demo_set)` pair assembled into a ready-to-use system prompt.
+
+## When to use MIPROv2 over GEPA
+
+MIPROv2 shines when **format and style** matter as much as content — situations where seeing worked examples teaches the model what to do better than instructions alone. A technical troubleshooting bot that must follow a 4-section structure, a support bot that must respond step-by-step, or a classification agent that must match a specific output format.
+
+## Installation
+
+```bash
+uv add "alquimia-fair-forge"
+uv add langchain-groq  # or your preferred LLM provider
+```
+
+## Basic Usage
+
+```python
+import json
+from fair_forge import Retriever
+from fair_forge.schemas import Dataset
+from fair_forge.prompt_optimizer.mipro import MIPROv2Optimizer
+from langchain_groq import ChatGroq
+
+class IncidentsRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        with open("dataset.json", encoding="utf-8") as f:
+            return [Dataset.model_validate(item) for item in json.load(f)]
+
+model = ChatGroq(model="llama-3.3-70b-versatile")
+
+result = MIPROv2Optimizer.run(
+    retriever=IncidentsRetriever,
+    model=model,
+    seed_prompt="Eres un agente de soporte técnico.",
+    objective=(
+        "Responder incidencias técnicas con un diagnóstico estructurado en 4 secciones: "
+        "Diagnóstico, Causa probable, Solución inmediata (pasos numerados), y Seguimiento. "
+        "Usar únicamente la información del contexto proporcionado."
+    ),
+)
+
+print(f"Score: {result.initial_score:.2f} → {result.final_score:.2f}  ({result.n_examples} examples)")
+print(result.optimized_prompt)
+```
+
+## Parameters
+
+### Required
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `retriever` | `Type[Retriever]` | Data source class returning `list[Dataset]` |
+| `model` | `BaseChatModel` | LangChain-compatible model for instruction generation and evaluation |
+| `seed_prompt` | `str` | Current system prompt to improve |
+| `objective` | `str` | Plain language description of what a good response looks like |
+
+### Optional
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `executor` | `Callable` | Default executor | Function that calls your agent: `(prompt, query, context) → str` |
+| `evaluator` | `Callable` | `LLMEvaluator` | Function that scores a response: `(actual, expected, query, context) → float` |
+| `num_candidates` | `int` | `10` | Instruction variants to generate in Phase 1 |
+| `num_trials` | `int` | `20` | Bayesian optimization trials (combinations to evaluate) |
+| `minibatch_size` | `int` | `25` | Examples per trial (uses full dataset if smaller) |
+| `max_demos_per_set` | `int` | `3` | Maximum few-shot examples per demo set |
+| `num_demo_sets` | `int` | `5` | Demo set variants to generate in Phase 1 |
+| `random_seed` | `int` | `42` | Seed for reproducibility |
+
+## Output Schema
+
+### MIPROv2Result
+
+```python
+result.optimized_prompt        # str         — instruction + examples, ready to use as system prompt
+result.optimized_instruction   # str         — instruction part only (without examples)
+result.initial_score           # float       — seed prompt score (0.0–1.0)
+result.final_score             # float       — best score found (0.0–1.0)
+result.trials_run              # int         — number of trials executed
+result.n_examples              # int         — total examples in the dataset
+result.demos                   # list[Demo]  — selected few-shot examples
+result.trials                  # list[TrialResult]
+```
+
+### Inspecting results
+
+```python
+# Trial history — see how the search progressed
+best_so_far = 0.0
+for t in result.trials:
+    is_best = t.score > best_so_far
+    if is_best:
+        best_so_far = t.score
+    marker = " ★ new best" if is_best else ""
+    print(f"  Trial {t.trial + 1:2d} — instruction #{t.instruction_idx + 1}, "
+          f"demo set #{t.demo_set_idx + 1} — score: {t.score:.2f}{marker}")
+
+# Final result — instruction and examples separately
+print("=== Optimized instruction ===")
+print(result.optimized_instruction)
+
+print("=== Selected examples ===")
+for demo in result.demos:
+    print(f"User: {demo.query}")
+    print(f"Assistant: {demo.response}")
+    print()
+```
+
+### Score interpretation
+
+| Score | Interpretation |
+|-------|----------------|
+| 0.8–1.0 | Excellent — agent consistently meets the objective |
+| 0.6–0.8 | Good — minor deviations |
+| 0.4–0.6 | Moderate — frequent misses |
+| 0.0–0.4 | Poor — prompt is clearly inadequate |
+
+<Note>
+  The score is the average across all examples of what the evaluator returns (0.0–1.0). With the default `LLMEvaluator`, it represents how well the agent follows the `objective` as judged by the LLM.
+</Note>
+
+## Custom Executor
+
+If your agent is more than a direct model call (has memory, tools, an API), pass a custom executor:
+
+```python
+def my_executor(prompt: str, query: str, context: str) -> str:
+    return my_agent.call(system=prompt, user=query, context=context)
+
+result = MIPROv2Optimizer.run(
+    retriever=MyRetriever,
+    model=model,
+    seed_prompt="...",
+    objective="...",
+    executor=my_executor,
+)
+```
+
+## LLM Provider Options
+
+<CodeGroup>
+```python Groq
+from langchain_groq import ChatGroq
+model = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key")
+```
+
+```python OpenAI
+from langchain_openai import ChatOpenAI
+model = ChatOpenAI(model="gpt-4o", api_key="your-api-key")
+```
+
+```python Anthropic
+from langchain_anthropic import ChatAnthropic
+model = ChatAnthropic(model="claude-sonnet-4-6", api_key="your-api-key")
+```
+
+```python Ollama (Local)
+from langchain_ollama import ChatOllama
+model = ChatOllama(model="llama3.1:70b")
+```
+</CodeGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Choose tasks where examples matter">
+    MIPROv2 is most valuable when the expected output follows a specific format or style that's hard to fully specify in instructions. A structured diagnosis template, a numbered step-by-step response, or a classification with a fixed schema are ideal cases.
+  </Accordion>
+
+  <Accordion title="Write a specific objective">
+    The `objective` drives both instruction generation and LLM-based evaluation. Include the output format you expect:
+
+    ```python
+    objective = (
+        "Respond to technical incidents with a structured diagnosis in exactly 4 sections: "
+        "1) Diagnosis: what is happening in one line. "
+        "2) Probable cause: why it occurs in one line. "
+        "3) Immediate solution: numbered steps to fix the issue. "
+        "4) Follow-up: next steps or prevention in one line. "
+        "Use only information from the provided context."
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Ground truth is the few-shot source">
+    MIPROv2 builds demo sets from your `ground_truth_assistant` field. The quality of your ground truth directly determines the quality of the few-shot examples the optimizer can select. Write ideal responses in your dataset.
+  </Accordion>
+
+  <Accordion title="Tune num_trials vs speed">
+    More trials means better coverage of the search space but slower execution. With `num_candidates=10` and `num_demo_sets=5` there are 50 possible combinations. `num_trials=20` covers 40% of the space guided by Bayesian search, which is usually enough.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="GEPA" icon="arrow-trend-up" href="/prompt-optimizer/gepa">
+    Iterative prompt improvement from failures
+  </Card>
+  <Card title="Retriever" icon="database" href="/core-concepts/retriever">
+    Build a Retriever to load your evaluation dataset
+  </Card>
+</CardGroup>

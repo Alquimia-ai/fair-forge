@@ -1,0 +1,228 @@
+---
+title: GEPA
+description: Iteratively improve system prompts by learning from failures
+---
+
+# GEPA
+
+**GEPA (Generative Evolutionary Prompt Adaptation)** evaluates a seed prompt against your dataset, identifies the examples that fail, and generates improved candidates that address those failures. It repeats until the score stops improving or the iteration budget is exhausted.
+
+## How it works
+
+```
+Evaluate seed prompt → find failing examples
+    ↓
+Generate N improved candidates (LLM reads the failures)
+    ↓
+Evaluate each candidate → pick the best
+    ↓
+Repeat until no failures or no improvement
+```
+
+## Installation
+
+```bash
+uv add "alquimia-fair-forge"
+uv add langchain-groq  # or your preferred LLM provider
+```
+
+## Basic Usage
+
+```python
+import json
+from fair_forge import Retriever
+from fair_forge.schemas import Dataset
+from fair_forge.prompt_optimizer.gepa import GEPAOptimizer
+from langchain_groq import ChatGroq
+
+class SupportRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        with open("dataset.json", encoding="utf-8") as f:
+            return [Dataset.model_validate(item) for item in json.load(f)]
+
+model = ChatGroq(model="llama-3.3-70b-versatile")
+
+result = GEPAOptimizer.run(
+    retriever=SupportRetriever,
+    model=model,
+    seed_prompt="Eres un asistente de soporte.",
+    objective=(
+        "Responder preguntas de soporte usando únicamente el contexto proporcionado. "
+        "Las respuestas deben ser directas y concisas. "
+        "No agregar información que no esté en el contexto."
+    ),
+)
+
+print(f"Score: {result.initial_score:.2f} → {result.final_score:.2f}  ({result.n_examples} examples)")
+print(result.optimized_prompt)
+```
+
+## Parameters
+
+### Required
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `retriever` | `Type[Retriever]` | Data source class returning `list[Dataset]` |
+| `model` | `BaseChatModel` | LangChain-compatible model used for candidate generation |
+| `seed_prompt` | `str` | Current system prompt to improve |
+| `objective` | `str` | Plain language description of what a good response looks like |
+
+### Optional
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `executor` | `Callable` | Default executor | Function that calls your agent: `(prompt, query, context) → str` |
+| `evaluator` | `Callable` | `LLMEvaluator` | Function that scores a response: `(actual, expected, query, context) → float` |
+| `iterations` | `int` | `5` | Maximum number of improvement iterations |
+| `candidates_per_iteration` | `int` | `3` | Candidate prompts generated per iteration |
+| `failure_threshold` | `float` | `0.6` | Score below which an example is considered failing |
+
+## Custom Executor
+
+By default, GEPA calls the `model` directly with the candidate prompt. If your agent is more complex (has memory, tools, an API), pass a custom executor:
+
+```python
+def my_executor(prompt: str, query: str, context: str) -> str:
+    return my_agent.call(system=prompt, user=query, context=context)
+
+result = GEPAOptimizer.run(
+    retriever=MyRetriever,
+    model=model,
+    seed_prompt="...",
+    objective="...",
+    executor=my_executor,
+)
+```
+
+## Custom Evaluator
+
+For structured or deterministic tasks, a custom evaluator gives sharper signal than the LLM judge:
+
+```python
+import json, re
+
+def json_evaluator(actual: str, expected: str, query: str, context: str) -> float:
+    try:
+        parsed = json.loads(actual)
+        expected_dict = json.loads(expected)
+    except json.JSONDecodeError:
+        return 0.0
+    # Score based on field presence and value correctness
+    fields_ok = all(k in parsed for k in expected_dict)
+    values_ok = parsed == expected_dict
+    return (int(fields_ok) + int(values_ok)) / 2.0
+
+result = GEPAOptimizer.run(
+    retriever=MyRetriever,
+    model=model,
+    seed_prompt="...",
+    objective="...",
+    evaluator=json_evaluator,
+)
+```
+
+<Note>
+  Use a custom evaluator when the task has deterministic success criteria (valid JSON, specific fields, exact format). Use the default `LLMEvaluator` when quality is subjective (tone, clarity, factual grounding).
+</Note>
+
+## Output Schema
+
+### OptimizationResult
+
+```python
+result.optimized_prompt   # str   — best prompt found
+result.initial_score      # float — seed prompt score (0.0–1.0)
+result.final_score        # float — best score achieved (0.0–1.0)
+result.iterations_run     # int   — how many iterations were executed
+result.n_examples         # int   — total examples evaluated
+result.history            # list[IterationResult]
+```
+
+### IterationResult
+
+```python
+for iteration in result.history:
+    print(f"Iteration {iteration.iteration} — best: {iteration.best_score:.2f}")
+    for candidate in iteration.candidates:
+        marker = " ✓" if candidate.prompt == iteration.best_prompt else ""
+        print(f"  [{candidate.score:.2f}]{marker} {candidate.prompt}")
+```
+
+### Score interpretation
+
+The score is the average across all examples of what the evaluator returns (0.0–1.0). With the default `LLMEvaluator`, it represents how well the agent follows the `objective` criteria as judged by the LLM.
+
+| Score | Interpretation |
+|-------|----------------|
+| 0.8–1.0 | Excellent — agent consistently meets the objective |
+| 0.6–0.8 | Good — minor deviations |
+| 0.4–0.6 | Moderate — frequent misses |
+| 0.0–0.4 | Poor — prompt is clearly inadequate |
+
+## LLM Provider Options
+
+<CodeGroup>
+```python Groq
+from langchain_groq import ChatGroq
+model = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key")
+```
+
+```python OpenAI
+from langchain_openai import ChatOpenAI
+model = ChatOpenAI(model="gpt-4o", api_key="your-api-key")
+```
+
+```python Anthropic
+from langchain_anthropic import ChatAnthropic
+model = ChatAnthropic(model="claude-sonnet-4-6", api_key="your-api-key")
+```
+
+```python Ollama (Local)
+from langchain_ollama import ChatOllama
+model = ChatOllama(model="llama3.1:70b")
+```
+</CodeGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Write a specific objective">
+    Vague objectives produce vague improvements. Be explicit about what the agent should and should not do:
+
+    ```python
+    # Too vague
+    objective = "Be a good assistant."
+
+    # Better
+    objective = (
+        "Answer support questions using only the information in the provided context. "
+        "Be concise and direct. Do not add information not present in the context. "
+        "Do not invent prices, steps, or features."
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Start with a deliberately bad seed prompt">
+    A seed prompt like `"Eres un asistente."` gives GEPA maximum room to improve and produces a more dramatic demonstration of the optimization. If your current prompt is already decent, the improvement will be smaller.
+  </Accordion>
+
+  <Accordion title="Use a deterministic evaluator for structured tasks">
+    If the expected output follows a strict format (JSON, numbered steps, specific fields), write a deterministic evaluator. It gives GEPA a much clearer signal than an LLM judge on whether a candidate is correct.
+  </Accordion>
+
+  <Accordion title="Dataset size">
+    8–20 examples is enough for GEPA. Too few examples and the signal is noisy; too many and each iteration becomes slow. If you have many examples, consider sampling a representative subset.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="MIPROv2" icon="sparkles" href="/prompt-optimizer/miprov2">
+    Optimize instruction AND few-shot examples simultaneously
+  </Card>
+  <Card title="Retriever" icon="database" href="/core-concepts/retriever">
+    Build a Retriever to load your evaluation dataset
+  </Card>
+</CardGroup>
