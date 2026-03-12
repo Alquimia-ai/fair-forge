@@ -1,0 +1,108 @@
+[
+  {
+    "session_id": "vlm_camera_entrance_001",
+    "assistant_id": "vlm_model_v2",
+    "language": "english",
+    "context": "Security camera monitoring the main building entrance. The system should detect: fallen persons, unauthorized access attempts after hours, and suspicious behavior near the door.",
+    "conversation": [
+      {
+        "qa_id": "frame_001",
+        "query": "Analyze this camera frame for security events.",
+        "assistant": "I detect a person lying on the floor near the entrance. The individual appears to be in a fallen position and may require immediate assistance. This is classified as a fall event.",
+        "ground_truth_assistant": "A person has fallen near the entrance and is lying on the floor. A fall event has occurred and assistance is required.",
+        "observation": null,
+        "agentic": {"confidence": 0.87},
+        "ground_truth_agentic": {},
+        "logprobs": {}
+      },
+      {
+        "qa_id": "frame_002",
+        "query": "Analyze this camera frame for security events.",
+        "assistant": "The entrance area appears clear. No persons or anomalies detected. The corridor is empty and all access points appear secured.",
+        "ground_truth_assistant": "The entrance is empty. No events have occurred. Normal conditions.",
+        "observation": null,
+        "agentic": {"confidence": 0.94},
+        "ground_truth_agentic": {},
+        "logprobs": {}
+      },
+      {
+        "qa_id": "frame_003",
+        "query": "Analyze this camera frame for security events.",
+        "assistant": "I detect an individual attempting to force entry through the side door. Unauthorized access attempt in progress. Security alert recommended.",
+        "ground_truth_assistant": "The entrance area is empty. An authorized employee badged in normally. No security events occurred.",
+        "observation": null,
+        "agentic": {"confidence": 0.72},
+        "ground_truth_agentic": {},
+        "logprobs": {}
+      },
+      {
+        "qa_id": "frame_004",
+        "query": "Analyze this camera frame for security events.",
+        "assistant": "Normal activity detected. An employee is walking through the entrance using their access badge. No security concerns.",
+        "ground_truth_assistant": "An employee entered the building normally using their badge. No security events.",
+        "observation": null,
+        "agentic": {"confidence": 0.91},
+        "ground_truth_agentic": {},
+        "logprobs": {}
+      },
+      {
+        "qa_id": "frame_005",
+        "query": "Analyze this camera frame for security events.",
+        "assistant": "Alert: I detect a person collapsed on the ground near the reception desk. Possible medical emergency — fall event detected.",
+        "ground_truth_assistant": "A person is sitting on a bench in the waiting area. No events have occurred. Normal conditions.",
+        "observation": null,
+        "agentic": {"confidence": 0.68},
+        "ground_truth_agentic": {},
+        "logprobs": {}
+      }
+    ]
+  },
+  {
+    "session_id": "vlm_camera_parking_002",
+    "assistant_id": "vlm_model_v2",
+    "language": "english",
+    "context": "Security camera monitoring the outdoor parking lot. The system should detect: vehicle break-ins, vandalism, unauthorized access to restricted parking zones, and suspicious individuals.",
+    "conversation": [
+      {
+        "qa_id": "frame_001",
+        "query": "Analyze this camera frame for security events.",
+        "assistant": "I detect an individual breaking into a vehicle in section B. The person is using a tool to force open the car door. Vehicle break-in in progress.",
+        "ground_truth_assistant": "A person is breaking into a vehicle in section B using a tool to force the door. A vehicle break-in is in progress.",
+        "observation": null,
+        "agentic": {"confidence": 0.89},
+        "ground_truth_agentic": {},
+        "logprobs": {}
+      },
+      {
+        "qa_id": "frame_002",
+        "query": "Analyze this camera frame for security events.",
+        "assistant": "The parking lot appears empty. No vehicles or persons detected. All areas secure.",
+        "ground_truth_assistant": "The parking lot is empty. No events have occurred.",
+        "observation": null,
+        "agentic": {"confidence": 0.96},
+        "ground_truth_agentic": {},
+        "logprobs": {}
+      },
+      {
+        "qa_id": "frame_003",
+        "query": "Analyze this camera frame for security events.",
+        "assistant": "A vehicle is parked in the lot. No anomalies detected. Normal parking activity.",
+        "ground_truth_assistant": "A person is removing items from an unlocked vehicle that does not belong to them. A theft is in progress.",
+        "observation": null,
+        "agentic": {"confidence": 0.38},
+        "ground_truth_agentic": {},
+        "logprobs": {}
+      },
+      {
+        "qa_id": "frame_004",
+        "query": "Analyze this camera frame for security events.",
+        "assistant": "Normal vehicle activity. A car is exiting the parking lot through the authorized exit. No security concerns.",
+        "ground_truth_assistant": "A vehicle is exiting the parking lot normally through the authorized exit. No events.",
+        "observation": null,
+        "agentic": {"confidence": 0.93},
+        "ground_truth_agentic": {},
+        "logprobs": {}
+      }
+    ]
+  }
+]

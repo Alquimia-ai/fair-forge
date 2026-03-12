@@ -228,6 +228,46 @@ def create_multiple_datasets() -> list[Dataset]:
     ]
 
 
+def create_vision_dataset() -> Dataset:
+    """Create a dataset for vision metrics testing with VLM-style free-text predictions."""
+    conversation = [
+        create_sample_batch(
+            qa_id="qa_001",
+            query="Analyze this camera frame for security events.",
+            assistant="I detect a person lying on the floor near the entrance. This appears to be a fallen person requiring assistance.",
+            ground_truth_assistant="A person is lying on the floor near the entrance. A fall event has occurred.",
+            agentic={"confidence": 0.9},
+        ),
+        create_sample_batch(
+            qa_id="qa_002",
+            query="Analyze this camera frame for security events.",
+            assistant="The corridor appears empty. No anomalies or security events detected.",
+            ground_truth_assistant="The corridor is empty. No events have occurred.",
+            agentic={"confidence": 0.95},
+        ),
+        create_sample_batch(
+            qa_id="qa_003",
+            query="Analyze this camera frame for security events.",
+            assistant="I detect an unauthorized person attempting to access a restricted area. Possible intrusion detected.",
+            ground_truth_assistant="The scene shows an empty restricted area. No intrusion has occurred.",
+            agentic={"confidence": 0.78},
+        ),
+        create_sample_batch(
+            qa_id="qa_004",
+            query="Analyze this camera frame for security events.",
+            assistant="The parking lot appears normal. No incidents detected.",
+            ground_truth_assistant="A vehicle has been broken into in the parking lot. A theft event is in progress.",
+            agentic={"confidence": 0.3},
+        ),
+    ]
+    return create_sample_dataset(
+        session_id="vision_session",
+        assistant_id="argos_vlm",
+        context="Argos security camera surveillance system monitoring building entrances and restricted areas.",
+        conversation=conversation,
+    )
+
+
 def create_regulatory_dataset() -> Dataset:
     """Create a dataset for Regulatory metric testing."""
     conversation = [

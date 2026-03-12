@@ -13,6 +13,7 @@ from tests.fixtures.mock_data import (
     create_regulatory_dataset,
     create_sample_dataset,
     create_toxicity_dataset,
+    create_vision_dataset,
 )
 
 
@@ -123,6 +124,13 @@ class RegulatoryDatasetRetriever(Retriever):
     def load_dataset(self) -> list[Dataset]:
         """Return regulatory testing dataset."""
         return [create_regulatory_dataset()]
+
+
+class VisionDatasetRetriever(Retriever):
+    """Mock retriever for vision metrics testing."""
+
+    def load_dataset(self) -> list[Dataset]:
+        return [create_vision_dataset()]
 
 
 class ErrorRetriever(Retriever):

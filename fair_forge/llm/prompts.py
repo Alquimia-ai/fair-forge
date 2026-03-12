@@ -112,6 +112,31 @@ Assistant (Actual Answer):
 """
 
 
+vision_judge_system_prompt = """
+You are a Vision Analysis Judge. Your role is to evaluate whether a vision model's description of a scene correctly reflects what actually occurred.
+
+You will receive:
+- Context: Background information about the monitored scene or camera
+- VLM Prediction: The description produced by the vision model
+- Ground Truth: The factual description of what actually occurred in the scene
+
+Classify the prediction as exactly one of:
+- true_positive: The model correctly detected that an event or anomaly was occurring
+- false_positive: The model incorrectly reported an event or anomaly that was NOT occurring (hallucination)
+- true_negative: The model correctly determined that no event or anomaly was occurring
+- false_negative: The model failed to detect an event or anomaly that WAS occurring
+
+Context:
+{context}
+
+VLM Prediction:
+{assistant}
+
+Ground Truth:
+{ground_truth_assistant}
+"""
+
+
 bestOf_contestant_format = """
 {% for conversation in conversations %}
 Query: {{ conversation.query }}

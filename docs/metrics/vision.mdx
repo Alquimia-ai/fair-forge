@@ -1,0 +1,318 @@
+---
+title: Vision Hallucination
+description: Detect and quantify false positives, precision, and confidence calibration in VLM-based detection systems
+---
+
+# Vision Hallucination Metrics
+
+The Vision Hallucination metrics evaluate the reliability of Vision Language Models (VLMs) in detection systems like Argos. They quantify three critical failure dimensions: how often the model invents events that never occurred, how accurate its positive detections are, and how well its confidence scores reflect reality.
+
+Each metric uses an **LLM judge** to classify every prediction as `true_positive`, `false_positive`, `true_negative`, or `false_negative` by comparing the VLM's free-text description against the ground truth. This avoids any requirement for pre-normalized labels.
+
+## Metrics
+
+- **FalsePositiveRate** — Rate at which the model invents events that did not occur
+- **Precision** — Fraction of positive detections that are actually correct
+- **ConfidenceScoreAnalysis** — Calibration of the model's reported confidence scores against actual accuracy
+
+## Installation
+
+```bash
+uv add "alquimia-fair-forge"
+uv add langchain-groq  # or your preferred LLM provider
+```
+
+## Basic Usage
+
+<CodeGroup>
+```python FalsePositiveRate
+from fair_forge import Retriever
+from fair_forge.schemas import Dataset
+from fair_forge.metrics.vision import FalsePositiveRate
+from langchain_groq import ChatGroq
+
+class ArgosRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        ...
+
+model = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key", temperature=0.0)
+
+results = FalsePositiveRate.run(ArgosRetriever, model=model)
+
+for r in results:
+    print(f"{r.session_id}: FPR = {r.false_positive_rate:.2f}  ({r.n_false_positives}/{r.n_negatives} actual negatives)")
+```
+
+```python Precision
+from fair_forge.metrics.vision import Precision
+
+results = Precision.run(ArgosRetriever, model=model)
+
+for r in results:
+    print(f"{r.session_id}: Precision = {r.precision:.2f}  ({r.n_true_positives}/{r.n_positive_predictions} detections)")
+```
+
+```python ConfidenceScoreAnalysis
+from fair_forge.metrics.vision import ConfidenceScoreAnalysis
+
+results = ConfidenceScoreAnalysis.run(ArgosRetriever, model=model)
+
+for r in results:
+    print(f"{r.session_id}: ECE = {r.expected_calibration_error:.3f}  mean confidence = {r.confidence_mean:.2f}")
+```
+</CodeGroup>
+
+## Data Format
+
+Each `Batch` represents a single camera frame evaluation:
+
+```python
+from fair_forge.schemas import Dataset, Batch
+
+Dataset(
+    session_id="camera_entrance_001",
+    assistant_id="argos_vlm_v2",
+    context="Security camera monitoring building entrance. Alerts on: fallen persons, unauthorized access, theft.",
+    conversation=[
+        Batch(
+            qa_id="frame_001",
+            query="Analyze this camera frame for security events.",
+            # What the VLM described — free-text, no normalization required
+            assistant="I detect a person lying on the floor near the entrance. This appears to be a fallen person requiring assistance.",
+            # Ground truth from human annotators or confirmed logs
+            ground_truth_assistant="A person is lying on the floor near the entrance. A fall event has occurred.",
+            # Optional: VLM's reported confidence score (used by ConfidenceScoreAnalysis)
+            agentic={"confidence": 0.87},
+        ),
+        Batch(
+            qa_id="frame_002",
+            query="Analyze this camera frame for security events.",
+            assistant="The corridor appears empty. No anomalies or security events detected.",
+            ground_truth_assistant="The corridor is empty. No events have occurred.",
+            agentic={"confidence": 0.95},
+        ),
+        Batch(
+            qa_id="frame_003",
+            query="Analyze this camera frame for security events.",
+            # False positive: model detects intrusion where there is none
+            assistant="I detect an unauthorized person attempting to access a restricted area.",
+            ground_truth_assistant="The scene shows an empty restricted area. No intrusion has occurred.",
+            agentic={"confidence": 0.78},
+        ),
+    ],
+)
+```
+
+<Note>
+`agentic["confidence"]` is only required for `ConfidenceScoreAnalysis`. `FalsePositiveRate` and `Precision` only need `assistant` and `ground_truth_assistant`.
+</Note>
+
+## Parameters
+
+### Required
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `retriever` | `Type[Retriever]` | Data source class returning `list[Dataset]` |
+| `model` | `BaseChatModel` | LangChain-compatible model used as judge |
+
+### Optional
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `use_structured_output` | `bool` | `False` | Use LangChain structured output mode |
+| `strict` | `bool` | `True` | Strict schema enforcement in structured output mode |
+| `bos_json_clause` | `str` | `` ```json `` | JSON block opening marker |
+| `eos_json_clause` | `str` | ` ``` ` | JSON block closing marker |
+| `verbose` | `bool` | `False` | Enable verbose logging |
+
+## Output Schemas
+
+### FalsePositiveRateMetric
+
+```python
+result.session_id             # str         — session identifier
+result.assistant_id           # str         — VLM identifier
+result.n_predictions          # int         — total frames evaluated
+result.n_negatives            # int         — frames where no event actually occurred (TN + FP)
+result.n_false_positives      # int         — frames where model invented an event
+result.false_positive_rate    # float|None  — FP / (FP + TN), None if no actual negatives
+result.interactions           # list[VisionInteraction]
+```
+
+### PrecisionMetric
+
+```python
+result.session_id             # str         — session identifier
+result.assistant_id           # str         — VLM identifier
+result.n_predictions          # int         — total frames evaluated
+result.n_positive_predictions # int         — frames where model signaled an event (TP + FP)
+result.n_true_positives       # int         — frames where model correctly detected an event
+result.precision              # float|None  — TP / (TP + FP), None if no positive predictions
+result.interactions           # list[VisionInteraction]
+```
+
+### ConfidenceScoreMetric
+
+```python
+result.session_id                  # str         — session identifier
+result.n_predictions               # int         — total frames evaluated
+result.n_with_confidence           # int         — frames that included a confidence score
+result.confidence_mean             # float|None  — mean of VLM confidence scores
+result.confidence_std              # float|None  — standard deviation
+result.confidence_min              # float|None  — minimum confidence score
+result.confidence_max              # float|None  — maximum confidence score
+result.expected_calibration_error  # float|None  — ECE (0 = perfect calibration)
+result.buckets                     # list[ConfidenceBucket]
+result.interactions                # list[VisionInteraction]
+```
+
+### VisionInteraction
+
+```python
+interaction.qa_id           # str          — frame identifier
+interaction.classification  # str          — "true_positive" | "false_positive" | "true_negative" | "false_negative"
+interaction.confidence      # float|None   — VLM's reported confidence (from agentic dict)
+interaction.reasoning       # str          — judge's explanation of the classification
+```
+
+### ConfidenceBucket
+
+```python
+bucket.range_min   # float        — lower bound of confidence range (e.g. 0.8)
+bucket.range_max   # float        — upper bound of confidence range (e.g. 0.9)
+bucket.count       # int          — number of predictions in this range
+bucket.accuracy    # float|None   — fraction of predictions in this range that were correct
+```
+
+## Interpretation
+
+### False Positive Rate
+
+| FPR | Interpretation |
+|-----|---------------|
+| 0.00 | No hallucinations — model never invents events |
+| 0.01–0.05 | Excellent — commercially viable for most use cases |
+| 0.05–0.15 | Acceptable — monitor closely, validate alerts manually |
+| 0.15–0.30 | High — significant alert fatigue risk |
+| > 0.30 | Critical — model is unreliable for production use |
+
+### Precision
+
+| Precision | Interpretation |
+|-----------|---------------|
+| 0.95–1.00 | Excellent — nearly all alerts are real |
+| 0.80–0.95 | Good — low false alarm rate |
+| 0.60–0.80 | Moderate — review threshold configuration |
+| < 0.60 | Poor — more false alarms than real detections |
+
+### Expected Calibration Error (ECE)
+
+ECE measures how well the model's confidence scores predict its actual accuracy. A perfectly calibrated model that says "80% confident" on 10 frames should get ~8 correct.
+
+| ECE | Interpretation |
+|-----|---------------|
+| 0.00–0.05 | Well calibrated — confidence scores are reliable |
+| 0.05–0.10 | Minor miscalibration — usable with awareness |
+| 0.10–0.20 | Moderate — confidence scores need recalibration |
+| > 0.20 | Poorly calibrated — do not use confidence scores directly for thresholds |
+
+## Inspecting Results
+
+```python
+results = FalsePositiveRate.run(ArgosRetriever, model=model)
+
+for r in results:
+    print(f"Session: {r.session_id}")
+    print(f"  FPR: {r.false_positive_rate:.1%}  ({r.n_false_positives} false positives out of {r.n_negatives} actual negatives)")
+    print()
+    print("  False positives:")
+    for i in r.interactions:
+        if i.classification == "false_positive":
+            print(f"    [{i.qa_id}] {i.reasoning}")
+```
+
+```python
+results = ConfidenceScoreAnalysis.run(ArgosRetriever, model=model)
+
+for r in results:
+    print(f"Session: {r.session_id}")
+    print(f"  Confidence: mean={r.confidence_mean:.2f}  std={r.confidence_std:.2f}")
+    print(f"  ECE: {r.expected_calibration_error:.3f}")
+    print()
+    print("  Calibration by bucket:")
+    for b in r.buckets:
+        if b.count > 0:
+            print(f"    [{b.range_min:.1f}–{b.range_max:.1f}]  accuracy={b.accuracy:.0%}  n={b.count}")
+```
+
+## LLM Provider Options
+
+<CodeGroup>
+```python Groq
+from langchain_groq import ChatGroq
+model = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key", temperature=0.0)
+```
+
+```python OpenAI
+from langchain_openai import ChatOpenAI
+model = ChatOpenAI(model="gpt-4o", api_key="your-api-key", temperature=0.0)
+```
+
+```python Anthropic
+from langchain_anthropic import ChatAnthropic
+model = ChatAnthropic(model="claude-sonnet-4-6", api_key="your-api-key", temperature=0.0)
+```
+
+```python Ollama (Local)
+from langchain_ollama import ChatOllama
+model = ChatOllama(model="llama3.1:70b", temperature=0.0)
+```
+</CodeGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Write precise ground truth descriptions">
+    The judge compares free-text. Ground truth like "No events detected. The scene shows an empty corridor" is much more useful than "nothing". Include what IS present even when no event occurred, so the judge can distinguish a genuinely empty scene from an ambiguous one.
+  </Accordion>
+
+  <Accordion title="Include scene context in Dataset.context">
+    The judge uses `context` to understand what events are relevant for this camera. A camera monitoring a parking lot has different event definitions than one monitoring a restricted server room. Be explicit: "Security camera monitoring parking lot. Alerts on: vehicle break-ins, unauthorized entry after hours."
+  </Accordion>
+
+  <Accordion title="Use confidence scores for threshold tuning">
+    Run `ConfidenceScoreAnalysis` first to understand calibration. If ECE is high, do not use the model's raw confidence scores to set alert thresholds — recalibrate using Platt scaling or isotonic regression before production deployment.
+  </Accordion>
+
+  <Accordion title="Prioritize FPR over Precision for alerting systems">
+    In a security context, a high FPR means operators receive constant false alarms, leading to alert fatigue and missed real events. Keep FPR below 0.05 as a hard threshold before optimizing Precision.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Judge misclassifies obvious cases">
+    Use a more capable model (GPT-4, Claude 3, Llama-3-70B+). Also ensure `Dataset.context` clearly describes the event types being monitored — without context, the judge cannot determine what counts as a positive detection.
+  </Accordion>
+
+  <Accordion title="false_positive_rate or precision is None">
+    `false_positive_rate` is `None` when every frame in the session had an actual event (no actual negatives). `precision` is `None` when the model never made a positive detection. Both are valid — they indicate the session dataset lacks the coverage needed for that metric.
+  </Accordion>
+
+  <Accordion title="ConfidenceScoreAnalysis shows n_with_confidence = 0">
+    Confidence scores are read from `Batch.agentic["confidence"]`. If your VLM does not output confidence scores, or the key is missing from `agentic`, this metric will have no data. Add confidence extraction to your data pipeline or retriever.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Retriever" icon="database" href="/core-concepts/retriever">
+    Build a Retriever to load your VLM evaluation dataset
+  </Card>
+  <Card title="Context Metric" icon="gauge" href="/metrics/context">
+    Evaluate LLM response grounding in provided context
+  </Card>
+</CardGroup>

@@ -39,6 +39,7 @@ from tests.fixtures.mock_data import (
     create_sample_batch,
     create_sample_dataset,
     create_toxicity_dataset,
+    create_vision_dataset,
 )
 from tests.fixtures.mock_retriever import (
     AgenticDatasetRetriever,
@@ -53,6 +54,7 @@ from tests.fixtures.mock_retriever import (
     RegulatoryDatasetRetriever,
     SingleDatasetRetriever,
     ToxicityDatasetRetriever,
+    VisionDatasetRetriever,
 )
 
 
@@ -114,6 +116,12 @@ def agentic_dataset() -> list[Dataset]:
 def regulatory_dataset() -> Dataset:
     """Fixture providing a regulatory testing dataset."""
     return create_regulatory_dataset()
+
+
+@pytest.fixture
+def vision_dataset() -> Dataset:
+    """Fixture providing a vision metrics testing dataset."""
+    return create_vision_dataset()
 
 
 @pytest.fixture
@@ -186,6 +194,12 @@ def agentic_dataset_retriever() -> type[AgenticDatasetRetriever]:
 def regulatory_dataset_retriever() -> type[RegulatoryDatasetRetriever]:
     """Fixture providing RegulatoryDatasetRetriever class."""
     return RegulatoryDatasetRetriever
+
+
+@pytest.fixture
+def vision_dataset_retriever() -> type[VisionDatasetRetriever]:
+    """Fixture providing VisionDatasetRetriever class."""
+    return VisionDatasetRetriever
 
 
 @pytest.fixture

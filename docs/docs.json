@@ -72,7 +72,8 @@
               "metrics/humanity",
               "metrics/best-of",
               "metrics/agentic",
-              "metrics/regulatory"
+              "metrics/regulatory",
+              "metrics/vision"
             ]
           },
           {
