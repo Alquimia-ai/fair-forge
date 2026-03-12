@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v3.0.0-b.1 (2026-03-12)
+
+### Chores
+
+- **ci**: Fix sync-develop job output and auto-resolve conflicts with main
+  ([`3ab30ed`](https://github.com/Alquimia-ai/fair-forge/commit/3ab30ed326b0d6192f30a400b92a04643bfd1e80))
+
+### Features
+
+- **prompt-optimizer**: Add GEPA and MIPROv2 prompt optimization module
+  ([`9dd083b`](https://github.com/Alquimia-ai/fair-forge/commit/9dd083beceb65f08b014e8a45fdab4ab829c3217))
+
+- **prompt-optimizer**: Expose tips and proposal prompts as optional args in MIPROv2
+  ([`e662879`](https://github.com/Alquimia-ai/fair-forge/commit/e6628799e9107dde534b0d8592972e67ad8deae5))
+
+
 ## v2.0.0 (2026-03-12)
 
 ### Bug Fixes
