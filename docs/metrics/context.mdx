@@ -1,19 +1,18 @@
 ---
 title: Context
-description: Evaluate how well AI responses align with provided context
+description: Evaluate how well AI responses align with provided context, with session-level aggregation and pluggable statistical modes
 ---
 
 # Context Metric
 
-The Context metric evaluates how well an AI assistant's responses align with the provided system context and instructions.
+The Context metric evaluates how well an AI assistant's responses align with the provided system context. It accumulates `context_awareness` scores across all interactions in a session and emits one session-level result, with optional uncertainty quantification via Bayesian mode. The `interactions` list preserves per-QA scores for debugging.
 
 ## Overview
 
-This metric uses an LLM as a judge to assess:
-
-- **Context Awareness**: How well the response follows the given context (0-1 scale)
-- **Context Insight**: Explanation of the alignment assessment
-- **Context Thinkings**: The judge's reasoning process
+- **Context Awareness**: How closely the response follows the given context (0.0–1.0)
+- **Session aggregate**: Weighted mean across all interactions
+- **Per-interaction detail**: Each QA pair's score accessible via `interactions`
+- **Bayesian mode**: Bootstrapped credible interval around the session mean
 
 ## Installation
 
@@ -24,32 +23,44 @@ uv add langchain-groq  # Or your preferred LLM provider
 
 ## Basic Usage
 
-```python
+<CodeGroup>
+```python Frequentist (default)
 from fair_forge.metrics.context import Context
 from langchain_groq import ChatGroq
 from your_retriever import MyRetriever
 
-# Initialize the judge model
-judge_model = ChatGroq(
-    model="llama-3.3-70b-versatile",
-    api_key="your-api-key",
-    temperature=0.0,
-)
+judge_model = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key", temperature=0.0)
 
-# Run the metric
+metrics = Context.run(MyRetriever, model=judge_model)
+
+for metric in metrics:
+    print(f"Session: {metric.session_id}  ({metric.n_interactions} interactions)")
+    print(f"  Context awareness: {metric.context_awareness:.2f}")
+
+    for interaction in metric.interactions:
+        status = "✅" if interaction.context_awareness >= 0.8 else "❌"
+        print(f"  {status} [{interaction.qa_id}] {interaction.context_awareness:.2f}")
+```
+
+```python Bayesian
+from fair_forge.metrics.context import Context
+from fair_forge.statistical import BayesianMode
+from langchain_groq import ChatGroq
+from your_retriever import MyRetriever
+
+judge_model = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key", temperature=0.0)
+
 metrics = Context.run(
     MyRetriever,
     model=judge_model,
-    use_structured_output=True,
-    verbose=True,
+    statistical_mode=BayesianMode(mc_samples=5000, ci_level=0.95),
 )
 
-# Analyze results
 for metric in metrics:
-    print(f"QA ID: {metric.qa_id}")
-    print(f"Context Awareness: {metric.context_awareness}")
-    print(f"Insight: {metric.context_insight}")
+    print(f"Context awareness: {metric.context_awareness:.2f}  "
+          f"[{metric.context_awareness_ci_low:.2f}, {metric.context_awareness_ci_high:.2f}]")
 ```
+</CodeGroup>
 
 ## Parameters
 
@@ -64,10 +75,52 @@ for metric in metrics:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
+| `statistical_mode` | `StatisticalMode` | `FrequentistMode()` | Statistical computation mode |
 | `use_structured_output` | `bool` | `False` | Use LangChain structured output |
 | `bos_json_clause` | `str` | `"```json"` | JSON block start marker |
 | `eos_json_clause` | `str` | `"```"` | JSON block end marker |
 | `verbose` | `bool` | `False` | Enable verbose logging |
+
+## Statistical Modes
+
+<Tabs>
+  <Tab title="Frequentist">
+    Returns the weighted mean of per-interaction scores. CI fields are `None`.
+
+    ```python
+    metric.context_awareness          # 0.78
+    metric.context_awareness_ci_low   # None
+    metric.context_awareness_ci_high  # None
+    ```
+  </Tab>
+  <Tab title="Bayesian">
+    Bootstraps the weighted mean to produce a credible interval. A wide CI means more interactions are needed before drawing conclusions.
+
+    ```python
+    metric.context_awareness          # 0.78
+    metric.context_awareness_ci_low   # 0.61
+    metric.context_awareness_ci_high  # 0.91
+    ```
+  </Tab>
+</Tabs>
+
+## Interaction Weights
+
+Each `Batch` can carry an optional `weight` to control its contribution to the session aggregate:
+
+```python
+# Weight critical interactions more heavily
+Batch(qa_id="q1", ..., weight=0.5),   # Most important
+Batch(qa_id="q2", ..., weight=0.3),
+Batch(qa_id="q3", ..., weight=0.2),   # Least important
+```
+
+| Case | Behavior |
+|------|----------|
+| All weights provided, sum = 1.0 | Used as-is |
+| All weights provided, sum ≠ 1.0 | Warning emitted, equal weights applied |
+| Some weights provided | Remaining weight split equally among unweighted |
+| No weights provided | Equal weights (1/n each) |
 
 ## Output Schema
 
@@ -77,10 +130,19 @@ for metric in metrics:
 class ContextMetric(BaseMetric):
     session_id: str
     assistant_id: str
-    qa_id: str                    # ID of the evaluated interaction
-    context_awareness: float      # Alignment score (0-1)
-    context_insight: str          # Explanation of the assessment
-    context_thinkings: str        # Judge's reasoning (if available)
+    n_interactions: int                    # Number of interactions evaluated
+    context_awareness: float               # Weighted mean (0.0-1.0)
+    context_awareness_ci_low: float | None # Lower credible bound — Bayesian only
+    context_awareness_ci_high: float | None # Upper credible bound — Bayesian only
+    interactions: list[ContextInteraction]  # Per-QA scores
+```
+
+### ContextInteraction
+
+```python
+class ContextInteraction(BaseModel):
+    qa_id: str
+    context_awareness: float   # Per-interaction score (0.0-1.0)
 ```
 
 ## Interpretation
@@ -89,40 +151,22 @@ class ContextMetric(BaseMetric):
 
 | Score Range | Interpretation |
 |-------------|----------------|
-| 0.8 - 1.0 | Excellent alignment - response fully follows context |
-| 0.6 - 0.8 | Good alignment - mostly follows context with minor deviations |
-| 0.4 - 0.6 | Moderate alignment - partially follows context |
-| 0.2 - 0.4 | Poor alignment - significant deviations from context |
-| 0.0 - 0.2 | Very poor - response ignores or contradicts context |
-
-### Example Insights
-
-```
-Score: 1.0
-Insight: "The assistant's response directly answers the user's query about
-the CEO of Alquimia, matching the ground truth provided in the context.
-No extraneous information is included."
-
-Score: 0.2
-Insight: "The assistant's response repeats a generic statement that
-doesn't reflect the detailed information in the context. It fails to
-mention the key attributes."
-
-Score: 0.0
-Insight: "The assistant provided no response to the user's queries,
-failing to address the context."
-```
+| 0.8–1.0 | Excellent — response fully follows context |
+| 0.6–0.8 | Good — mostly follows context with minor deviations |
+| 0.4–0.6 | Moderate — partially follows context |
+| 0.2–0.4 | Poor — significant deviations |
+| 0.0–0.2 | Very poor — ignores or contradicts context |
 
 ## Complete Example
 
 ```python
 import os
 from fair_forge.metrics.context import Context
+from fair_forge.statistical import BayesianMode
 from fair_forge.core.retriever import Retriever
 from fair_forge.schemas.common import Dataset, Batch
 from langchain_groq import ChatGroq
 
-# Define retriever with context
 class ContextTestRetriever(Retriever):
     def load_dataset(self) -> list[Dataset]:
         context = """You are a helpful customer service assistant for TechStore.
@@ -142,150 +186,85 @@ class ContextTestRetriever(Retriever):
                     Batch(
                         qa_id="q1",
                         query="What's your return policy?",
-                        assistant="Our return policy allows returns within 30 days with a receipt. Is there anything else I can help with?",
+                        assistant="Returns within 30 days with a receipt. Anything else I can help with?",
                         ground_truth_assistant="Returns within 30 days with receipt.",
                     ),
                     Batch(
                         qa_id="q2",
                         query="Do you offer free shipping?",
-                        assistant="Yes, we offer free shipping on orders over $50. Would you like help with anything else?",
+                        assistant="Yes, free shipping on orders over $50.",
                         ground_truth_assistant="Free shipping on orders over $50.",
                     ),
                     Batch(
                         qa_id="q3",
                         query="What are your hours?",
-                        assistant="We're open 24/7!",  # Wrong - context says Mon-Fri 9-5
+                        assistant="We're open 24/7!",  # Wrong — context says Mon-Fri 9-5
                         ground_truth_assistant="Mon-Fri 9am-5pm EST.",
                     ),
                 ]
             )
         ]
 
-# Initialize judge
-judge = ChatGroq(
-    model="llama-3.3-70b-versatile",
-    api_key=os.getenv("GROQ_API_KEY"),
-    temperature=0.0,
-)
+judge = ChatGroq(model="llama-3.3-70b-versatile", api_key=os.getenv("GROQ_API_KEY"), temperature=0.0)
 
-# Run context evaluation
 metrics = Context.run(
     ContextTestRetriever,
     model=judge,
+    statistical_mode=BayesianMode(mc_samples=5000, ci_level=0.95),
     use_structured_output=True,
-    verbose=True,
 )
 
-# Analyze results
-print("Context Evaluation Results")
-print("=" * 60)
-
 for metric in metrics:
-    status = "PASS" if metric.context_awareness >= 0.8 else "FAIL"
-    print(f"\n[{status}] QA ID: {metric.qa_id}")
-    print(f"Score: {metric.context_awareness:.2f}")
-    print(f"Insight: {metric.context_insight}")
-
-# Calculate average
-avg_score = sum(m.context_awareness for m in metrics) / len(metrics)
-print(f"\nAverage Context Awareness: {avg_score:.2f}")
+    print(f"Session: {metric.session_id}  ({metric.n_interactions} interactions)")
+    ci = f"  [{metric.context_awareness_ci_low:.2f}, {metric.context_awareness_ci_high:.2f}]" \
+         if metric.context_awareness_ci_low is not None else ""
+    print(f"  Context awareness: {metric.context_awareness:.2f}{ci}")
+    print()
+    print("  Per-interaction:")
+    for interaction in metric.interactions:
+        status = "✅ PASS" if interaction.context_awareness >= 0.8 else "❌ FAIL"
+        print(f"    [{interaction.qa_id}] {status}  score={interaction.context_awareness:.2f}")
 ```
 
 ## LLM Provider Options
 
-### Groq
-
-```python
+<CodeGroup>
+```python Groq
 from langchain_groq import ChatGroq
-
-judge = ChatGroq(
-    model="llama-3.3-70b-versatile",
-    api_key="your-api-key",
-    temperature=0.0,
-)
+judge = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key", temperature=0.0)
 ```
 
-### OpenAI
-
-```python
+```python OpenAI
 from langchain_openai import ChatOpenAI
-
-judge = ChatOpenAI(
-    model="gpt-4o",
-    api_key="your-api-key",
-    temperature=0.0,
-)
+judge = ChatOpenAI(model="gpt-4o", api_key="your-api-key", temperature=0.0)
 ```
 
-### Anthropic
-
-```python
+```python Anthropic
 from langchain_anthropic import ChatAnthropic
-
-judge = ChatAnthropic(
-    model="claude-3-sonnet-20240229",
-    api_key="your-api-key",
-    temperature=0.0,
-)
+judge = ChatAnthropic(model="claude-3-5-sonnet-20241022", api_key="your-api-key", temperature=0.0)
 ```
 
-### Ollama (Local)
-
-```python
+```python Ollama (Local)
 from langchain_ollama import ChatOllama
-
-judge = ChatOllama(
-    model="llama3.1:8b",
-    temperature=0.0,
-)
+judge = ChatOllama(model="llama3.1:70b", temperature=0.0)
 ```
-
-## Structured vs Non-Structured Output
-
-### Structured Output
-
-Uses LangChain's structured output feature (recommended):
-
-```python
-metrics = Context.run(
-    MyRetriever,
-    model=judge,
-    use_structured_output=True,  # Uses .with_structured_output()
-)
-```
-
-**Pros**: More reliable parsing, better type safety
-**Cons**: Requires model support for structured output
-
-### Non-Structured Output
-
-Uses regex extraction from JSON blocks:
-
-```python
-metrics = Context.run(
-    MyRetriever,
-    model=judge,
-    use_structured_output=False,
-    bos_json_clause="```json",
-    eos_json_clause="```",
-)
-```
-
-**Pros**: Works with any model
-**Cons**: May have parsing failures
+</CodeGroup>
 
 ## Best Practices
 
 <AccordionGroup>
+  <Accordion title="Use Bayesian Mode for Small Sessions">
+    A session with 3 interactions gives a very uncertain mean. Bayesian mode expresses this with a wide CI, preventing overconfident conclusions.
+  </Accordion>
+
   <Accordion title="Provide Clear Context">
-    Include specific, actionable instructions in your context:
+    Include specific, actionable instructions:
     ```python
     context = """You are a support assistant for Acme Corp.
     Rules:
     1. Always greet customers by name if available
     2. Never discuss competitors
-    3. Escalate billing issues to human support
-    4. Response time SLA: 24 hours"""
+    3. Escalate billing issues to human support"""
     ```
   </Accordion>
 
@@ -301,27 +280,26 @@ metrics = Context.run(
     ```
   </Accordion>
 
-  <Accordion title="Use Temperature 0">
-    Set `temperature=0` for consistent, deterministic judgments:
+  <Accordion title="Weight Critical Interactions">
+    If some QA pairs test more important context rules, give them higher weights:
     ```python
-    judge = ChatGroq(model="...", temperature=0.0)
+    Batch(qa_id="policy_question",   ..., weight=0.6),  # High-stakes
+    Batch(qa_id="greeting",          ..., weight=0.2),
+    Batch(qa_id="general_question",  ..., weight=0.2),
     ```
-  </Accordion>
-
-  <Accordion title="Choose Appropriate Model">
-    Larger models provide better judgment quality:
-    - **Production**: GPT-4, Claude-3, Llama-3-70B
-    - **Testing**: Llama-3-8B, GPT-3.5
   </Accordion>
 </AccordionGroup>
 
 ## Next Steps
 
-<CardGroup cols={2}>
-  <Card title="Conversational Metric" icon="comments" href="/metrics/conversational">
-    Learn about dialogue quality evaluation
+<CardGroup cols={3}>
+  <Card title="Statistical Modes" icon="chart-line" href="/core-concepts/statistical-modes">
+    Frequentist vs Bayesian approaches
   </Card>
-  <Card title="Humanity Metric" icon="heart" href="/metrics/humanity">
-    Learn about emotional analysis
+  <Card title="Conversational Metric" icon="comments" href="/metrics/conversational">
+    Evaluate dialogue quality with Grice's maxims
+  </Card>
+  <Card title="Regulatory Metric" icon="scale-balanced" href="/metrics/regulatory">
+    Compliance against a regulatory corpus
   </Card>
 </CardGroup>

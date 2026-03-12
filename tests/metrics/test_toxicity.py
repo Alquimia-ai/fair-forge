@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
+from fair_forge.core.embedder import Embedder
 from fair_forge.metrics.toxicity import Toxicity
 from fair_forge.schemas.toxicity import ToxicityMetric
 from fair_forge.statistical import BayesianMode, FrequentistMode
@@ -24,7 +25,6 @@ class MockToxicityLoader:
     """Mock toxicity loader."""
 
     def load(self, language: str):
-        """Return mock toxic words."""
         return [
             MockToxicityDataset("hate", "offensive"),
             MockToxicityDataset("stupid", "offensive"),
@@ -41,7 +41,6 @@ class MockGroupExtractor:
         pass
 
     def detect_batch(self, texts):
-        """Return mock group detections."""
         return [
             {
                 "male": Mock(present=True, confidence=0.9),
@@ -51,17 +50,20 @@ class MockGroupExtractor:
         ]
 
 
+def _make_mock_embedder() -> MagicMock:
+    mock = MagicMock(spec=Embedder)
+    mock.encode.return_value = np.array([[0.1, 0.2]])
+    return mock
+
+
 class TestToxicityMetric:
     """Test suite for Toxicity metric."""
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_toxicity_initialization_frequentist(self, mock_transformer, toxicity_dataset_retriever):
+    def test_toxicity_initialization_frequentist(self, toxicity_dataset_retriever):
         """Test that Toxicity metric initializes correctly with frequentist mode."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
-            embedding_model="all-MiniLM-L6-v2",
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
             statistical_mode=FrequentistMode(),
@@ -73,15 +75,12 @@ class TestToxicityMetric:
         assert toxicity.min_cluster_size == 5
         assert toxicity.umap_n_components == 2
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_toxicity_initialization_bayesian(self, mock_transformer, toxicity_dataset_retriever):
+    def test_toxicity_initialization_bayesian(self, toxicity_dataset_retriever):
         """Test that Toxicity metric initializes correctly with Bayesian mode."""
-        mock_transformer.return_value = MagicMock()
-
         bayesian_mode = BayesianMode(mc_samples=5000, ci_level=0.95)
         toxicity = Toxicity(
             toxicity_dataset_retriever,
-            embedding_model="all-MiniLM-L6-v2",
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
             statistical_mode=bayesian_mode,
@@ -91,28 +90,22 @@ class TestToxicityMetric:
         assert isinstance(toxicity.statistical_mode, BayesianMode)
         assert toxicity.statistical_mode.get_result_type() == "distribution"
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_toxicity_default_statistical_mode(self, mock_transformer, toxicity_dataset_retriever):
+    def test_toxicity_default_statistical_mode(self, toxicity_dataset_retriever):
         """Test that Toxicity defaults to FrequentistMode."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
-            embedding_model="all-MiniLM-L6-v2",
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
         )
 
         assert isinstance(toxicity.statistical_mode, FrequentistMode)
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_toxicity_custom_configuration(self, mock_transformer, toxicity_dataset_retriever):
+    def test_toxicity_custom_configuration(self, toxicity_dataset_retriever):
         """Test Toxicity metric with custom configuration."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
-            embedding_model="custom-model",
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             toxicity_min_cluster_size=10,
             toxicity_cluster_selection_epsilon=0.05,
@@ -132,13 +125,11 @@ class TestToxicityMetric:
         assert toxicity.w_ASB == 0.3
         assert toxicity.w_DTO == 0.2
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_tokenize(self, mock_transformer, toxicity_dataset_retriever):
+    def test_tokenize(self, toxicity_dataset_retriever):
         """Test text tokenization."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
         )
@@ -151,13 +142,11 @@ class TestToxicityMetric:
         assert "world" in tokens
         assert "test" in tokens
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_tokenize_unicode(self, mock_transformer, toxicity_dataset_retriever):
+    def test_tokenize_unicode(self, toxicity_dataset_retriever):
         """Test tokenization with unicode characters."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
         )
@@ -168,13 +157,11 @@ class TestToxicityMetric:
         assert isinstance(tokens, list)
         assert len(tokens) > 0
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_build_toxic_set(self, mock_transformer, toxicity_dataset_retriever):
+    def test_build_toxic_set(self, toxicity_dataset_retriever):
         """Test building toxic word set."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
         )
@@ -188,13 +175,11 @@ class TestToxicityMetric:
         assert "kill" in toxic_set
         assert "destroy" in toxic_set
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_count_toxic_in_counter(self, mock_transformer, toxicity_dataset_retriever):
+    def test_count_toxic_in_counter(self, toxicity_dataset_retriever):
         """Test counting toxic words in Counter."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
         )
@@ -207,13 +192,11 @@ class TestToxicityMetric:
         assert toxic_words == 2
         assert total_words == 5
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_count_toxic_in_counter_no_toxic(self, mock_transformer, toxicity_dataset_retriever):
+    def test_count_toxic_in_counter_no_toxic(self, toxicity_dataset_retriever):
         """Test counting when no toxic words present."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
         )
@@ -226,20 +209,17 @@ class TestToxicityMetric:
         assert toxic_words == 0
         assert total_words == 3
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_toxicity_score_text(self, mock_transformer, toxicity_dataset_retriever):
+    def test_toxicity_score_text(self, toxicity_dataset_retriever):
         """Test toxicity score calculation for text."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
         )
 
         toxic_set = {"hate", "stupid", "idiot"}
 
-        # Text with 2 toxic words out of 7 total
         text = "I hate stupid people and love coding"
         score = toxicity._toxicity_score_text(text, toxic_set)
 
@@ -247,13 +227,11 @@ class TestToxicityMetric:
         assert 0 <= score <= 1
         assert score == pytest.approx(2 / 7, abs=0.01)
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_toxicity_score_text_no_toxic(self, mock_transformer, toxicity_dataset_retriever):
+    def test_toxicity_score_text_no_toxic(self, toxicity_dataset_retriever):
         """Test toxicity score with no toxic words."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
         )
@@ -264,13 +242,11 @@ class TestToxicityMetric:
 
         assert score == 0.0
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_toxicity_score_text_empty(self, mock_transformer, toxicity_dataset_retriever):
+    def test_toxicity_score_text_empty(self, toxicity_dataset_retriever):
         """Test toxicity score with empty text."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
         )
@@ -280,13 +256,11 @@ class TestToxicityMetric:
 
         assert score == 0.0
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_is_toxic_text(self, mock_transformer, toxicity_dataset_retriever):
+    def test_is_toxic_text(self, toxicity_dataset_retriever):
         """Test binary toxicity classification."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
         )
@@ -299,13 +273,11 @@ class TestToxicityMetric:
         assert toxicity._is_toxic_text(toxic_text, toxic_set, threshold=0.1) is True
         assert toxicity._is_toxic_text(clean_text, toxic_set, threshold=0.1) is False
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_normalize_weights(self, mock_transformer, toxicity_dataset_retriever):
+    def test_normalize_weights(self, toxicity_dataset_retriever):
         """Test weight normalization."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
             w_DR=2.0,
@@ -320,13 +292,11 @@ class TestToxicityMetric:
         assert w_DTO == pytest.approx(1.0 / 6.0, abs=0.01)
         assert w_DR + w_ASB + w_DTO == pytest.approx(1.0, abs=0.01)
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_normalize_weights_zero(self, mock_transformer, toxicity_dataset_retriever):
+    def test_normalize_weights_zero(self, toxicity_dataset_retriever):
         """Test weight normalization when all weights are zero."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
             w_DR=0.0,
@@ -340,13 +310,11 @@ class TestToxicityMetric:
         assert w_ASB == pytest.approx(1.0 / 3.0, abs=0.01)
         assert w_DTO == pytest.approx(1.0 / 3.0, abs=0.01)
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_compute_DR_frequentist(self, mock_transformer, toxicity_dataset_retriever):
+    def test_compute_DR_frequentist(self, toxicity_dataset_retriever):
         """Test DR computation in frequentist mode."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
             statistical_mode=FrequentistMode(),
@@ -360,13 +328,11 @@ class TestToxicityMetric:
         assert isinstance(DR, float)
         assert DR >= 0
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_compute_DR_bayesian(self, mock_transformer, toxicity_dataset_retriever):
+    def test_compute_DR_bayesian(self, toxicity_dataset_retriever):
         """Test DR computation in Bayesian mode."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
             statistical_mode=BayesianMode(mc_samples=1000),
@@ -382,13 +348,11 @@ class TestToxicityMetric:
         assert "ci_low" in DR
         assert "ci_high" in DR
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_compute_DTO_frequentist(self, mock_transformer, toxicity_dataset_retriever):
+    def test_compute_DTO_frequentist(self, toxicity_dataset_retriever):
         """Test DTO computation in frequentist mode."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
             statistical_mode=FrequentistMode(),
@@ -403,13 +367,11 @@ class TestToxicityMetric:
         assert isinstance(DTO, float)
         assert DTO >= 0
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_compute_ASB(self, mock_transformer, toxicity_dataset_retriever):
+    def test_compute_ASB(self, toxicity_dataset_retriever):
         """Test ASB computation (placeholder)."""
-        mock_transformer.return_value = MagicMock()
-
         toxicity = Toxicity(
             toxicity_dataset_retriever,
+            embedder=_make_mock_embedder(),
             toxicity_loader=MockToxicityLoader,
             group_prototypes={"gender": ["male", "female"]},
             statistical_mode=FrequentistMode(),
@@ -420,17 +382,14 @@ class TestToxicityMetric:
         assert isinstance(ASB, float)
         assert ASB == 0.0
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
     @patch("fair_forge.metrics.toxicity.hdbscan")
     @patch("fair_forge.metrics.toxicity.umap")
-    def test_batch_processing(self, mock_umap, mock_hdbscan, mock_transformer):
+    def test_batch_processing(self, mock_umap, mock_hdbscan):
         """Test batch processing with mocked dependencies."""
         from tests.fixtures.mock_retriever import MockRetriever
 
-        # Setup mocks
-        mock_model = MagicMock()
-        mock_model.encode.return_value = np.array([[0.1, 0.2], [0.3, 0.4]])
-        mock_transformer.return_value = mock_model
+        mock_embedder = _make_mock_embedder()
+        mock_embedder.encode.return_value = np.array([[0.1, 0.2], [0.3, 0.4]])
 
         mock_umap_instance = MagicMock()
         mock_umap_instance.fit_transform.return_value = np.array([[0.1, 0.2], [0.3, 0.4]])
@@ -440,7 +399,6 @@ class TestToxicityMetric:
         mock_hdbscan_instance.fit_predict.return_value = np.array([0, 0])
         mock_hdbscan.HDBSCAN.return_value = mock_hdbscan_instance
 
-        # Create test data
         batch_data = [
             create_sample_batch(qa_id="qa_001", assistant="This is a clean response"),
             create_sample_batch(qa_id="qa_002", assistant="Another clean response"),
@@ -449,10 +407,10 @@ class TestToxicityMetric:
         dataset = create_sample_dataset(conversation=batch_data)
         retriever = type("TestRetriever", (MockRetriever,), {"load_dataset": lambda self: [dataset]})
 
-        # Patch group extractor
         with patch("fair_forge.metrics.toxicity.EmbeddingGroupExtractor", MockGroupExtractor):
             toxicity = Toxicity(
                 retriever,
+                embedder=mock_embedder,
                 toxicity_loader=MockToxicityLoader,
                 group_prototypes={"gender": ["male", "female"]},
             )
@@ -463,20 +421,18 @@ class TestToxicityMetric:
                 batch=dataset.conversation,
                 language=dataset.language,
             )
+            toxicity.on_process_complete()
 
             assert len(toxicity.metrics) == 1
             metric = toxicity.metrics[0]
             assert isinstance(metric, ToxicityMetric)
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_metric_attributes(self, mock_transformer):
+    def test_metric_attributes(self):
         """Test that all expected attributes exist in ToxicityMetric."""
         from tests.fixtures.mock_retriever import MockRetriever
 
-        # Setup mocks
-        mock_model = MagicMock()
-        mock_model.encode.return_value = np.array([[0.1, 0.2], [0.3, 0.4]])
-        mock_transformer.return_value = mock_model
+        mock_embedder = _make_mock_embedder()
+        mock_embedder.encode.return_value = np.array([[0.1, 0.2], [0.3, 0.4]])
 
         batch_data = [
             create_sample_batch(qa_id="qa_001", assistant="Clean response one"),
@@ -501,6 +457,7 @@ class TestToxicityMetric:
 
             toxicity = Toxicity(
                 retriever,
+                embedder=mock_embedder,
                 toxicity_loader=MockToxicityLoader,
                 group_prototypes={"gender": ["male", "female"]},
             )
@@ -511,6 +468,7 @@ class TestToxicityMetric:
                 batch=dataset.conversation,
                 language=dataset.language,
             )
+            toxicity.on_process_complete()
 
             metric = toxicity.metrics[0]
 
@@ -529,14 +487,12 @@ class TestToxicityMetric:
             assert hasattr(metric.assistant_space, "latent_space")
             assert hasattr(metric.assistant_space, "cluster_labels")
 
-    @patch("fair_forge.metrics.toxicity.SentenceTransformer")
-    def test_group_prototypes_required(self, mock_transformer, toxicity_dataset_retriever):
+    def test_group_prototypes_required(self, toxicity_dataset_retriever):
         """Test that group_prototypes is required when group_extractor is None."""
-        mock_transformer.return_value = MagicMock()
-
         with pytest.raises(ValueError, match="group_prototypes must be provided"):
             Toxicity(
                 toxicity_dataset_retriever,
+                embedder=_make_mock_embedder(),
                 toxicity_loader=MockToxicityLoader,
                 group_prototypes=None,
                 group_extractor=None,

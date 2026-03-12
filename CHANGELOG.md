@@ -2,6 +2,157 @@
 
 <!-- version list -->
 
+## v2.0.0-b.3 (2026-03-10)
+
+### Bug Fixes
+
+- **ci**: Update mintlify CLI to version with validate command
+  ([`5496680`](https://github.com/Alquimia-ai/fair-forge/commit/5496680884d9e68fa15ba884f2912d9d00e508fb))
+
+- **docs**: Address PR review comments
+  ([`241f277`](https://github.com/Alquimia-ai/fair-forge/commit/241f277851a0e0f9b9f7c80e3d825ed4f7390f73))
+
+- **guardians**: Handle API error responses in OpenAIGuardianProvider
+  ([`795e028`](https://github.com/Alquimia-ai/fair-forge/commit/795e028a1a220bbaa33105f01b00e61ab7c0cabe))
+
+- **llm**: Move ChatPromptTemplate to module level and update structured mode tests
+  ([`875d278`](https://github.com/Alquimia-ai/fair-forge/commit/875d27889c572f05582f6d67a856d203587c2097))
+
+### Continuous Integration
+
+- Restrict release trigger to fair_forge directory changes
+  ([`f0d592e`](https://github.com/Alquimia-ai/fair-forge/commit/f0d592eeb041b027b8c53b348cb09a8598ea7749))
+
+### Refactoring
+
+- Move experiments directory outside fair_forge package
+  ([`27a2874`](https://github.com/Alquimia-ai/fair-forge/commit/27a2874fa2f0a61be7c246415fe864a6a6e3fda9))
+
+- **core**: Extract Embedder and Reranker ABCs for dependency inversion
+  ([`ae09be1`](https://github.com/Alquimia-ai/fair-forge/commit/ae09be166382670f8c2af66f6482be62aeb792e3))
+
+- **llm**: Migrate Judge to create_agent with ProviderStrategy
+  ([`2411cbd`](https://github.com/Alquimia-ai/fair-forge/commit/2411cbdca43fb30ee63a02155624ae7639be9b6c))
+
+### Testing
+
+- **metrics**: Add missing strict param to Judge initialization assertions
+  ([`0d18989`](https://github.com/Alquimia-ai/fair-forge/commit/0d18989611a8dd4bc504eccc7722a652505705c2))
+
+
+## v2.0.0-b.2 (2026-03-06)
+
+### Features
+
+- **examples**: Add Heretic generator notebook for vLLM HuggingFace endpoint
+  ([`0fcaeb1`](https://github.com/Alquimia-ai/fair-forge/commit/0fcaeb12f58e6d8d6fb2d62bcd18469bc24f1c08))
+
+
+## v2.0.0-b.1 (2026-03-05)
+
+### Bug Fixes
+
+- **core**: Use statistical_mode rng and guard zero-weight in bootstrap
+  ([`4ae7810`](https://github.com/Alquimia-ai/fair-forge/commit/4ae78104c4c9c25164e69502a5929d651dc79de6))
+
+- **core**: Validate assigned weights sum in _resolve_weights
+  ([`3e80edf`](https://github.com/Alquimia-ai/fair-forge/commit/3e80edf5e0f2fe5c4a7bc51573a423daefdbbcd5))
+
+- **schemas**: Enforce non-negative constraint on Batch.weight
+  ([`9a48fb9`](https://github.com/Alquimia-ai/fair-forge/commit/9a48fb91a12b3a8f2114ad040ebff44d1e5a9aa1))
+
+### Chores
+
+- **deps**: Update uv.lock
+  ([`c2df7b3`](https://github.com/Alquimia-ai/fair-forge/commit/c2df7b33f57d0bd702729460c0e9ec55b9efc676))
+
+### Continuous Integration
+
+- Downgrade node to 18 to fix katex __VERSION__ error in mintlify
+  ([`b5e1c0e`](https://github.com/Alquimia-ai/fair-forge/commit/b5e1c0e6afa622766b1f2d265b17098e96004680))
+
+- Pin mintlify to 4.0.5 to avoid katex __VERSION__ build bug
+  ([`8421784`](https://github.com/Alquimia-ai/fair-forge/commit/8421784452aa329cf0f189d7ae85f7bd46e83f4a))
+
+### Features
+
+- **metrics**: Add statistical mode support to bias and agentic
+  ([`5d7e760`](https://github.com/Alquimia-ai/fair-forge/commit/5d7e76015a7d940a3acfeaffb993fc92a1724aaf))
+
+- **metrics**: Add statistical mode to conversational, context, regulatory
+  ([`7102533`](https://github.com/Alquimia-ai/fair-forge/commit/7102533e4568e1d3001c1bef377a28f7eaa69f34))
+
+### Performance Improvements
+
+- **core**: Vectorize bayesian bootstrap sampling in _aggregate_scores
+  ([`0083643`](https://github.com/Alquimia-ai/fair-forge/commit/008364309a30862fb28b92c6dd9a338e96d1595e))
+
+
+## v1.3.0-b.1 (2026-02-27)
+
+### Bug Fixes
+
+- **metrics**: Skip single-assistant blocks and document king-of-the-hill semantics
+  ([`c57a827`](https://github.com/Alquimia-ai/fair-forge/commit/c57a827c6a8e729459ffb862fb9851cc07f5dba7))
+
+- **metrics**: Warn on mixed-language datasets and document limitation
+  ([`52c7d95`](https://github.com/Alquimia-ai/fair-forge/commit/52c7d95c7b7aaafe036a0ad5a33e03a759d0b15e))
+
+### Chores
+
+- Remove cloud deps group and fix notebook cell source format
+  ([`e5b6f06`](https://github.com/Alquimia-ai/fair-forge/commit/e5b6f06c571a6a6e3aeafb9c142878aa519fa3d0))
+
+- Remove dep aenum
+  ([`6d07e37`](https://github.com/Alquimia-ai/fair-forge/commit/6d07e37fa921f8ebdbe8e72d6e93a5c12acd6df3))
+
+- **storage**: Remove storage module and docs
+  ([`174d31e`](https://github.com/Alquimia-ai/fair-forge/commit/174d31e833f8577c76a2ff59eeabae28c670bce1))
+
+### Continuous Integration
+
+- **release**: Skip release on docs-only changes
+  ([`df28fd1`](https://github.com/Alquimia-ai/fair-forge/commit/df28fd13531696f7d0944cff870c33166041250e))
+
+### Documentation
+
+- Add fair forge logo and update branding
+  ([`5f014c2`](https://github.com/Alquimia-ai/fair-forge/commit/5f014c2505144e39ef082785dd5ee5ecd84135e5))
+
+- **core-concepts**: Clarify BestOf granularity behavior with stream_batches
+  ([`5583f2c`](https://github.com/Alquimia-ai/fair-forge/commit/5583f2ce7aba80c2ae0bdc0c0e521323d3751623))
+
+- **core-concepts**: Rewrite retriever docs and add streaming retrievers page
+  ([`8a7731a`](https://github.com/Alquimia-ai/fair-forge/commit/8a7731a369f366ff69126ac13cf59a7b9f49c83c))
+
+- **examples**: Note json.load memory limitation in streaming retrievers
+  ([`adb44a1`](https://github.com/Alquimia-ai/fair-forge/commit/adb44a1fc31c3787e3e2cc889562abd2415106aa))
+
+### Features
+
+- **core**: Add streaming dataset support with iteration level strategy
+  ([`d76e461`](https://github.com/Alquimia-ai/fair-forge/commit/d76e461e43e58efe11de38b4350e9b1d8b1fff26))
+
+- **examples**: Add streaming retrievers and context notebook streaming section
+  ([`b092b2d`](https://github.com/Alquimia-ai/fair-forge/commit/b092b2d80cf2aef6c9afc952af166f9f2baeff45))
+
+- **schemas**: Add IterationLevel, SessionMetadata, and StreamedBatch types
+  ([`8eb8a02`](https://github.com/Alquimia-ai/fair-forge/commit/8eb8a02aaa0640f18a4232d6b4ef153a78cf9733))
+
+### Refactoring
+
+- **core**: Simplify iteration_level handling and remove retriever_cls
+  ([`3b71c13`](https://github.com/Alquimia-ai/fair-forge/commit/3b71c133a192361409c4d6a1f2ec8085d1714b7a))
+
+### Testing
+
+- **core**: Add streaming mode and iteration level detection tests
+  ([`e6a1f96`](https://github.com/Alquimia-ai/fair-forge/commit/e6a1f96850773077ded4296ce5a5344da05990cb))
+
+- **toxicity**: Call on_process_complete after batch in unit tests
+  ([`58e8476`](https://github.com/Alquimia-ai/fair-forge/commit/58e84768cf40871d2b627d242a9f4d7edff71579))
+
+
 ## v1.2.0 (2026-02-23)
 
 ### Continuous Integration
@@ -13,6 +164,7 @@
 
 - Add fair forge logo and update branding
   ([`5f014c2`](https://github.com/Alquimia-ai/fair-forge/commit/5f014c2505144e39ef082785dd5ee5ecd84135e5))
+
 
 
 ## v1.2.0-b.7 (2026-02-23)

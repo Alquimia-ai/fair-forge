@@ -46,4 +46,8 @@ class AgenticMetric(BaseMetric):
     tool_correctness_scores: list[ToolCorrectnessScore | None] = []  # Tool scores per interaction
     k: int = 0
     pass_at_k: float = 0.0
+    pass_at_k_ci_low: float | None = None
+    pass_at_k_ci_high: float | None = None
     pass_pow_k: float = 0.0
+    pass_pow_k_ci_low: float | None = None
+    pass_pow_k_ci_high: float | None = None

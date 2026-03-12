@@ -55,6 +55,7 @@
             "pages": [
               "core-concepts/architecture",
               "core-concepts/retriever",
+              "core-concepts/retriever-streaming",
               "core-concepts/dataset-batch",
               "core-concepts/statistical-modes"
             ]
@@ -91,15 +92,6 @@
               "runners/overview",
               "runners/alquimia-runner",
               "runners/custom-runners"
-            ]
-          },
-          {
-            "group": "Storage",
-            "icon": "hard-drive",
-            "pages": [
-              "storage/overview",
-              "storage/local-storage",
-              "storage/lakefs-storage"
             ]
           },
           {

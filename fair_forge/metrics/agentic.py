@@ -3,17 +3,21 @@
 from collections import defaultdict
 from typing import Any
 
+import numpy as np
 from langchain_core.language_models.chat_models import BaseChatModel
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from fair_forge.core import FairForge, Retriever
 from fair_forge.llm import Judge
 from fair_forge.schemas import Batch
 from fair_forge.schemas.agentic import AgenticMetric, ToolCorrectnessScore
+from fair_forge.statistical import FrequentistMode, StatisticalMode
 
 
 class AnswerCorrectnessOutput(BaseModel):
     """Structured output for answer correctness evaluation."""
+
+    model_config = ConfigDict(extra="forbid")
 
     correctness_score: float = Field(ge=0.0, le=1.0, description="Correctness score (0.0-1.0)")
     reasoning: str = Field(description="Brief explanation of the evaluation")
@@ -115,11 +119,13 @@ class Agentic(FairForge):
         model: BaseChatModel,
         k: int,
         use_structured_output: bool = True,
+        strict: bool = True,
         bos_json_clause: str = "```json",
         eos_json_clause: str = "```",
         threshold: float = 0.7,
         tool_threshold: float = 1.0,
         tool_weights: dict[str, float] | None = None,
+        statistical_mode: StatisticalMode | None = None,
         **kwargs,
     ):
         super().__init__(retriever, **kwargs)
@@ -127,6 +133,7 @@ class Agentic(FairForge):
         self.model = model
         self.k = k
         self.use_structured_output = use_structured_output
+        self.strict = strict
         self.bos_json_clause = bos_json_clause
         self.eos_json_clause = eos_json_clause
         self.threshold = threshold
@@ -140,9 +147,11 @@ class Agentic(FairForge):
                 "utilization": 0.25,
             }
         self.tool_weights = tool_weights
+        self.statistical_mode = statistical_mode if statistical_mode is not None else FrequentistMode()
 
         self.logger.info(f"Initialized Agentic metric with model: {model.__class__.__name__}")
         self.logger.info(f"Thresholds - Answer: {threshold}, Tool: {tool_threshold}")
+        self.logger.info(f"Statistical mode: {self.statistical_mode.get_result_type()}")
 
     @classmethod
     def run(cls, retriever: type[Retriever], k: int, **kwargs) -> list[AgenticMetric]:
@@ -202,9 +211,7 @@ Examples:
         data = {"answer": answer, "ground_truth": ground_truth}
 
         try:
-            _reasoning, result = judge.check(
-                system_prompt, query, data, output_schema=AnswerCorrectnessOutput
-            )
+            _reasoning, result = judge.check(system_prompt, query, data, output_schema=AnswerCorrectnessOutput)
 
             self.logger.debug(f"Judge returned - reasoning: {_reasoning[:100] if _reasoning else 'None'}...")
 
@@ -226,8 +233,8 @@ Examples:
             self.logger.debug(f"✓ Extracted score from object: {score}")
             return score
 
-        except Exception as e:
-            self.logger.exception(f"❌ Error evaluating answer correctness: {e}")
+        except Exception:
+            self.logger.exception("❌ Error evaluating answer correctness")
             return 0.0
 
     def _evaluate_tool_correctness(
@@ -364,6 +371,7 @@ Examples:
         judge = Judge(
             model=self.model,
             use_structured_output=self.use_structured_output,
+            strict=self.strict,
             bos_json_clause=self.bos_json_clause,
             eos_json_clause=self.eos_json_clause,
             verbose=self.verbose,
@@ -421,23 +429,52 @@ Examples:
             correct_interactions = len(correct_indices)
             is_fully_correct = correct_interactions == total_interactions
 
-            status = "✅ FULLY CORRECT" if is_fully_correct else f"❌ PARTIAL ({correct_interactions}/{total_interactions})"
+            status = (
+                "✅ FULLY CORRECT" if is_fully_correct else f"❌ PARTIAL ({correct_interactions}/{total_interactions})"
+            )
             self.logger.info(f"  Conversation result: {status}")
 
-            metric = AgenticMetric(
-                session_id=dataset.session_id,
-                assistant_id=dataset.assistant_id,
-                total_interactions=total_interactions,
-                correct_interactions=correct_interactions,
-                is_fully_correct=is_fully_correct,
-                threshold=self.threshold,
-                correctness_scores=correctness_scores,
-                correct_indices=correct_indices,
-                tool_correctness_scores=tool_correctness_scores if tool_correctness_scores else [],
-                k=self.k,
-                pass_at_k=pass_at_k(total_interactions, correct_interactions, self.k),
-                pass_pow_k=pass_pow_k(total_interactions, correct_interactions, self.k),
-            )
+            p_result = self.statistical_mode.rate_estimation(correct_interactions, total_interactions)
+
+            if self.statistical_mode.get_result_type() == "point_estimate":
+                metric = AgenticMetric(
+                    session_id=dataset.session_id,
+                    assistant_id=dataset.assistant_id,
+                    total_interactions=total_interactions,
+                    correct_interactions=correct_interactions,
+                    is_fully_correct=is_fully_correct,
+                    threshold=self.threshold,
+                    correctness_scores=correctness_scores,
+                    correct_indices=correct_indices,
+                    tool_correctness_scores=tool_correctness_scores if tool_correctness_scores else [],
+                    k=self.k,
+                    pass_at_k=pass_at_k(total_interactions, correct_interactions, self.k),
+                    pass_pow_k=pass_pow_k(total_interactions, correct_interactions, self.k),
+                )
+            else:
+                p_samples = p_result["samples"]
+                pass_at_k_samples = 1.0 - (1.0 - p_samples) ** self.k
+                pass_pow_k_samples = p_samples**self.k
+
+                alpha = (1.0 - getattr(self.statistical_mode, "ci_level", 0.95)) / 2.0
+                metric = AgenticMetric(
+                    session_id=dataset.session_id,
+                    assistant_id=dataset.assistant_id,
+                    total_interactions=total_interactions,
+                    correct_interactions=correct_interactions,
+                    is_fully_correct=is_fully_correct,
+                    threshold=self.threshold,
+                    correctness_scores=correctness_scores,
+                    correct_indices=correct_indices,
+                    tool_correctness_scores=tool_correctness_scores if tool_correctness_scores else [],
+                    k=self.k,
+                    pass_at_k=float(np.mean(pass_at_k_samples)),
+                    pass_at_k_ci_low=float(np.quantile(pass_at_k_samples, alpha)),
+                    pass_at_k_ci_high=float(np.quantile(pass_at_k_samples, 1.0 - alpha)),
+                    pass_pow_k=float(np.mean(pass_pow_k_samples)),
+                    pass_pow_k_ci_low=float(np.quantile(pass_pow_k_samples, alpha)),
+                    pass_pow_k_ci_high=float(np.quantile(pass_pow_k_samples, 1.0 - alpha)),
+                )
 
             self.metrics.append(metric)
 

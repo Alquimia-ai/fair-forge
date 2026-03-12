@@ -1,10 +1,12 @@
 """Pydantic schemas for LLM structured outputs."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ContextJudgeOutput(BaseModel):
     """Structured output for context evaluation."""
+
+    model_config = ConfigDict(extra="forbid")
 
     score: float = Field(ge=0, le=1, description="Context alignment score (0-1)")
     insight: str = Field(description="Insight about context compliance")
@@ -12,6 +14,8 @@ class ContextJudgeOutput(BaseModel):
 
 class ConversationalJudgeOutput(BaseModel):
     """Structured output for conversational evaluation."""
+
+    model_config = ConfigDict(extra="forbid")
 
     memory: float = Field(ge=0, le=10, description="Memory recall score (0-10)")
     language: float = Field(ge=0, le=10, description="Language appropriateness score (0-10)")
@@ -25,6 +29,8 @@ class ConversationalJudgeOutput(BaseModel):
 
 class BestOfJudgeOutput(BaseModel):
     """Structured output for best-of evaluation."""
+
+    model_config = ConfigDict(extra="forbid")
 
     winner: str = Field(description="Winner identifier or 'tie'")
     verdict: str = Field(description="Explanation of why this contestant won")

@@ -143,60 +143,46 @@ class TestJudge:
         assert thought == "Let me analyze this"
         assert json_data == {"result": "done"}
 
-    @patch("fair_forge.llm.judge.ChatPromptTemplate")
-    def test_check_structured_mode(self, mock_template, mock_model):
+    @patch("fair_forge.llm.judge.create_agent")
+    def test_check_structured_mode(self, mock_create_agent, mock_model):
         """Test check method in structured output mode."""
         expected_result = ContextJudgeOutput(score=0.9, insight="Good context")
 
-        mock_raw_response = MagicMock()
-        mock_raw_response.content_blocks = []
+        mock_msg = MagicMock()
+        mock_msg.additional_kwargs = {}
 
-        mock_structured_model = MagicMock()
-        mock_model.with_structured_output.return_value = mock_structured_model
-
-        mock_chain = MagicMock()
-        mock_chain.invoke.return_value = {"raw": mock_raw_response, "parsed": expected_result}
-
-        mock_prompt = MagicMock()
-        mock_prompt.__or__ = MagicMock(return_value=mock_chain)
-        mock_template.from_messages.return_value = mock_prompt
+        mock_agent = MagicMock()
+        mock_agent.invoke.return_value = {
+            "structured_response": expected_result,
+            "messages": [mock_msg],
+        }
+        mock_create_agent.return_value = mock_agent
 
         judge = Judge(model=mock_model, use_structured_output=True)
         thought, result = judge.check("System", "Query", {}, output_schema=ContextJudgeOutput)
 
         assert thought == ""
         assert result == expected_result
-        mock_model.with_structured_output.assert_called_once_with(
-            ContextJudgeOutput,
-            include_raw=True,
-        )
 
-    @patch("fair_forge.llm.judge.ChatPromptTemplate")
-    def test_check_structured_mode_with_reasoning(self, mock_template, mock_model):
-        """Test check method extracts reasoning from content_blocks in structured mode."""
+    @patch("fair_forge.llm.judge.create_agent")
+    def test_check_structured_mode_with_reasoning(self, mock_create_agent, mock_model):
+        """Test check method extracts reasoning from additional_kwargs in structured mode."""
         expected_result = ContextJudgeOutput(score=0.9, insight="Good context")
 
-        mock_raw_response = MagicMock()
-        mock_raw_response.content_blocks = [
-            {"type": "reasoning", "reasoning": "First I analyze the context."},
-            {"type": "reasoning", "reasoning": "Then I evaluate the response."},
-            {"type": "text", "text": "Some text"},
-        ]
+        mock_msg = MagicMock()
+        mock_msg.additional_kwargs = {"reasoning_content": "First I analyze. Then I evaluate."}
 
-        mock_structured_model = MagicMock()
-        mock_model.with_structured_output.return_value = mock_structured_model
-
-        mock_chain = MagicMock()
-        mock_chain.invoke.return_value = {"raw": mock_raw_response, "parsed": expected_result}
-
-        mock_prompt = MagicMock()
-        mock_prompt.__or__ = MagicMock(return_value=mock_chain)
-        mock_template.from_messages.return_value = mock_prompt
+        mock_agent = MagicMock()
+        mock_agent.invoke.return_value = {
+            "structured_response": expected_result,
+            "messages": [mock_msg],
+        }
+        mock_create_agent.return_value = mock_agent
 
         judge = Judge(model=mock_model, use_structured_output=True)
         thought, result = judge.check("System", "Query", {}, output_schema=ContextJudgeOutput)
 
-        assert thought == "First I analyze the context. Then I evaluate the response."
+        assert thought == "First I analyze. Then I evaluate."
         assert result == expected_result
 
     @patch("fair_forge.llm.judge.ChatPromptTemplate")

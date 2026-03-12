@@ -101,6 +101,8 @@ class OpenAIGuardianProvider(LLMGuardianProvider):
         self.chat_completions = "chat_completions" in kwargs
 
     def _parse_guardian_response(self, response_json):
+        if "error" in response_json or "choices" not in response_json:
+            raise RuntimeError(f"API error: {response_json.get('error', response_json)}")
         choice = response_json["choices"][0]
         prob_token = 1.0
         if "message" in choice:

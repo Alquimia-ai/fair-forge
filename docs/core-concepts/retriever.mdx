@@ -1,54 +1,53 @@
 ---
 title: Retriever
-description: Creating custom retrievers to load your conversation data
+description: Loading conversation data into Fair Forge with full-dataset and streaming modes
 ---
 
 # Retriever
 
-The `Retriever` class is the primary interface for loading your conversation data into Fair Forge. Every evaluation requires a custom retriever implementation.
+The `Retriever` class is the entry point for loading your conversation data into Fair Forge. Every evaluation requires a custom retriever that implements `load_dataset()`. Fair Forge supports three iteration strategies that control how data is consumed — from loading everything upfront to yielding individual QA pairs on demand.
 
-## Basic Structure
+## Iteration Modes
 
-```python
-from fair_forge.core.retriever import Retriever
-from fair_forge.schemas.common import Dataset, Batch
+Choose the mode that fits your dataset size and processing requirements:
 
-class MyRetriever(Retriever):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # Store any configuration
-        self.data_path = kwargs.get('data_path', './data')
+| Mode | Value | Returns | Use When |
+|------|-------|---------|----------|
+| `FULL_DATASET` | `"full_dataset"` | `list[Dataset]` | Default. Dataset fits comfortably in memory |
+| `STREAM_SESSIONS` | `"stream_sessions"` | `Iterator[Dataset]` | Many sessions, avoid loading all at once |
+| `STREAM_BATCHES` | `"stream_batches"` | `Iterator[StreamedBatch]` | QA pairs arrive independently (e.g. from a queue) |
 
-    def load_dataset(self) -> list[Dataset]:
-        """Load and return your conversation data."""
-        datasets = []
-        # Load your data and convert to Dataset objects
-        return datasets
-```
+The default mode is `FULL_DATASET`. To use streaming, override the `iteration_level` property.
 
-## Retriever Interface
-
-The `Retriever` abstract base class requires one method:
+## Interface
 
 ```python
+from abc import ABC, abstractmethod
+from collections.abc import Iterator
+from fair_forge.schemas.common import Dataset, IterationLevel, StreamedBatch
+
 class Retriever(ABC):
     def __init__(self, **kwargs):
-        """Initialize with optional configuration."""
-        pass
+        self.kwargs = kwargs
+
+    @property
+    def iteration_level(self) -> IterationLevel:
+        return IterationLevel.FULL_DATASET  # default
 
     @abstractmethod
-    def load_dataset(self) -> list[Dataset]:
-        """Load and return datasets for evaluation.
-
-        Returns:
-            list[Dataset]: List of conversation datasets
-        """
-        pass
+    def load_dataset(self) -> list[Dataset] | Iterator[Dataset] | Iterator[StreamedBatch]:
+        ...
 ```
 
-## Examples
+<Note>
+  The return type of `load_dataset()` must be consistent with `iteration_level`. Returning an `Iterator` with the default `FULL_DATASET` level will raise a `ValueError` at runtime.
+</Note>
 
-### Loading from JSON File
+## Full Dataset Mode
+
+The simplest and most common mode. Load all sessions into a list and return it.
+
+### Loading from JSON
 
 ```python
 import json
@@ -57,28 +56,23 @@ from fair_forge.core.retriever import Retriever
 from fair_forge.schemas.common import Dataset
 
 class JSONRetriever(Retriever):
-    def __init__(self, **kwargs):
+    def __init__(self, file_path: str = "data.json", **kwargs):
         super().__init__(**kwargs)
-        self.file_path = kwargs.get('file_path', 'data.json')
+        self.file_path = Path(file_path)
 
     def load_dataset(self) -> list[Dataset]:
         with open(self.file_path) as f:
-            data = json.load(f)
+            return [Dataset.model_validate(item) for item in json.load(f)]
 
-        datasets = []
-        for item in data:
-            datasets.append(Dataset.model_validate(item))
-        return datasets
-
-# Usage
+# Usage — kwargs are forwarded to the retriever constructor
 metrics = Toxicity.run(
     JSONRetriever,
-    file_path='conversations.json',
+    file_path="conversations.json",
     group_prototypes={...},
 )
 ```
 
-### Loading from Database
+### Loading from a Database
 
 ```python
 import sqlite3
@@ -86,42 +80,30 @@ from fair_forge.core.retriever import Retriever
 from fair_forge.schemas.common import Dataset, Batch
 
 class DatabaseRetriever(Retriever):
-    def __init__(self, **kwargs):
+    def __init__(self, db_path: str, assistant_id: str, **kwargs):
         super().__init__(**kwargs)
-        self.db_path = kwargs.get('db_path', 'conversations.db')
-        self.assistant_id = kwargs.get('assistant_id', 'default')
+        self.db_path = db_path
+        self.assistant_id = assistant_id
 
     def load_dataset(self) -> list[Dataset]:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # Fetch sessions
-        cursor.execute("""
-            SELECT DISTINCT session_id, context, language
-            FROM conversations
-            WHERE assistant_id = ?
-        """, (self.assistant_id,))
+        cursor.execute(
+            "SELECT DISTINCT session_id, context, language FROM conversations WHERE assistant_id = ?",
+            (self.assistant_id,),
+        )
 
         datasets = []
         for session_id, context, language in cursor.fetchall():
-            # Fetch conversation batches for this session
-            cursor.execute("""
-                SELECT qa_id, query, assistant, ground_truth
-                FROM conversations
-                WHERE session_id = ?
-                ORDER BY created_at
-            """, (session_id,))
-
+            cursor.execute(
+                "SELECT qa_id, query, assistant, ground_truth FROM conversations WHERE session_id = ? ORDER BY created_at",
+                (session_id,),
+            )
             batches = [
-                Batch(
-                    qa_id=row[0],
-                    query=row[1],
-                    assistant=row[2],
-                    ground_truth_assistant=row[3],
-                )
+                Batch(qa_id=row[0], query=row[1], assistant=row[2], ground_truth_assistant=row[3])
                 for row in cursor.fetchall()
             ]
-
             datasets.append(Dataset(
                 session_id=session_id,
                 assistant_id=self.assistant_id,
@@ -132,49 +114,28 @@ class DatabaseRetriever(Retriever):
 
         conn.close()
         return datasets
-
-# Usage
-metrics = Context.run(
-    DatabaseRetriever,
-    db_path='my_chatbot.db',
-    assistant_id='gpt-4-assistant',
-    model=judge_model,
-)
 ```
 
-### Loading from API
+### Loading from an API
 
 ```python
 import httpx
 from fair_forge.core.retriever import Retriever
-from fair_forge.schemas.common import Dataset, Batch
+from fair_forge.schemas.common import Dataset
 
 class APIRetriever(Retriever):
-    def __init__(self, **kwargs):
+    def __init__(self, api_url: str, api_key: str, **kwargs):
         super().__init__(**kwargs)
-        self.api_url = kwargs.get('api_url')
-        self.api_key = kwargs.get('api_key')
+        self.api_url = api_url
+        self.api_key = api_key
 
     def load_dataset(self) -> list[Dataset]:
-        headers = {'Authorization': f'Bearer {self.api_key}'}
-
         with httpx.Client() as client:
             response = client.get(
-                f'{self.api_url}/conversations',
-                headers=headers,
+                f"{self.api_url}/conversations",
+                headers={"Authorization": f"Bearer {self.api_key}"},
             )
-            data = response.json()
-
-        return [Dataset.model_validate(d) for d in data['datasets']]
-
-# Usage
-metrics = Bias.run(
-    APIRetriever,
-    api_url='https://api.example.com',
-    api_key='your-api-key',
-    guardian=LLamaGuard,
-    config=guardian_config,
-)
+        return [Dataset.model_validate(d) for d in response.json()["datasets"]]
 ```
 
 ### Loading from CSV
@@ -186,157 +147,131 @@ from fair_forge.core.retriever import Retriever
 from fair_forge.schemas.common import Dataset, Batch
 
 class CSVRetriever(Retriever):
-    def __init__(self, **kwargs):
+    def __init__(self, file_path: str, **kwargs):
         super().__init__(**kwargs)
-        self.file_path = kwargs.get('file_path', 'conversations.csv')
+        self.file_path = file_path
 
     def load_dataset(self) -> list[Dataset]:
-        # Group conversations by session
-        sessions = defaultdict(list)
-
-        with open(self.file_path, newline='') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                sessions[row['session_id']].append(row)
+        sessions: dict[str, list] = defaultdict(list)
+        with open(self.file_path, newline="") as f:
+            for row in csv.DictReader(f):
+                sessions[row["session_id"]].append(row)
 
         datasets = []
         for session_id, rows in sessions.items():
             batches = [
                 Batch(
-                    qa_id=row['qa_id'],
-                    query=row['query'],
-                    assistant=row['assistant'],
-                    ground_truth_assistant=row.get('ground_truth', ''),
+                    qa_id=row["qa_id"],
+                    query=row["query"],
+                    assistant=row["assistant"],
+                    ground_truth_assistant=row.get("ground_truth", ""),
                 )
                 for row in rows
             ]
-
             datasets.append(Dataset(
                 session_id=session_id,
-                assistant_id=rows[0].get('assistant_id', 'unknown'),
-                language=rows[0].get('language', 'english'),
-                context=rows[0].get('context', ''),
+                assistant_id=rows[0].get("assistant_id", "unknown"),
+                language=rows[0].get("language", "english"),
+                context=rows[0].get("context", ""),
                 conversation=batches,
             ))
 
         return datasets
 ```
 
-### Multi-Assistant Retriever (for BestOf)
+### Multi-Assistant Retriever (BestOf)
+
+BestOf expects one `Dataset` per assistant, all answering the same questions. The retriever loads them — BestOf handles the tournament logic automatically.
 
 ```python
+import json
+from pathlib import Path
 from fair_forge.core.retriever import Retriever
-from fair_forge.schemas.common import Dataset, Batch
+from fair_forge.schemas.common import Dataset
 
 class MultiAssistantRetriever(Retriever):
-    """Load datasets from multiple assistants for comparison."""
+    """Each Dataset in the file represents one assistant answering the same questions."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, file_path: str = "dataset_bestof.json", **kwargs):
         super().__init__(**kwargs)
-        self.assistants = kwargs.get('assistants', [])
+        self.file_path = Path(file_path)
 
     def load_dataset(self) -> list[Dataset]:
-        datasets = []
+        with open(self.file_path) as f:
+            return [Dataset.model_validate(item) for item in json.load(f)]
 
-        # Same questions, different assistants
-        questions = [
-            "What are the benefits of renewable energy?",
-            "Explain machine learning in simple terms.",
-        ]
-
-        for assistant_id in self.assistants:
-            # Get responses from each assistant
-            responses = self._get_responses(assistant_id, questions)
-
-            batches = [
-                Batch(qa_id=f"q{i}", query=q, assistant=r)
-                for i, (q, r) in enumerate(zip(questions, responses))
-            ]
-
-            datasets.append(Dataset(
-                session_id=f"eval-{assistant_id}",
-                assistant_id=assistant_id,
-                language="english",
-                context="",
-                conversation=batches,
-            ))
-
-        return datasets
-
-    def _get_responses(self, assistant_id: str, questions: list) -> list:
-        # Implement based on your assistant API
-        pass
-
-# Usage with BestOf
+# Usage — BestOf only needs model and criteria; the retriever provides the assistants
 metrics = BestOf.run(
     MultiAssistantRetriever,
-    assistants=['gpt-4', 'claude-3', 'llama-3'],
     model=judge_model,
+    use_structured_output=True,
+    criteria="Overall response quality, helpfulness, and clarity",
 )
+```
+
+The JSON file must contain one entry per assistant, all sharing the same `qa_id` values so BestOf can pair their responses:
+
+```json
+[
+  {
+    "session_id": "eval-session",
+    "assistant_id": "assistant_alpha",
+    "language": "english",
+    "context": "",
+    "conversation": [
+      {"qa_id": "q1", "query": "What are the benefits of renewable energy?", "assistant": "...", "ground_truth_assistant": ""}
+    ]
+  },
+  {
+    "session_id": "eval-session",
+    "assistant_id": "assistant_beta",
+    "language": "english",
+    "context": "",
+    "conversation": [
+      {"qa_id": "q1", "query": "What are the benefits of renewable energy?", "assistant": "...", "ground_truth_assistant": ""}
+    ]
+  }
+]
 ```
 
 ## Best Practices
 
 <AccordionGroup>
-  <Accordion title="Use kwargs for Configuration">
-    Pass configuration through `**kwargs` to keep retrievers flexible:
+  <Accordion title="Use explicit constructor parameters instead of kwargs.get()">
+    Declare parameters explicitly for clarity and IDE support:
     ```python
+    # Preferred
     class MyRetriever(Retriever):
-        def __init__(self, **kwargs):
+        def __init__(self, file_path: str, assistant_id: str = "default", **kwargs):
             super().__init__(**kwargs)
-            self.file_path = kwargs.get('file_path', 'default.json')
-            self.filter_by = kwargs.get('filter_by', None)
+            self.file_path = file_path
+            self.assistant_id = assistant_id
     ```
   </Accordion>
 
-  <Accordion title="Handle Missing Data Gracefully">
-    Set defaults for optional fields:
-    ```python
-    Batch(
-        qa_id=row.get('qa_id', f'q-{idx}'),
-        query=row['query'],  # Required
-        assistant=row.get('assistant', ''),
-        ground_truth_assistant=row.get('ground_truth'),  # None if missing
-    )
-    ```
-  </Accordion>
-
-  <Accordion title="Log Data Loading">
-    Use the logging utilities for debugging:
-    ```python
-    from fair_forge.utils.logging import logger
-
-    class MyRetriever(Retriever):
-        def load_dataset(self) -> list[Dataset]:
-            logger.info(f"Loading datasets from {self.file_path}")
-            datasets = self._load()
-            logger.info(f"Loaded {len(datasets)} datasets")
-            return datasets
-    ```
-  </Accordion>
-
-  <Accordion title="Validate Data">
-    Use Pydantic validation to catch issues early:
+  <Accordion title="Handle missing fields with Pydantic defaults">
+    Use `model_validate` to leverage Pydantic's validation and defaults:
     ```python
     def load_dataset(self) -> list[Dataset]:
-        datasets = []
-        for item in raw_data:
-            try:
-                datasets.append(Dataset.model_validate(item))
-            except ValidationError as e:
-                logger.warning(f"Skipping invalid dataset: {e}")
-        return datasets
+        with open(self.file_path) as f:
+            return [Dataset.model_validate(item) for item in json.load(f)]
     ```
+    Fields with defaults (`language="english"`) are filled in automatically.
+  </Accordion>
+
+  <Accordion title="Use streaming for large datasets">
+    If your dataset has thousands of sessions or QA pairs, prefer streaming
+    to avoid loading everything into memory. See the [Streaming](/core-concepts/retriever-streaming) page.
   </Accordion>
 </AccordionGroup>
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Dataset & Batch" icon="table" href="/core-concepts/dataset-batch">
-    Learn about data structures
+  <Card title="Streaming Retrievers" icon="arrow-right-arrow-left" href="/core-concepts/retriever-streaming">
+    Handle large datasets with stream_sessions and stream_batches
   </Card>
-  <Card title="Metrics" icon="chart-pie" href="/metrics/overview">
-    Run your first metric
+  <Card title="Dataset & Batch" icon="table" href="/core-concepts/dataset-batch">
+    Understand the data structures used by all retrievers
   </Card>
 </CardGroup>

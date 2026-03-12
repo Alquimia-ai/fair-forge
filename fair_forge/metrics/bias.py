@@ -1,10 +1,9 @@
-import scipy.stats as st
-from pydantic import BaseModel
 from tqdm import tqdm
 
 from fair_forge.core import FairForge, Guardian, Retriever
 from fair_forge.schemas import Batch
 from fair_forge.schemas.bias import BiasMetric, ProtectedAttribute
+from fair_forge.statistical import FrequentistMode, StatisticalMode
 
 
 class Bias(FairForge):
@@ -12,51 +11,23 @@ class Bias(FairForge):
     A class for measuring and analyzing bias in AI assistant responses.
 
     This class implements various methods to detect and quantify bias across different protected attributes
-    such as gender, race, religion, nationality, and sexual orientation. It uses a combination of
-    confidence intervals and guardian-based bias detection to provide comprehensive bias analysis.
+    such as gender, race, religion, nationality, and sexual orientation. It uses a guardian-based
+    bias detection to provide comprehensive bias analysis, with pluggable statistical computation
+    via StatisticalMode (frequentist or Bayesian).
 
     Attributes:
         protected_attributes (list[ProtectedAttribute]): List of protected attributes to monitor for bias
         guardian (Guardian): Instance of the Guardian class for bias detection
-        confidence_level (float): Confidence level for statistical calculations (default: 0.95)
+        statistical_mode (StatisticalMode): Statistical computation mode
     """
-
-    class ClopperPearson(BaseModel):
-        """
-        A model representing Clopper-Pearson confidence interval parameters.
-
-        Attributes:
-            lower_bound (float): Lower bound of the confidence interval
-            upper_bound (float): Upper bound of the confidence interval
-            probability (float): True probability of success
-            samples (int): Total number of samples
-            k_success (int): Number of successful outcomes
-            alpha (float): Significance level
-        """
-
-        lower_bound: float
-        upper_bound: float
-        probability: float
-        samples: int
-        k_success: int
-        alpha: float
 
     def __init__(
         self,
         retriever: type[Retriever],
         guardian: type[Guardian],
-        confidence_level: float = 0.95,
+        statistical_mode: StatisticalMode | None = None,
         **kwargs,
     ):
-        """
-        Initialize the Bias class with configuration parameters.
-
-        Args:
-            retriever (Type[Retriever]): The retriever class to use
-            guardian (Type[Guardian]): The guardian class for bias detection
-            confidence_level (float, optional): Confidence level for statistical calculations. Defaults to 0.95.
-            **kwargs: Additional keyword arguments passed to the parent class
-        """
         super().__init__(retriever, **kwargs)
         self.protected_attributes = [
             ProtectedAttribute(
@@ -82,54 +53,17 @@ class Bias(FairForge):
         ]  # PROTECTED ATTRIBUTES DEFINED BY FAIR FORGE
 
         self.guardian = guardian(**kwargs)
-        self.confidence_level = confidence_level
+        self.statistical_mode = statistical_mode if statistical_mode is not None else FrequentistMode()
 
         self.logger.info("--BIAS CONFIGURATION--")
-        self.logger.debug(f"Confidence level: {self.confidence_level}")
+        self.logger.debug(f"Statistical mode: {self.statistical_mode.get_result_type()}")
 
-        # List protected attributes
         for attribute in self.protected_attributes:
             self.logger.debug(f"Protected attribute: {attribute.attribute.value}")
-
-    def _clopper_pearson_confidence_interval(self, samples: int, k_success: int) -> ClopperPearson:
-        """
-        Calculate the Clopper-Pearson confidence interval for a binomial proportion.
-
-        Args:
-            samples (int): Total number of samples
-            k_success (int): Number of successful outcomes
-
-        Returns:
-            ClopperPearson: Object containing confidence interval parameters
-        """
-        alpha = 1 - self.confidence_level
-        if k_success == samples:
-            p_truth = 1.0
-            p_u = 1.0
-        else:
-            p_truth = k_success / samples
-            p_u = st.beta.ppf(1 - alpha / 2, k_success + 1, samples - k_success)
-
-        p_l = st.beta.ppf(alpha / 2, k_success, samples - k_success + 1)
-
-        return self.ClopperPearson(
-            lower_bound=p_l, upper_bound=p_u, probability=p_truth, samples=samples, k_success=k_success, alpha=alpha
-        )
 
     def _get_guardian_biased_attributes(
         self, batch: list[Batch], attributes: list[ProtectedAttribute], context: str
     ) -> dict[str, list[BiasMetric.GuardianInteraction]]:
-        """
-        Analyze batch interactions for bias using the guardian model.
-
-        Args:
-            batch (list[Batch]): List of batch interactions to analyze
-            attributes (list[ProtectedAttribute]): List of protected attributes to check
-            context (str): Context information for bias analysis
-
-        Returns:
-            dict[str,list[BiasMetric.GuardianInteraction]]: Dictionary mapping attributes to their bias analysis results
-        """
         biases_by_attribute = {attribute.attribute.value: [] for attribute in self.protected_attributes}
         for interaction in tqdm(
             batch,
@@ -153,36 +87,37 @@ class Bias(FairForge):
                 )
         return biases_by_attribute
 
-    def _calculate_confidence_intervals(
+    def _calculate_attribute_rates(
         self, biases_by_attributes: dict[str, list[BiasMetric.GuardianInteraction]]
-    ) -> list[BiasMetric.ConfidenceInterval]:
-        """
-        Calculate confidence intervals for bias measurements across all protected attributes.
-
-        Args:
-            biases_by_attributes (dict[str, list[BiasMetric.GuardianInteraction]]): Dictionary of bias analysis results
-
-        Returns:
-            list[BiasMetric.ConfidenceInterval]: List of confidence intervals for each protected attribute
-        """
-        intervals = []
+    ) -> list[BiasMetric.AttributeBiasRate]:
+        rates = []
         for attribute in self.protected_attributes:
-            samples = len(biases_by_attributes[attribute.attribute.value])
-            k_success = sum(1 for bias in biases_by_attributes[attribute.attribute.value] if not bias.is_biased)
-            clopper_pearson = self._clopper_pearson_confidence_interval(samples, k_success)
-            confidence_interval = BiasMetric.ConfidenceInterval(
-                alpha=clopper_pearson.alpha,
-                lower_bound=clopper_pearson.lower_bound,
-                upper_bound=clopper_pearson.upper_bound,
-                probability=clopper_pearson.probability,
-                samples=clopper_pearson.samples,
-                k_success=clopper_pearson.k_success,
-                confidence_level=self.confidence_level,
-                protected_attribute=attribute.attribute.value,
-            )
-            intervals.append(confidence_interval)
+            interactions = biases_by_attributes[attribute.attribute.value]
+            n_samples = len(interactions)
+            k_biased = sum(1 for bias in interactions if bias.is_biased)
 
-        return intervals
+            result = self.statistical_mode.rate_estimation(k_biased, n_samples)
+
+            if self.statistical_mode.get_result_type() == "point_estimate":
+                rate = BiasMetric.AttributeBiasRate(
+                    protected_attribute=attribute.attribute.value,
+                    n_samples=n_samples,
+                    k_biased=k_biased,
+                    rate=float(result),
+                )
+            else:
+                rate = BiasMetric.AttributeBiasRate(
+                    protected_attribute=attribute.attribute.value,
+                    n_samples=n_samples,
+                    k_biased=k_biased,
+                    rate=float(result["mean"]),
+                    ci_low=float(result["ci_low"]),
+                    ci_high=float(result["ci_high"]),
+                )
+
+            rates.append(rate)
+
+        return rates
 
     def batch(
         self,
@@ -192,28 +127,16 @@ class Bias(FairForge):
         batch: list[Batch],
         language: str = "en",
     ):
-        """
-        Process a batch of interactions to analyze bias.
-
-        This method serves as the main interface for bias analysis, using guardian-based
-        bias detection and confidence interval calculations.
-
-        Args:
-            session_id (str): Unique identifier for the analysis session
-            context (str): Context information for bias analysis
-            assistant_id (str): Identifier for the AI assistant being analyzed
-            batch (list[Batch]): List of batch interactions to analyze
-        """
         biases_by_attribute = self._get_guardian_biased_attributes(batch, self.protected_attributes, context)
 
         self.logger.info(f"Biases by attribute: {biases_by_attribute}")
 
-        confidence_intervals = self._calculate_confidence_intervals(biases_by_attribute)
+        attribute_rates = self._calculate_attribute_rates(biases_by_attribute)
 
         bias_metric = BiasMetric(
             session_id=session_id,
             assistant_id=assistant_id,
-            confidence_intervals=confidence_intervals,
+            attribute_rates=attribute_rates,
             guardian_interactions=biases_by_attribute,
         )
         self.metrics.append(bias_metric)
