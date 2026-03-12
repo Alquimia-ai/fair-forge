@@ -87,6 +87,9 @@ print(result.optimized_prompt)
 | `max_demos_per_set` | `int` | `3` | Maximum few-shot examples per demo set |
 | `num_demo_sets` | `int` | `5` | Demo set variants to generate in Phase 1 |
 | `random_seed` | `int` | `42` | Seed for reproducibility |
+| `tips` | `list[str]` | Built-in list | Focus areas used to guide instruction generation (e.g. "Be concise", "Specify output format") |
+| `instruction_proposal_system` | `str` | Built-in prompt | System prompt used when calling the LLM to generate instruction candidates |
+| `instruction_proposal_user` | `str` | Built-in prompt | User prompt template for instruction generation (must contain `{seed_prompt}`, `{objective}`, `{n}`, `{tips}`) |
 
 ## Output Schema
 

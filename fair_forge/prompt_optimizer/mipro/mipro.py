@@ -46,6 +46,9 @@ class MIPROv2Optimizer(BaseOptimizer):
         max_demos_per_set: int = 3,
         num_demo_sets: int = 5,
         random_seed: int = 42,
+        tips: list[str] | None = None,
+        instruction_proposal_system: str | None = None,
+        instruction_proposal_user: str | None = None,
         **kwargs,
     ):
         super().__init__(retriever, **kwargs)
@@ -63,6 +66,9 @@ class MIPROv2Optimizer(BaseOptimizer):
         self._num_demo_sets = num_demo_sets
         self._random_seed = random_seed
         self._rng = random.Random(random_seed)
+        self._tips = tips
+        self._instruction_proposal_system = instruction_proposal_system
+        self._instruction_proposal_user = instruction_proposal_user
 
     def _default_executor(self) -> Executor:
         model = self._model
@@ -123,6 +129,9 @@ class MIPROv2Optimizer(BaseOptimizer):
             seed_prompt=self._seed_prompt,
             objective=self._objective,
             num_candidates=self._num_candidates,
+            tips=self._tips,
+            system_prompt=self._instruction_proposal_system,
+            user_prompt=self._instruction_proposal_user,
         ).propose()
 
         demo_sets = DemoBootstrapper(
