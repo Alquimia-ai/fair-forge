@@ -28,19 +28,31 @@ class _InstructionVariants(BaseModel):
 
 
 class InstructionProposer:
-    def __init__(self, model: BaseChatModel, seed_prompt: str, objective: str, num_candidates: int):
+    def __init__(
+        self,
+        model: BaseChatModel,
+        seed_prompt: str,
+        objective: str,
+        num_candidates: int,
+        tips: list[str] | None = None,
+        system_prompt: str | None = None,
+        user_prompt: str | None = None,
+    ):
         self._model = model
         self._seed_prompt = seed_prompt
         self._objective = objective
         self._num_candidates = num_candidates
+        self._tips = tips or _TIPS
+        self._system_prompt = system_prompt or INSTRUCTION_PROPOSAL_SYSTEM
+        self._user_prompt = user_prompt or INSTRUCTION_PROPOSAL_USER
 
     def propose(self) -> list[str]:
-        tips = [_TIPS[i % len(_TIPS)] for i in range(self._num_candidates)]
+        tips = [self._tips[i % len(self._tips)] for i in range(self._num_candidates)]
         tips_text = "\n".join(f"{i + 1}. {tip}" for i, tip in enumerate(tips))
         messages = [
-            SystemMessage(content=INSTRUCTION_PROPOSAL_SYSTEM),
+            SystemMessage(content=self._system_prompt),
             HumanMessage(
-                content=INSTRUCTION_PROPOSAL_USER.format(
+                content=self._user_prompt.format(
                     seed_prompt=self._seed_prompt,
                     objective=self._objective,
                     n=self._num_candidates,
