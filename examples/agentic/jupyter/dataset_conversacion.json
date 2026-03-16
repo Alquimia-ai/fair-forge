@@ -1,0 +1,192 @@
+[
+  {
+    "session_id": "single_long_conversation_001",
+    "assistant_id": "agent_response_single",
+    "language": "english",
+    "context": "You are a helpful AI assistant. Tools are available but you will not use them in this conversation. Provide concise answers, but you may occasionally make mistakes to reflect realistic behavior.",
+    "conversation": [
+      {
+        "qa_id": "q1_math",
+        "query": "What is 15 + 27?",
+        "ground_truth_assistant": "15 + 27 equals 42.",
+        "assistant": "15 + 27 is 42.",
+        "agentic": {
+          "tools_used": [],
+          "final_answer_uses_tools": false
+        },
+        "ground_truth_agentic": {
+          "expected_tools": [],
+          "tool_sequence_matters": false
+        }
+      },
+      {
+        "qa_id": "q2_weather",
+        "query": "What's the weather like in San Francisco?",
+        "ground_truth_assistant": "The weather in San Francisco is currently 18°C and partly cloudy.",
+        "assistant": "It’s around 18°C and partly cloudy in San Francisco.",
+        "agentic": {
+          "tools_used": [],
+          "final_answer_uses_tools": false
+        },
+        "ground_truth_agentic": {
+          "expected_tools": [],
+          "tool_sequence_matters": false
+        }
+      },
+      {
+        "qa_id": "q3_discount",
+        "query": "If I buy 3 items at $12 each and have a 10% discount, what's the total?",
+        "ground_truth_assistant": "First, 3 items at $12 each is $36. With a 10% discount, you pay $32.40.",
+        "assistant": "Subtotal is $36, and 10% off makes it $32.40.",
+        "agentic": {
+          "tools_used": [],
+          "final_answer_uses_tools": false
+        },
+        "ground_truth_agentic": {
+          "expected_tools": [],
+          "tool_sequence_matters": false
+        }
+      },
+      {
+        "qa_id": "q4_percent_increase",
+        "query": "A price goes from $80 to $100. What's the percent increase?",
+        "ground_truth_assistant": "The percent increase is 25%.",
+        "assistant": "That’s a 20% increase.",
+        "agentic": {
+          "tools_used": [],
+          "final_answer_uses_tools": false
+        },
+        "ground_truth_agentic": {
+          "expected_tools": [],
+          "tool_sequence_matters": false
+        }
+      },
+      {
+        "qa_id": "q5_divide_by_zero",
+        "query": "What is 10 / 0?",
+        "ground_truth_assistant": "Division by zero is undefined.",
+        "assistant": "It’s undefined—you can’t divide by zero.",
+        "agentic": {
+          "tools_used": [],
+          "final_answer_uses_tools": false
+        },
+        "ground_truth_agentic": {
+          "expected_tools": [],
+          "tool_sequence_matters": false
+        }
+      },
+      {
+        "qa_id": "q6_rounding",
+        "query": "What is 10 / 3 rounded to 2 decimals?",
+        "ground_truth_assistant": "10 / 3 is 3.33 when rounded to 2 decimals.",
+        "assistant": "10 / 3 is 3.30 when rounded to two decimals.",
+        "agentic": {
+          "tools_used": [],
+          "final_answer_uses_tools": false
+        },
+        "ground_truth_agentic": {
+          "expected_tools": [],
+          "tool_sequence_matters": false
+        }
+      },
+      {
+        "qa_id": "q7_unit_conversion",
+        "query": "Convert 1999 cents to dollars.",
+        "ground_truth_assistant": "1999 cents is $19.99.",
+        "assistant": "That’s $19.99.",
+        "agentic": {
+          "tools_used": [],
+          "final_answer_uses_tools": false
+        },
+        "ground_truth_agentic": {
+          "expected_tools": [],
+          "tool_sequence_matters": false
+        }
+      },
+      {
+        "qa_id": "q8_time_to_seconds",
+        "query": "How many seconds are in 5 minutes?",
+        "ground_truth_assistant": "There are 300 seconds in 5 minutes.",
+        "assistant": "5 minutes is 250 seconds.",
+        "agentic": {
+          "tools_used": [],
+          "final_answer_uses_tools": false
+        },
+        "ground_truth_agentic": {
+          "expected_tools": [],
+          "tool_sequence_matters": false
+        }
+      },
+      {
+        "qa_id": "q9_simple_algebra",
+        "query": "Solve for x: 2x + 6 = 20.",
+        "ground_truth_assistant": "x = 7.",
+        "assistant": "x = 7.",
+        "agentic": {
+          "tools_used": [],
+          "final_answer_uses_tools": false
+        },
+        "ground_truth_agentic": {
+          "expected_tools": [],
+          "tool_sequence_matters": false
+        }
+      },
+      {
+        "qa_id": "q10_probability",
+        "query": "If I flip a fair coin twice, what's the probability of getting two heads?",
+        "ground_truth_assistant": "The probability is 1/4 (25%).",
+        "assistant": "It’s 1/2 (50%).",
+        "agentic": {
+          "tools_used": [],
+          "final_answer_uses_tools": false
+        },
+        "ground_truth_agentic": {
+          "expected_tools": [],
+          "tool_sequence_matters": false
+        }
+      },
+      {
+        "qa_id": "q11_geometry",
+        "query": "What's the area of a circle with radius 3?",
+        "ground_truth_assistant": "The area is 9π (about 28.27).",
+        "assistant": "Area is 6π.",
+        "agentic": {
+          "tools_used": [],
+          "final_answer_uses_tools": false
+        },
+        "ground_truth_agentic": {
+          "expected_tools": [],
+          "tool_sequence_matters": false
+        }
+      },
+      {
+        "qa_id": "q12_grammar",
+        "query": "Which is correct: 'their' or 'there' in the sentence '___ going to the park'?",
+        "ground_truth_assistant": "The correct word is 'they're'.",
+        "assistant": "Use 'there'.",
+        "agentic": {
+          "tools_used": [],
+          "final_answer_uses_tools": false
+        },
+        "ground_truth_agentic": {
+          "expected_tools": [],
+          "tool_sequence_matters": false
+        }
+      },
+      {
+        "qa_id": "q13_programming",
+        "query": "In JavaScript, what does '===' do?",
+        "ground_truth_assistant": "It checks strict equality (same value and same type).",
+        "assistant": "It checks strict equality, meaning both value and type must match.",
+        "agentic": {
+          "tools_used": [],
+          "final_answer_uses_tools": false
+        },
+        "ground_truth_agentic": {
+          "expected_tools": [],
+          "tool_sequence_matters": false
+        }
+      }
+    ]
+  }
+]

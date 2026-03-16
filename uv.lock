@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -185,7 +185,7 @@ wheels = [
 
 [[package]]
 name = "alquimia-fair-forge"
-version = "1.3.0b1"
+version = "2.0.0b1"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },
@@ -285,6 +285,10 @@ toxicity = [
     { name = "torch" },
     { name = "umap-learn" },
 ]
+vision = [
+    { name = "sentence-transformers" },
+    { name = "torch" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -314,7 +318,7 @@ requires-dist = [
     { name = "aiosseclient", marker = "extra == 'runners'", specifier = ">=0.1.8" },
     { name = "alquimia-client", marker = "extra == 'generators-alquimia'", specifier = ">=0.1.0" },
     { name = "alquimia-client", marker = "extra == 'runners'", specifier = ">=0.1.0" },
-    { name = "alquimia-fair-forge", extras = ["context", "conversational", "bestof", "agentic", "humanity", "toxicity", "bias", "regulatory"], marker = "extra == 'metrics'" },
+    { name = "alquimia-fair-forge", extras = ["context", "conversational", "bestof", "agentic", "humanity", "toxicity", "bias", "regulatory", "vision"], marker = "extra == 'metrics'" },
     { name = "alquimia-fair-forge", extras = ["metrics", "runners", "generators", "generators-alquimia", "explainability"], marker = "extra == 'all'" },
     { name = "commitizen", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "hdbscan", marker = "extra == 'toxicity'", specifier = ">=0.8.41" },
@@ -348,12 +352,14 @@ requires-dist = [
     { name = "scikit-learn", marker = "extra == 'toxicity'", specifier = ">=1.3.0,<1.8" },
     { name = "scipy", specifier = ">=1.14.1" },
     { name = "sentence-transformers", marker = "extra == 'toxicity'", specifier = ">=5.0.0" },
+    { name = "sentence-transformers", marker = "extra == 'vision'", specifier = ">=5.0.0" },
     { name = "sphinx", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "sphinx-rtd-theme", marker = "extra == 'dev'", specifier = ">=2.0.0" },
     { name = "torch", marker = "extra == 'bias'", specifier = ">=2.0.0" },
     { name = "torch", marker = "extra == 'explainability'", specifier = ">=2.0.0" },
     { name = "torch", marker = "extra == 'regulatory'", specifier = ">=2.0.0" },
     { name = "torch", marker = "extra == 'toxicity'", specifier = ">=2.0.0" },
+    { name = "torch", marker = "extra == 'vision'", specifier = ">=2.0.0" },
     { name = "tqdm", specifier = ">=4.65.0" },
     { name = "transformers", specifier = ">=4.35.0" },
     { name = "transformers", marker = "extra == 'explainability'", specifier = ">=4.35.0" },
@@ -361,7 +367,7 @@ requires-dist = [
     { name = "umap-learn", marker = "extra == 'toxicity'", specifier = ">=0.5.6,<0.6.0" },
     { name = "virtualenv", marker = "extra == 'dev'", specifier = ">=20.36.1" },
 ]
-provides-extras = ["context", "conversational", "bestof", "agentic", "humanity", "toxicity", "bias", "regulatory", "explainability", "metrics", "runners", "generators", "generators-alquimia", "all", "dev"]
+provides-extras = ["context", "conversational", "bestof", "agentic", "humanity", "toxicity", "bias", "vision", "regulatory", "explainability", "metrics", "runners", "generators", "generators-alquimia", "all", "dev"]
 
 [package.metadata.requires-dev]
 dev = [

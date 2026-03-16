@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd C:/Users/ericf/Desktop/Alquimia/fair-forge && uv run ruff check fair_forge/prompt_optimizer 2>&1)",
+      "Bash(python -c \"import json; nb = json.load\\(open\\('C:/Users/ericf/Desktop/Alquimia/fair-forge/examples/context/jupyter/context.ipynb'\\)\\); code_cells = [c for c in nb['cells'] if c['cell_type']=='code']; print\\(json.dumps\\(code_cells[0], indent=2\\)\\)\")",
+      "Bash(python -c \"import json; nb = json.load\\(open\\('C:/Users/ericf/Desktop/Alquimia/fair-forge/examples/prompt_optimizer/gepa/jupyter/gepa.ipynb'\\)\\); code_cells = [c for c in nb['cells'] if c['cell_type']=='code']; print\\('outputs' in code_cells[0], 'execution_count' in code_cells[0]\\)\")",
+      "WebFetch(domain:deepeval.com)",
+      "Bash(cd C:/Users/ericf/Desktop/Alquimia/fair-forge && uv run ruff check fair_forge/prompt_optimizer && uv run mypy fair_forge/prompt_optimizer --ignore-missing-imports 2>&1 | tail -3)",
+      "Bash(cd C:/Users/ericf/Desktop/Alquimia/fair-forge && uv run ruff check fair_forge/prompt_optimizer/evaluators.py && uv run mypy fair_forge/prompt_optimizer/evaluators.py --ignore-missing-imports 2>&1 | tail -3)",
+      "Bash(cd C:/Users/ericf/Desktop/Alquimia/fair-forge && uv run mypy fair_forge/prompt_optimizer --ignore-missing-imports 2>&1 | tail -3)",
+      "Bash(cd C:/Users/ericf/Desktop/Alquimia/fair-forge && uv run mypy fair_forge/prompt_optimizer --ignore-missing-imports 2>&1 | grep \"error:\")",
+      "Bash(cd C:/Users/ericf/Desktop/Alquimia/fair-forge && uv run mypy fair_forge/prompt_optimizer --ignore-missing-imports 2>&1 | tail -2)",
+      "Bash(cd \"C:/Users/ericf/Desktop/Alquimia/fair-forge\" && uv add optuna)",
+      "Bash(cd \"C:/Users/ericf/Desktop/Alquimia/fair-forge\" && uv run pytest tests/prompt_optimizer/ -v --no-header --tb=short 2>&1 | tail -60)",
+      "Bash(cd \"C:/Users/ericf/Desktop/Alquimia/fair-forge\" && uv run pytest tests/prompt_optimizer/ -v --no-header --tb=short --no-cov 2>&1)",
+      "WebFetch(domain:www.mintlify.com)",
+      "Bash(uv run:*)",
+      "Bash(git add:*)",
+      "Bash(grep -r \"image\\\\|vision\\\\|VLM\\\\|multimodal\\\\|visual\" /c/Users/ericf/Desktop/Alquimia/fair-forge/fair_forge --include=\"*.py\" 2>/dev/null | grep -v \".venv\" | head -50)",
+      "Bash(grep -r \"image\\\\|vision\\\\|VLM\\\\|visual\\\\|multimodal\" /c/Users/ericf/Desktop/Alquimia/fair-forge/examples --include=\"*.ipynb\" --include=\"*.py\" 2>/dev/null | grep -v \".venv\" | head -30)"
+    ]
+  }
+}

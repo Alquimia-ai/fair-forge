@@ -1,8 +1,6 @@
 """Pydantic schemas for LLM structured outputs."""
 
-from typing import Literal
-
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 
 class ContextJudgeOutput(BaseModel):
@@ -23,17 +21,6 @@ class ConversationalJudgeOutput(BaseModel):
     relation_maxim: float = Field(ge=0, le=10, description="Grice relation maxim score (0-10)")
     manner_maxim: float = Field(ge=0, le=10, description="Grice manner maxim score (0-10)")
     sensibleness: float = Field(ge=0, le=10, description="Sensibleness score (0-10)")
-
-
-class VisionJudgeOutput(BaseModel):
-    """Structured output for vision hallucination evaluation."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    classification: Literal["true_positive", "false_positive", "true_negative", "false_negative"] = Field(
-        description="Classification of the VLM prediction against ground truth"
-    )
-    reasoning: str = Field(description="Explanation of the classification decision")
 
 
 class BestOfJudgeOutput(BaseModel):

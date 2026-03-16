@@ -10,8 +10,8 @@ from fair_forge.schemas.metrics import BaseMetric
 class VisionInteraction(BaseModel):
     qa_id: str
     classification: Literal["true_positive", "false_positive", "true_negative", "false_negative"]
+    similarity_score: float
     confidence: float | None = None
-    reasoning: str
 
 
 class FalsePositiveRateMetric(BaseMetric):

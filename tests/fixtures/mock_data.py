@@ -229,35 +229,39 @@ def create_multiple_datasets() -> list[Dataset]:
 
 
 def create_vision_dataset() -> Dataset:
-    """Create a dataset for vision metrics testing with VLM-style free-text predictions."""
+    """Create a dataset for vision metrics testing with VLM free-text descriptions."""
     conversation = [
         create_sample_batch(
             qa_id="qa_001",
-            query="Analyze this camera frame for security events.",
-            assistant="I detect a person lying on the floor near the entrance. This appears to be a fallen person requiring assistance.",
-            ground_truth_assistant="A person is lying on the floor near the entrance. A fall event has occurred.",
+            query="Describe what you observe in this camera frame.",
+            assistant="A person is lying on the floor near the entrance. They appear to have fallen.",
+            ground_truth_assistant="A person fell near the entrance and is lying on the floor.",
             agentic={"confidence": 0.9},
+            ground_truth_agentic={"detected": True},
         ),
         create_sample_batch(
             qa_id="qa_002",
-            query="Analyze this camera frame for security events.",
-            assistant="The corridor appears empty. No anomalies or security events detected.",
+            query="Describe what you observe in this camera frame.",
+            assistant="The corridor appears empty. No persons or anomalies detected.",
             ground_truth_assistant="The corridor is empty. No events have occurred.",
             agentic={"confidence": 0.95},
+            ground_truth_agentic={"detected": False},
         ),
         create_sample_batch(
             qa_id="qa_003",
-            query="Analyze this camera frame for security events.",
-            assistant="I detect an unauthorized person attempting to access a restricted area. Possible intrusion detected.",
-            ground_truth_assistant="The scene shows an empty restricted area. No intrusion has occurred.",
+            query="Describe what you observe in this camera frame.",
+            assistant="An unauthorized person is attempting to access a restricted area.",
+            ground_truth_assistant="The restricted area is empty. No intrusion has occurred.",
             agentic={"confidence": 0.78},
+            ground_truth_agentic={"detected": False},
         ),
         create_sample_batch(
             qa_id="qa_004",
-            query="Analyze this camera frame for security events.",
+            query="Describe what you observe in this camera frame.",
             assistant="The parking lot appears normal. No incidents detected.",
-            ground_truth_assistant="A vehicle has been broken into in the parking lot. A theft event is in progress.",
+            ground_truth_assistant="A vehicle has been broken into in the parking lot.",
             agentic={"confidence": 0.3},
+            ground_truth_agentic={"detected": True},
         ),
     ]
     return create_sample_dataset(

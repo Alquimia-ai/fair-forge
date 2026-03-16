@@ -2,14 +2,11 @@
 
 import math
 from abc import abstractmethod
-from typing import TYPE_CHECKING
 
-from langchain_core.language_models.chat_models import BaseChatModel
+import numpy as np
 from tqdm.auto import tqdm
 
 from fair_forge.core import FairForge, Retriever
-from fair_forge.llm import Judge, VisionJudgeOutput
-from fair_forge.llm.prompts import vision_judge_system_prompt
 from fair_forge.schemas import Batch
 from fair_forge.schemas.vision import (
     ConfidenceBucket,
@@ -19,37 +16,59 @@ from fair_forge.schemas.vision import (
     VisionInteraction,
 )
 
-if TYPE_CHECKING:
-    pass
-
+_DEFAULT_MODEL = "all-mpnet-base-v2"
+_DEFAULT_THRESHOLD = 0.75
 _N_CONFIDENCE_BUCKETS = 10
+
+
+def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+
+def _derive_classification(similarity: float, threshold: float, gt_detected: bool) -> str:
+    correct = similarity >= threshold
+    if correct and gt_detected:
+        return "true_positive"
+    if correct and not gt_detected:
+        return "true_negative"
+    if not correct and gt_detected:
+        return "false_negative"
+    return "false_positive"
 
 
 class _VisionBase(FairForge):
     """Shared base for vision hallucination metrics.
 
-    Handles the LLM judge call per interaction and accumulates VisionInteraction
-    objects per session. Subclasses only implement on_process_complete() to
-    derive their specific metric from the accumulated classifications.
+    Compares the VLM's free-text description (assistant) against the human ground
+    truth (ground_truth_assistant) using cosine similarity between sentence embeddings.
+    Classification into TP/FP/TN/FN uses the similarity score against a configurable
+    threshold combined with the actual event label from ground_truth_agentic["detected"].
+
+    Expected Batch fields:
+        assistant                        — VLM free-text description of the scene
+        ground_truth_assistant           — human description of what actually happened
+        ground_truth_agentic["detected"] (bool, required) — whether an event actually occurred
+        agentic["confidence"]            (float, optional) — model confidence score
     """
 
     def __init__(
         self,
         retriever: type[Retriever],
-        model: BaseChatModel,
-        use_structured_output: bool = False,
-        strict: bool = True,
-        bos_json_clause: str = "```json",
-        eos_json_clause: str = "```",
+        model_name: str = _DEFAULT_MODEL,
+        threshold: float = _DEFAULT_THRESHOLD,
         **kwargs,
     ):
         super().__init__(retriever, **kwargs)
-        self._model = model
-        self._use_structured_output = use_structured_output
-        self._strict = strict
-        self._bos_json_clause = bos_json_clause
-        self._eos_json_clause = eos_json_clause
+        self._model_name = model_name
+        self._threshold = threshold
+        self._encoder = None
         self._session_data: dict[str, dict] = {}
+
+    def _get_encoder(self):
+        if self._encoder is None:
+            from sentence_transformers import SentenceTransformer
+            self._encoder = SentenceTransformer(self._model_name)
+        return self._encoder
 
     def batch(
         self,
@@ -62,40 +81,28 @@ class _VisionBase(FairForge):
         if session_id not in self._session_data:
             self._session_data[session_id] = {"assistant_id": assistant_id, "interactions": []}
 
-        judge = Judge(
-            model=self._model,
-            use_structured_output=self._use_structured_output,
-            strict=self._strict,
-            bos_json_clause=self._bos_json_clause,
-            eos_json_clause=self._eos_json_clause,
-        )
+        encoder = self._get_encoder()
+        assistants = [i.assistant for i in batch]
+        ground_truths = [i.ground_truth_assistant for i in batch]
+        emb_a = encoder.encode(assistants, show_progress_bar=False)
+        emb_b = encoder.encode(ground_truths, show_progress_bar=False)
 
-        for interaction in tqdm(batch, desc=session_id, unit="frame"):
+        for interaction, a, b in tqdm(zip(batch, emb_a, emb_b), desc=session_id, unit="event", total=len(batch)):
             self.logger.debug(f"QA ID: {interaction.qa_id}")
-            _, result = judge.check(
-                system_prompt=vision_judge_system_prompt,
-                query="Classify the VLM prediction against the ground truth and provide your JSON response.",
-                data={
-                    "context": context,
-                    "assistant": interaction.assistant,
-                    "ground_truth_assistant": interaction.ground_truth_assistant,
-                },
-                output_schema=VisionJudgeOutput,
-            )
 
-            if result is None:
-                raise ValueError(f"No valid response from judge for QA ID: {interaction.qa_id}")
+            gt_agentic = interaction.ground_truth_agentic or {}
+            if "detected" not in gt_agentic:
+                raise ValueError(f"Missing 'detected' in ground_truth_agentic for qa_id: {interaction.qa_id}")
 
-            classification = result["classification"] if isinstance(result, dict) else result.classification
-            reasoning = result["reasoning"] if isinstance(result, dict) else result.reasoning
-            confidence = (interaction.agentic or {}).get("confidence")
+            similarity = _cosine_similarity(a, b)
+            classification = _derive_classification(similarity, self._threshold, gt_agentic["detected"])
 
             self._session_data[session_id]["interactions"].append(
                 VisionInteraction(
                     qa_id=interaction.qa_id,
                     classification=classification,
-                    confidence=confidence,
-                    reasoning=reasoning,
+                    similarity_score=round(similarity, 4),
+                    confidence=(interaction.agentic or {}).get("confidence"),
                 )
             )
 
@@ -109,8 +116,8 @@ class FalsePositiveRate(_VisionBase):
 
     FPR = False Positives / (False Positives + True Negatives)
 
-    A high FPR indicates the model frequently generates hallucinated detections,
-    which is the critical failure mode for vision-based alerting systems like Argos.
+    A high FPR means the model frequently describes events in scenes where nothing
+    happened — the critical failure mode for vision-based alerting systems like Argos.
     """
 
     def on_process_complete(self):
@@ -135,12 +142,12 @@ class FalsePositiveRate(_VisionBase):
 
 
 class Precision(_VisionBase):
-    """Measures the accuracy of the VLM's positive detections.
+    """Measures the accuracy of the VLM's event descriptions.
 
     Precision = True Positives / (True Positives + False Positives)
 
-    A low precision means the model raises many false alarms relative to
-    correct detections — directly impacting operational trust in Argos alerts.
+    A low precision means the VLM frequently describes events that did not occur,
+    causing the downstream LLM to raise false alarms in Argos.
     """
 
     def on_process_complete(self):
@@ -167,13 +174,13 @@ class Precision(_VisionBase):
 class ConfidenceScoreAnalysis(_VisionBase):
     """Analyzes the distribution and calibration of VLM confidence scores.
 
-    Reads confidence from interaction.agentic["confidence"] and combines it
-    with judge-determined correctness to compute:
+    Reads confidence from agentic["confidence"] and combines it with the derived
+    correctness label to compute:
     - Descriptive statistics (mean, std, min, max)
     - Expected Calibration Error (ECE): how well confidence predicts correctness
 
-    A high ECE means the model is overconfident or underconfident relative to
-    its actual accuracy — useful for setting reliable alert thresholds in Argos.
+    A high ECE means the model is overconfident or underconfident relative to its
+    actual accuracy — useful for setting reliable alert thresholds in Argos.
     """
 
     def _compute_stats(self, values: list[float]) -> tuple[float, float, float, float]:
@@ -195,8 +202,7 @@ class ConfidenceScoreAnalysis(_VisionBase):
         for vi in confident:
             idx = min(int(vi.confidence / bucket_width), _N_CONFIDENCE_BUCKETS - 1)
             buckets_data[idx]["confidences"].append(vi.confidence)
-            is_correct = vi.classification in ("true_positive", "true_negative")
-            buckets_data[idx]["correct"].append(1 if is_correct else 0)
+            buckets_data[idx]["correct"].append(1 if vi.classification in ("true_positive", "true_negative") else 0)
 
         total = len(confident)
         ece = 0.0
