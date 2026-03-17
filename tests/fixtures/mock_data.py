@@ -228,6 +228,43 @@ def create_multiple_datasets() -> list[Dataset]:
     ]
 
 
+def create_vision_dataset() -> Dataset:
+    """Create a dataset for vision metrics testing with VLM free-text descriptions."""
+    conversation = [
+        create_sample_batch(
+            qa_id="qa_001",
+            query="Describe what you observe in this camera frame.",
+            assistant="A person is lying on the floor near the entrance. They appear to have fallen.",
+            ground_truth_assistant="A person fell near the entrance and is lying on the floor.",
+        ),
+        create_sample_batch(
+            qa_id="qa_002",
+            query="Describe what you observe in this camera frame.",
+            assistant="The corridor appears empty. No persons or anomalies detected.",
+            ground_truth_assistant="The corridor is empty. No events have occurred.",
+        ),
+        create_sample_batch(
+            qa_id="qa_003",
+            query="Describe what you observe in this camera frame.",
+            assistant="An unauthorized person is attempting to access a restricted area.",
+            ground_truth_assistant="The restricted area is empty. No intrusion has occurred.",
+        ),
+        create_sample_batch(
+            qa_id="qa_004",
+            query="Describe what you observe in this camera frame.",
+            assistant="The parking lot appears normal. No incidents detected.",
+            ground_truth_assistant="A vehicle has been broken into in the parking lot.",
+        ),
+    ]
+    return create_sample_dataset(
+        session_id="vision_session",
+        assistant_id="argos_vlm",
+        context="Argos security camera surveillance system monitoring building entrances and restricted areas.",
+        conversation=conversation,
+    )
+
+
+
 def create_regulatory_dataset() -> Dataset:
     """Create a dataset for Regulatory metric testing."""
     conversation = [
