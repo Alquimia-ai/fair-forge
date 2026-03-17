@@ -236,32 +236,24 @@ def create_vision_dataset() -> Dataset:
             query="Describe what you observe in this camera frame.",
             assistant="A person is lying on the floor near the entrance. They appear to have fallen.",
             ground_truth_assistant="A person fell near the entrance and is lying on the floor.",
-            agentic={"confidence": 0.9},
-            ground_truth_agentic={"detected": True},
         ),
         create_sample_batch(
             qa_id="qa_002",
             query="Describe what you observe in this camera frame.",
             assistant="The corridor appears empty. No persons or anomalies detected.",
             ground_truth_assistant="The corridor is empty. No events have occurred.",
-            agentic={"confidence": 0.95},
-            ground_truth_agentic={"detected": False},
         ),
         create_sample_batch(
             qa_id="qa_003",
             query="Describe what you observe in this camera frame.",
             assistant="An unauthorized person is attempting to access a restricted area.",
             ground_truth_assistant="The restricted area is empty. No intrusion has occurred.",
-            agentic={"confidence": 0.78},
-            ground_truth_agentic={"detected": False},
         ),
         create_sample_batch(
             qa_id="qa_004",
             query="Describe what you observe in this camera frame.",
             assistant="The parking lot appears normal. No incidents detected.",
             ground_truth_assistant="A vehicle has been broken into in the parking lot.",
-            agentic={"confidence": 0.3},
-            ground_truth_agentic={"detected": True},
         ),
     ]
     return create_sample_dataset(

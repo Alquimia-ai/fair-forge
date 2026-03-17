@@ -5,6 +5,8 @@ import logging
 import re
 from typing import TypeVar
 
+from langchain.agents import create_agent
+from langchain.agents.factory import ProviderStrategy
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel
@@ -18,8 +20,7 @@ class Judge:
     """LLM-based judge for evaluating AI responses.
 
     Supports two modes:
-    - Structured output: Uses LangChain's with_structured_output() for automatic
-      schema validation via API
+    - Structured output: Uses create_agent with response_format for schema validation
     - Regex extraction: Parses JSON from model response using regex patterns
 
     Reasoning content is automatically extracted from LangChain's
@@ -27,7 +28,7 @@ class Judge:
 
     Args:
         model: LangChain BaseChatModel instance
-        use_structured_output: If True, use with_structured_output() for parsing
+        use_structured_output: If True, use create_agent with response_format
         bos_json_clause: Opening marker for JSON block (default: ```json)
         eos_json_clause: Closing marker for JSON block (default: ```)
     """
@@ -36,12 +37,14 @@ class Judge:
         self,
         model: BaseChatModel,
         use_structured_output: bool = False,
+        strict: bool = True,
         bos_json_clause: str = "```json",
         eos_json_clause: str = "```",
         verbose: bool = False,
     ):
         self.model = model
         self.use_structured_output = use_structured_output
+        self.strict = strict
         self.bos_json_clause = bos_json_clause
         self.eos_json_clause = eos_json_clause
         self.verbose = verbose
@@ -58,16 +61,16 @@ class Judge:
         """Evaluate using the model.
 
         If use_structured_output=True and output_schema provided:
-            - Adds simple "return JSON" instruction to prompt
-            - Uses model.with_structured_output(output_schema) - schema passed via API
+            - Renders the system prompt template with data variables
+            - Uses create_agent with response_format for structured output
         Else:
             - Includes full JSON schema in prompt
             - Uses regex extraction from response
 
         Args:
-            system_prompt: System prompt for the evaluation
+            system_prompt: System prompt template for the evaluation
             query: User query to evaluate
-            data: Template variables for the prompt
+            data: Template variables for the system prompt
             output_schema: Pydantic model for structured output validation
 
         Returns:
@@ -108,22 +111,23 @@ Do not include any additional text after the JSON.
         data: dict,
         output_schema: type[T],
     ) -> tuple[str, T | None]:
-        structured_model = self.model.with_structured_output(
-            output_schema,
-            include_raw=True,
-        )
         rendered_system = self._render_system_prompt(system_prompt, data)
-        self.chat_history.append(("human", query))
-        messages = [SystemMessage(content=rendered_system)]
-        for role, content in self.chat_history:
-            messages.append(HumanMessage(content=content) if role == "human" else AIMessage(content=content))
+        agent = create_agent(
+            model=self.model,
+            response_format=ProviderStrategy(output_schema, strict=self.strict),
+            system_prompt=rendered_system,
+        )
 
-        max_retries = 3
+        messages = [*self.chat_history, ("human", query)]
+        self.chat_history.append(("human", query))
+
+        max_retries = 5
         result = None
         for attempt in range(max_retries):
             try:
-                result = structured_model.invoke(messages)
-                parsed = result.get("parsed") if isinstance(result, dict) else result
+                result = agent.invoke({"messages": messages})
+                parsed = result.get("structured_response")
+
                 if parsed is None and attempt < max_retries - 1:
                     self.logger.warning(f"Retry {attempt + 1}/{max_retries} - model returned invalid JSON")
                     continue
@@ -135,17 +139,14 @@ Do not include any additional text after the JSON.
                 raise
 
         reasoning = ""
-        raw_response = result.get("raw") if isinstance(result, dict) else None
-        if raw_response is not None:
-            content_blocks = getattr(raw_response, "content_blocks", None)
-            if content_blocks and isinstance(content_blocks, list):
-                reasoning_steps = [
-                    b for b in content_blocks if isinstance(b, dict) and b.get("type") == "reasoning"
-                ]
-                reasoning = " ".join(step.get("reasoning", "") for step in reasoning_steps)
+        if result:
+            for msg in reversed(result.get("messages", [])):
+                reasoning_content = getattr(msg, "additional_kwargs", {}).get("reasoning_content", "")
+                if reasoning_content:
+                    reasoning = reasoning_content
+                    break
 
-        parsed = result.get("parsed") if isinstance(result, dict) else None
-        return reasoning, parsed
+        return reasoning, result.get("structured_response") if result else None
 
     def _check_regex(
         self,
@@ -170,7 +171,7 @@ Do not include any additional text after the JSON.
         return reasoning, json_data
 
     def _extract_json(self, text: str) -> dict | None:
-        pattern = rf"{re.escape(self.bos_json_clause)}\s*(\{{.*\}})\s*{re.escape(self.eos_json_clause)}"
+        pattern = rf"{re.escape(self.bos_json_clause)}\s*(\{{.*?\}})\s*{re.escape(self.eos_json_clause)}"
         match = re.search(pattern, text, re.DOTALL)
         if match:
             try:

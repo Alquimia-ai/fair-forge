@@ -43,6 +43,7 @@ class BestOf(FairForge):
         retriever: type[Retriever],
         model: BaseChatModel,
         use_structured_output: bool = False,
+        strict: bool = True,
         bos_json_clause: str = "```json",
         eos_json_clause: str = "```",
         criteria: str = "BestOf",
@@ -51,6 +52,7 @@ class BestOf(FairForge):
         super().__init__(retriever, **kwargs)
         self.model = model
         self.use_structured_output = use_structured_output
+        self.strict = strict
         self.bos_json_clause = bos_json_clause
         self.eos_json_clause = eos_json_clause
         self.criteria = criteria
@@ -58,6 +60,7 @@ class BestOf(FairForge):
         self._judge = Judge(
             model=self.model,
             use_structured_output=self.use_structured_output,
+            strict=self.strict,
             bos_json_clause=self.bos_json_clause,
             eos_json_clause=self.eos_json_clause,
         )

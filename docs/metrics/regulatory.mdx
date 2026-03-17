@@ -39,7 +39,7 @@ The Regulatory metric evaluates whether AI assistant responses comply with a reg
 The session `verdict` is always derived from the session `compliance_score` — they always agree.
 
 <Note>
-The metric uses **Qwen3-Embedding** for semantic retrieval and **Qwen3-Reranker** for contradiction detection. Both models run locally using HuggingFace Transformers.
+By default, the metric uses **Qwen3-Embedding** for semantic retrieval and **Qwen3-Reranker** for contradiction detection via the `QwenEmbedder` and `QwenReranker` implementations. You can swap these for any custom `Embedder` or `Reranker` implementation.
 </Note>
 
 ## Installation
@@ -53,12 +53,19 @@ uv add "alquimia-fair-forge[regulatory]"
 <CodeGroup>
 ```python Frequentist (default)
 from fair_forge.connectors import LocalCorpusConnector
+from fair_forge.embedders import QwenEmbedder
 from fair_forge.metrics.regulatory import Regulatory
+from fair_forge.rerankers import QwenReranker
 from your_retriever import ConversationRetriever
 
 corpus_connector = LocalCorpusConnector("path/to/regulations/")
 
-metrics = Regulatory.run(ConversationRetriever, corpus_connector=corpus_connector)
+metrics = Regulatory.run(
+    ConversationRetriever,
+    corpus_connector=corpus_connector,
+    embedder=QwenEmbedder(),
+    reranker=QwenReranker(),
+)
 
 for metric in metrics:
     print(f"Session: {metric.session_id}")
@@ -75,7 +82,9 @@ for metric in metrics:
 
 ```python Bayesian
 from fair_forge.connectors import LocalCorpusConnector
+from fair_forge.embedders import QwenEmbedder
 from fair_forge.metrics.regulatory import Regulatory
+from fair_forge.rerankers import QwenReranker
 from fair_forge.statistical import BayesianMode
 from your_retriever import ConversationRetriever
 
@@ -84,6 +93,8 @@ corpus_connector = LocalCorpusConnector("path/to/regulations/")
 metrics = Regulatory.run(
     ConversationRetriever,
     corpus_connector=corpus_connector,
+    embedder=QwenEmbedder(),
+    reranker=QwenReranker(),
     statistical_mode=BayesianMode(mc_samples=5000, ci_level=0.95),
 )
 
@@ -102,22 +113,20 @@ for metric in metrics:
 |-----------|------|-------------|
 | `retriever` | `Type[Retriever]` | Data source class returning conversations to evaluate |
 | `corpus_connector` | `CorpusConnector` | Connector for loading regulatory documents |
+| `embedder` | `Embedder` | Embedder instance for encoding documents and queries (e.g., `QwenEmbedder`) |
+| `reranker` | `Reranker` | Reranker instance for scoring document-response alignment (e.g., `QwenReranker`) |
 
 ### Optional Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `statistical_mode` | `StatisticalMode` | `FrequentistMode()` | Statistical computation mode |
-| `embedding_model` | `str` | `"Qwen/Qwen3-Embedding-0.6B"` | HuggingFace model for embeddings |
-| `reranker_model` | `str` | `"Qwen/Qwen3-Reranker-0.6B"` | HuggingFace model for reranking |
 | `chunk_size` | `int` | `1000` | Characters per chunk |
 | `chunk_overlap` | `int` | `100` | Character overlap between chunks |
 | `top_k` | `int` | `10` | Maximum chunks to retrieve per query |
 | `similarity_threshold` | `float` | `0.3` | Minimum cosine similarity for retrieval |
 | `contradiction_threshold` | `float` | `0.6` | Reranker score below which a chunk is classified as contradicting |
 | `compliance_threshold` | `float` | `0.5` | Minimum session compliance score to emit COMPLIANT verdict |
-| `max_length` | `int` | `8192` | Maximum token length for models |
-| `batch_size` | `int` | `32` | Batch size for embedding computation |
 | `verbose` | `bool` | `False` | Enable verbose logging |
 
 ## Statistical Modes
@@ -238,10 +247,11 @@ connector = LakeFSCorpusConnector(
 ## Complete Example
 
 ```python
-import os
 from fair_forge.connectors import LocalCorpusConnector
 from fair_forge.core.retriever import Retriever
+from fair_forge.embedders import QwenEmbedder
 from fair_forge.metrics.regulatory import Regulatory
+from fair_forge.rerankers import QwenReranker
 from fair_forge.statistical import BayesianMode
 from fair_forge.schemas.common import Dataset, Batch
 
@@ -277,6 +287,8 @@ corpus_connector = LocalCorpusConnector("./regulations/")
 metrics = Regulatory.run(
     ComplianceRetriever,
     corpus_connector=corpus_connector,
+    embedder=QwenEmbedder(),
+    reranker=QwenReranker(),
     statistical_mode=BayesianMode(mc_samples=5000, ci_level=0.95),
     compliance_threshold=0.5,
     verbose=True,

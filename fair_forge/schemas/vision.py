@@ -1,50 +1,33 @@
-"""Pydantic schemas for vision hallucination metrics."""
-
-from typing import Literal
+"""Pydantic schemas for vision metrics."""
 
 from pydantic import BaseModel
 
 from fair_forge.schemas.metrics import BaseMetric
 
 
-class VisionInteraction(BaseModel):
+class VisionSimilarityInteraction(BaseModel):
     qa_id: str
-    classification: Literal["true_positive", "false_positive", "true_negative", "false_negative"]
     similarity_score: float
-    confidence: float | None = None
 
 
-class FalsePositiveRateMetric(BaseMetric):
-    n_predictions: int
-    n_negatives: int
-    n_false_positives: int
-    false_positive_rate: float | None
-    interactions: list[VisionInteraction]
+class VisionSimilarityMetric(BaseMetric):
+    mean_similarity: float
+    min_similarity: float
+    max_similarity: float
+    summary: str
+    interactions: list[VisionSimilarityInteraction]
 
 
-class PrecisionMetric(BaseMetric):
-    n_predictions: int
-    n_positive_predictions: int
-    n_true_positives: int
-    precision: float | None
-    interactions: list[VisionInteraction]
+class VisionHallucinationInteraction(BaseModel):
+    qa_id: str
+    similarity_score: float
+    is_hallucination: bool
 
 
-class ConfidenceBucket(BaseModel):
-    range_min: float
-    range_max: float
-    count: int
-    mean_confidence: float | None = None
-    accuracy: float | None = None
-
-
-class ConfidenceScoreMetric(BaseMetric):
-    n_predictions: int
-    n_with_confidence: int
-    confidence_mean: float | None = None
-    confidence_std: float | None = None
-    confidence_min: float | None = None
-    confidence_max: float | None = None
-    expected_calibration_error: float | None = None
-    buckets: list[ConfidenceBucket]
-    interactions: list[VisionInteraction]
+class VisionHallucinationMetric(BaseMetric):
+    hallucination_rate: float
+    n_hallucinations: int
+    n_frames: int
+    threshold: float
+    summary: str
+    interactions: list[VisionHallucinationInteraction]

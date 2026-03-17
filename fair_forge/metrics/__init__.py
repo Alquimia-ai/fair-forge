@@ -9,19 +9,18 @@ Import metrics directly from their modules:
     from fair_forge.metrics.best_of import BestOf
     from fair_forge.metrics.agentic import Agentic
     from fair_forge.metrics.regulatory import Regulatory
-    from fair_forge.metrics.vision import ConfidenceScoreAnalysis, FalsePositiveRate, Precision
+    from fair_forge.metrics.vision import VisionHallucination, VisionSimilarity
 """
 
 __all__ = [
     "Agentic",
     "BestOf",
     "Bias",
-    "ConfidenceScoreAnalysis",
     "Context",
     "Conversational",
-    "FalsePositiveRate",
     "Humanity",
-    "Precision",
     "Regulatory",
     "Toxicity",
+    "VisionHallucination",
+    "VisionSimilarity",
 ]

@@ -188,6 +188,7 @@ class TestConversationalMetric:
         mock_judge_class.assert_called_once_with(
             model=mock_model,
             use_structured_output=False,
+            strict=True,
             bos_json_clause="[",
             eos_json_clause="]",
         )
@@ -199,7 +200,13 @@ class TestConversationalMetric:
         mock_judge.check.return_value = ("", MOCK_JUDGE_RESULT)
 
         conv = Conversational(retriever=MockRetriever, model=mock_model)
-        conv.batch(session_id="s", context="c", assistant_id="a", batch=[create_sample_batch(qa_id="qa_001")], language="spanish")
+        conv.batch(
+            session_id="s",
+            context="c",
+            assistant_id="a",
+            batch=[create_sample_batch(qa_id="qa_001")],
+            language="spanish",
+        )
 
         call_args = mock_judge.check.call_args
         assert call_args[0][2]["preferred_language"] == "spanish"
@@ -223,14 +230,24 @@ class TestConversationalMetric:
         mock_judge = MagicMock()
         mock_judge_class.return_value = mock_judge
         expected_result = ConversationalJudgeOutput(
-            memory=8.5, language=9.0, insight="Good conversation",
-            quality_maxim=8.0, quantity_maxim=7.5, relation_maxim=9.0,
-            manner_maxim=8.5, sensibleness=9.0,
+            memory=8.5,
+            language=9.0,
+            insight="Good conversation",
+            quality_maxim=8.0,
+            quantity_maxim=7.5,
+            relation_maxim=9.0,
+            manner_maxim=8.5,
+            sensibleness=9.0,
         )
         mock_judge.check.return_value = ("", expected_result)
 
         conv = Conversational(retriever=MockRetriever, model=mock_model, use_structured_output=True)
-        conv.batch(session_id="test_session", context="Test context", assistant_id="test_assistant", batch=[create_sample_batch(qa_id="qa_001")])
+        conv.batch(
+            session_id="test_session",
+            context="Test context",
+            assistant_id="test_assistant",
+            batch=[create_sample_batch(qa_id="qa_001")],
+        )
         conv.on_process_complete()
 
         assert len(conv.metrics) == 1

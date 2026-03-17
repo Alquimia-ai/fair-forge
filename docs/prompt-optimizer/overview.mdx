@@ -1,0 +1,99 @@
+---
+title: Prompt Optimizer
+description: Automatically improve AI agent system prompts using GEPA and MIPROv2
+---
+
+# Prompt Optimizer
+
+The Prompt Optimizer module closes the evaluation loop: once Fair Forge measures where your agent fails, these tools automatically find the system prompt that fixes those failures.
+
+## How it fits into Fair Forge
+
+```
+Fair Forge measures metrics (Context, Conversational, etc.)
+    ↓ failing examples become your dataset
+GEPAOptimizer or MIPROv2Optimizer finds the best prompt
+    ↓ optimized prompt deployed to your agent
+Fair Forge measures again to confirm improvement
+```
+
+## Available Optimizers
+
+<CardGroup cols={2}>
+  <Card title="GEPA" icon="arrow-trend-up" href="/prompt-optimizer/gepa">
+    Iteratively reads failures and generates improved prompt candidates. Best when the prompt itself is clearly wrong.
+  </Card>
+  <Card title="MIPROv2" icon="sparkles" href="/prompt-optimizer/miprov2">
+    Optimizes instruction AND few-shot examples simultaneously using Bayesian search. Best when format and tone matter as much as content.
+  </Card>
+</CardGroup>
+
+## When to use each
+
+| | GEPA | MIPROv2 |
+|---|---|---|
+| **Optimizes** | Prompt instruction | Instruction + few-shot examples |
+| **Search strategy** | Iterative, reads failures | Bayesian (Optuna/TPE) |
+| **Best for** | Clearly bad prompts | Format-sensitive tasks |
+| **Speed** | Fast (few iterations) | Slower (20+ trials) |
+| **Examples needed** | No | Yes — key differentiator |
+
+## Installation
+
+```bash
+uv add "alquimia-fair-forge"
+uv add langchain-groq  # or your preferred LLM provider
+```
+
+## Common Pattern
+
+Both optimizers follow the same Fair Forge pattern:
+
+```python
+from fair_forge import Retriever
+from fair_forge.schemas import Dataset
+
+class MyRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        # Return your evaluation dataset
+        ...
+
+result = AnyOptimizer.run(
+    retriever=MyRetriever,
+    model=model,
+    seed_prompt="Your current (bad) system prompt.",
+    objective="Plain language description of what a good response looks like.",
+)
+
+print(result.optimized_prompt)
+```
+
+<Note>
+  The `objective` is the most important parameter. Describe what a **good** response looks like — the optimizer uses it to evaluate candidates and guide generation.
+</Note>
+
+## Custom Evaluator
+
+By default both optimizers use an LLM judge based on the `objective`. For structured or deterministic tasks, pass a custom evaluator for sharper signal:
+
+```python
+from fair_forge.prompt_optimizer import LLMEvaluator
+
+# Default — describe criteria in natural language
+evaluator = LLMEvaluator(
+    model=model,
+    criteria="Response must use only the provided context and be concise.",
+)
+
+# Custom — deterministic logic
+def my_evaluator(actual: str, expected: str, query: str, context: str) -> float:
+    # Return a float between 0.0 and 1.0
+    ...
+```
+
+## Output
+
+```python
+print(f"Score: {result.initial_score:.2f} → {result.final_score:.2f}  ({result.n_examples} examples)")
+print(result.optimized_prompt)
+```

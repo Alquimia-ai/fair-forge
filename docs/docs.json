@@ -96,6 +96,15 @@
             ]
           },
           {
+            "group": "Prompt Optimizer",
+            "icon": "wand-magic-sparkles",
+            "pages": [
+              "prompt-optimizer/overview",
+              "prompt-optimizer/gepa",
+              "prompt-optimizer/miprov2"
+            ]
+          },
+          {
             "group": "Explainability",
             "icon": "lightbulb",
             "pages": [
