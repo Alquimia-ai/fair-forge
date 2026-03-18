@@ -2,7 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pytest
 
 from fair_forge.metrics.vision import VisionHallucination, VisionSimilarity
@@ -10,14 +9,11 @@ from fair_forge.schemas.vision import VisionHallucinationMetric, VisionSimilarit
 from tests.fixtures.mock_data import create_sample_batch, create_sample_dataset
 from tests.fixtures.mock_retriever import MockRetriever, VisionDatasetRetriever
 
-_HIGH = np.array([1.0, 0.0])  # cosine similarity = 1.0
-_LOW = np.array([0.0, 1.0])   # cosine similarity = 0.0
 
-
-def _mock_encoder(encode_sequence: list[np.ndarray]):
-    encoder = MagicMock()
-    encoder.encode.side_effect = encode_sequence
-    return encoder
+def _mock_scorer(similarities: list[float]):
+    scorer = MagicMock()
+    scorer.calculate.side_effect = similarities
+    return scorer
 
 
 def _vision_retriever(batches):
@@ -38,10 +34,9 @@ def _batch(qa_id: str):
     )
 
 
-def _run_metric(metric_class, batches, encoder, threshold=0.75):
+def _run_metric(metric_class, batches, scorer, threshold=0.75):
     retriever = _vision_retriever(batches)
-    metric = metric_class(retriever, threshold=threshold)
-    metric._encoder = encoder
+    metric = metric_class(retriever, scorer=scorer, threshold=threshold)
     metric.batch(session_id="vision_session", context="camera", assistant_id="vlm", batch=batches)
     metric.on_process_complete()
     return metric
@@ -49,14 +44,14 @@ def _run_metric(metric_class, batches, encoder, threshold=0.75):
 
 class TestVisionSimilarity:
     def test_initialization(self, vision_dataset_retriever):
-        metric = VisionSimilarity(vision_dataset_retriever)
+        scorer = _mock_scorer([])
+        metric = VisionSimilarity(vision_dataset_retriever, scorer=scorer)
         assert metric._session_data == {}
         assert metric._threshold == 0.75
 
     def test_perfect_similarity(self):
         batches = [_batch("qa_001"), _batch("qa_002")]
-        encoder = _mock_encoder([np.array([_HIGH, _HIGH]), np.array([_HIGH, _HIGH])])
-        metric = _run_metric(VisionSimilarity, batches, encoder)
+        metric = _run_metric(VisionSimilarity, batches, _mock_scorer([1.0, 1.0]))
 
         result = metric.metrics[0]
         assert isinstance(result, VisionSimilarityMetric)
@@ -66,8 +61,7 @@ class TestVisionSimilarity:
 
     def test_mixed_similarity(self):
         batches = [_batch("qa_001"), _batch("qa_002")]
-        encoder = _mock_encoder([np.array([_HIGH, _LOW]), np.array([_HIGH, _HIGH])])
-        metric = _run_metric(VisionSimilarity, batches, encoder)
+        metric = _run_metric(VisionSimilarity, batches, _mock_scorer([1.0, 0.0]))
 
         result = metric.metrics[0]
         assert result.mean_similarity == pytest.approx(0.5, abs=0.01)
@@ -76,8 +70,7 @@ class TestVisionSimilarity:
 
     def test_summary_contains_key_info(self):
         batches = [_batch("qa_001")]
-        encoder = _mock_encoder([np.array([_HIGH]), np.array([_HIGH])])
-        metric = _run_metric(VisionSimilarity, batches, encoder)
+        metric = _run_metric(VisionSimilarity, batches, _mock_scorer([1.0]))
 
         summary = metric.metrics[0].summary
         assert "100%" in summary
@@ -85,8 +78,7 @@ class TestVisionSimilarity:
 
     def test_interactions_stored(self):
         batches = [_batch("qa_001"), _batch("qa_002")]
-        encoder = _mock_encoder([np.array([_HIGH, _LOW]), np.array([_HIGH, _HIGH])])
-        metric = _run_metric(VisionSimilarity, batches, encoder)
+        metric = _run_metric(VisionSimilarity, batches, _mock_scorer([1.0, 0.0]))
 
         interactions = metric.metrics[0].interactions
         assert len(interactions) == 2
@@ -99,12 +91,8 @@ class TestVisionSimilarity:
         dataset_b = create_sample_dataset(session_id="session_b", conversation=batches)
         retriever = type("R", (MockRetriever,), {"load_dataset": lambda self: [dataset_a, dataset_b]})
 
-        encoder = _mock_encoder([
-            np.array([_HIGH]), np.array([_HIGH]),
-            np.array([_HIGH]), np.array([_HIGH]),
-        ])
-        metric = VisionSimilarity(retriever)
-        metric._encoder = encoder
+        scorer = _mock_scorer([1.0, 1.0])
+        metric = VisionSimilarity(retriever, scorer=scorer)
         metric.batch(session_id="session_a", context="cam", assistant_id="vlm", batch=batches)
         metric.batch(session_id="session_b", context="cam", assistant_id="vlm", batch=batches)
         metric.on_process_complete()
@@ -112,13 +100,8 @@ class TestVisionSimilarity:
         assert len(metric.metrics) == 2
 
     def test_run_method(self, vision_dataset_retriever):
-        mock_encoder = MagicMock()
-        mock_encoder.encode.side_effect = [
-            np.array([_HIGH, _HIGH, _LOW, _LOW]),
-            np.array([_HIGH, _HIGH, _HIGH, _HIGH]),
-        ]
-        with patch.object(VisionSimilarity, "_get_encoder", return_value=mock_encoder):
-            results = VisionSimilarity.run(vision_dataset_retriever, verbose=False)
+        scorer = _mock_scorer([1.0, 1.0, 1.0, 1.0])
+        results = VisionSimilarity.run(vision_dataset_retriever, scorer=scorer, verbose=False)
 
         assert isinstance(results, list)
         assert isinstance(results[0], VisionSimilarityMetric)
@@ -126,14 +109,14 @@ class TestVisionSimilarity:
 
 class TestVisionHallucination:
     def test_initialization(self, vision_dataset_retriever):
-        metric = VisionHallucination(vision_dataset_retriever)
+        scorer = _mock_scorer([])
+        metric = VisionHallucination(vision_dataset_retriever, scorer=scorer)
         assert metric._session_data == {}
         assert metric._threshold == 0.75
 
     def test_no_hallucinations(self):
         batches = [_batch("qa_001"), _batch("qa_002")]
-        encoder = _mock_encoder([np.array([_HIGH, _HIGH]), np.array([_HIGH, _HIGH])])
-        metric = _run_metric(VisionHallucination, batches, encoder)
+        metric = _run_metric(VisionHallucination, batches, _mock_scorer([1.0, 1.0]))
 
         result = metric.metrics[0]
         assert isinstance(result, VisionHallucinationMetric)
@@ -142,8 +125,7 @@ class TestVisionHallucination:
 
     def test_all_hallucinations(self):
         batches = [_batch("qa_001"), _batch("qa_002")]
-        encoder = _mock_encoder([np.array([_HIGH, _HIGH]), np.array([_LOW, _LOW])])
-        metric = _run_metric(VisionHallucination, batches, encoder)
+        metric = _run_metric(VisionHallucination, batches, _mock_scorer([0.0, 0.0]))
 
         result = metric.metrics[0]
         assert result.n_hallucinations == 2
@@ -151,8 +133,7 @@ class TestVisionHallucination:
 
     def test_partial_hallucinations(self):
         batches = [_batch("qa_001"), _batch("qa_002"), _batch("qa_003")]
-        encoder = _mock_encoder([np.array([_HIGH, _HIGH, _LOW]), np.array([_HIGH, _HIGH, _HIGH])])
-        metric = _run_metric(VisionHallucination, batches, encoder)
+        metric = _run_metric(VisionHallucination, batches, _mock_scorer([1.0, 1.0, 0.0]))
 
         result = metric.metrics[0]
         assert result.n_hallucinations == 1
@@ -161,23 +142,20 @@ class TestVisionHallucination:
 
     def test_configurable_threshold(self):
         batches = [_batch("qa_001")]
-        encoder = _mock_encoder([np.array([_HIGH]), np.array([_LOW])])
         # similarity = 0.0, threshold = 0.0 → 0.0 < 0.0 is False → not a hallucination
-        metric = _run_metric(VisionHallucination, batches, encoder, threshold=0.0)
+        metric = _run_metric(VisionHallucination, batches, _mock_scorer([0.0]), threshold=0.0)
 
         assert metric.metrics[0].n_hallucinations == 0
 
     def test_threshold_stored_in_result(self):
         batches = [_batch("qa_001")]
-        encoder = _mock_encoder([np.array([_HIGH]), np.array([_HIGH])])
-        metric = _run_metric(VisionHallucination, batches, encoder, threshold=0.8)
+        metric = _run_metric(VisionHallucination, batches, _mock_scorer([1.0]), threshold=0.8)
 
         assert metric.metrics[0].threshold == 0.8
 
     def test_summary_contains_key_info(self):
         batches = [_batch("qa_001"), _batch("qa_002")]
-        encoder = _mock_encoder([np.array([_HIGH, _LOW]), np.array([_HIGH, _HIGH])])
-        metric = _run_metric(VisionHallucination, batches, encoder)
+        metric = _run_metric(VisionHallucination, batches, _mock_scorer([1.0, 0.0]))
 
         summary = metric.metrics[0].summary
         assert "1 of 2" in summary
@@ -185,21 +163,15 @@ class TestVisionHallucination:
 
     def test_interactions_classified_correctly(self):
         batches = [_batch("qa_001"), _batch("qa_002")]
-        encoder = _mock_encoder([np.array([_HIGH, _LOW]), np.array([_HIGH, _HIGH])])
-        metric = _run_metric(VisionHallucination, batches, encoder)
+        metric = _run_metric(VisionHallucination, batches, _mock_scorer([1.0, 0.0]))
 
         interactions = metric.metrics[0].interactions
         assert interactions[0].is_hallucination is False
         assert interactions[1].is_hallucination is True
 
     def test_run_method(self, vision_dataset_retriever):
-        mock_encoder = MagicMock()
-        mock_encoder.encode.side_effect = [
-            np.array([_HIGH, _HIGH, _LOW, _LOW]),
-            np.array([_HIGH, _HIGH, _HIGH, _HIGH]),
-        ]
-        with patch.object(VisionHallucination, "_get_encoder", return_value=mock_encoder):
-            results = VisionHallucination.run(vision_dataset_retriever, verbose=False)
+        scorer = _mock_scorer([1.0, 1.0, 1.0, 1.0])
+        results = VisionHallucination.run(vision_dataset_retriever, scorer=scorer, verbose=False)
 
         assert isinstance(results, list)
         assert isinstance(results[0], VisionHallucinationMetric)

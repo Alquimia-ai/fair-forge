@@ -22,6 +22,7 @@ from .loader import ToxicityLoader
 from .reranker import Reranker
 from .retriever import Retriever
 from .sentiment import SentimentAnalyzer
+from .similarity_scorer import SimilarityScorer
 
 __all__ = [
     "BaseGroupExtractor",
@@ -36,6 +37,7 @@ __all__ = [
     "Retriever",
     "RetrieverError",
     "SentimentAnalyzer",
+    "SimilarityScorer",
     "StatisticalModeError",
     "ToxicityLoader",
 ]

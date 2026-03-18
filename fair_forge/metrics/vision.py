@@ -2,10 +2,9 @@
 
 from abc import abstractmethod
 
-import numpy as np
 from tqdm.auto import tqdm
 
-from fair_forge.core import FairForge, Retriever
+from fair_forge.core import FairForge, Retriever, SimilarityScorer
 from fair_forge.schemas import Batch
 from fair_forge.schemas.vision import (
     VisionHallucinationInteraction,
@@ -18,15 +17,18 @@ _DEFAULT_MODEL = "all-mpnet-base-v2"
 _DEFAULT_THRESHOLD = 0.75
 
 
-def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
-    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+def _default_scorer() -> SimilarityScorer:
+    from fair_forge.embedders import SentenceTransformerEmbedder
+    from fair_forge.scorers import CosineSimilarity
+
+    return CosineSimilarity(SentenceTransformerEmbedder(model=_DEFAULT_MODEL))
 
 
 class _VisionBase(FairForge):
     """Shared base for vision metrics.
 
     Compares VLM free-text descriptions against human ground truth
-    using cosine similarity between sentence embeddings.
+    using a pluggable SimilarityScorer.
 
     Expected Batch fields:
         assistant              — VLM free-text description of the scene
@@ -36,21 +38,14 @@ class _VisionBase(FairForge):
     def __init__(
         self,
         retriever: type[Retriever],
-        model_name: str = _DEFAULT_MODEL,
+        scorer: SimilarityScorer | None = None,
         threshold: float = _DEFAULT_THRESHOLD,
         **kwargs,
     ):
         super().__init__(retriever, **kwargs)
-        self._model_name = model_name
+        self._scorer = scorer if scorer is not None else _default_scorer()
         self._threshold = threshold
-        self._encoder = None
         self._session_data: dict[str, dict] = {}
-
-    def _get_encoder(self):
-        if self._encoder is None:
-            from sentence_transformers import SentenceTransformer
-            self._encoder = SentenceTransformer(self._model_name)
-        return self._encoder
 
     def batch(
         self,
@@ -63,13 +58,9 @@ class _VisionBase(FairForge):
         if session_id not in self._session_data:
             self._session_data[session_id] = {"assistant_id": assistant_id, "interactions": []}
 
-        encoder = self._get_encoder()
-        emb_a = encoder.encode([i.assistant for i in batch], show_progress_bar=False)
-        emb_b = encoder.encode([i.ground_truth_assistant for i in batch], show_progress_bar=False)
-
-        for interaction, a, b in tqdm(zip(batch, emb_a, emb_b), desc=session_id, unit="frame", total=len(batch)):
+        for interaction in tqdm(batch, desc=session_id, unit="frame"):
             self.logger.debug(f"QA ID: {interaction.qa_id}")
-            similarity = _cosine_similarity(a, b)
+            similarity = self._scorer.calculate(interaction.assistant, interaction.ground_truth_assistant)
             self._session_data[session_id]["interactions"].append(
                 {"qa_id": interaction.qa_id, "similarity_score": round(similarity, 4)}
             )
@@ -82,9 +73,9 @@ class _VisionBase(FairForge):
 class VisionSimilarity(_VisionBase):
     """Measures how accurately the VLM describes scenes compared to human ground truth.
 
-    Uses cosine similarity between sentence embeddings of the VLM description
-    and the human-annotated ground truth. A score of 1.0 means the descriptions
-    are semantically identical; 0.0 means they are completely unrelated.
+    Uses a SimilarityScorer to compare the VLM description against the human-annotated
+    ground truth. A score of 1.0 means the descriptions are semantically identical;
+    0.0 means they are completely unrelated.
     """
 
     def on_process_complete(self):
@@ -114,7 +105,7 @@ class VisionSimilarity(_VisionBase):
 class VisionHallucination(_VisionBase):
     """Measures how often the VLM describes scenes that differ significantly from reality.
 
-    A frame is considered a hallucination when the cosine similarity between the VLM
+    A frame is considered a hallucination when the similarity score between the VLM
     description and the ground truth falls below the configured threshold.
     """
 
