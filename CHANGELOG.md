@@ -2,6 +2,27 @@
 
 <!-- version list -->
 
+## v3.0.0-b.2 (2026-03-18)
+
+### Documentation
+
+- **metrics**: Add vision metrics documentation and test fixtures
+  ([`16313bc`](https://github.com/Alquimia-ai/fair-forge/commit/16313bc021b6e88a2f1a8bef665415fbd1c1f792))
+
+### Features
+
+- **metrics**: Add VisionSimilarity and VisionHallucination metrics for VLM evaluation
+  ([`ca50030`](https://github.com/Alquimia-ai/fair-forge/commit/ca500307702fc5471b7c2f6429c72aee379432e3))
+
+- **metrics**: Replace vision hallucination metrics with VisionSimilarity and VisionHallucination
+  ([`10e9f88`](https://github.com/Alquimia-ai/fair-forge/commit/10e9f88951e18291bc4242236cffac5cf6eaef2e))
+
+### Refactoring
+
+- **metrics**: Apply Strategy and Adapter patterns to vision metrics
+  ([`e0a7c8d`](https://github.com/Alquimia-ai/fair-forge/commit/e0a7c8d423dc7c0ad02d011367cee6de1f2c34ea))
+
+
 ## v3.0.0-b.1 (2026-03-12)
 
 ### Chores
