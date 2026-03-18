@@ -5,7 +5,7 @@ description: Evaluate Vision Language Model (VLM) scene descriptions using seman
 
 # Vision Metrics
 
-The Vision metrics evaluate how accurately a Vision Language Model (VLM) describes scenes compared to human-annotated ground truth. They use **cosine similarity between sentence embeddings** (`all-mpnet-base-v2`) to compare free-text descriptions — no structured output required.
+The Vision metrics evaluate how accurately a Vision Language Model (VLM) describes scenes compared to human-annotated ground truth. They use a pluggable **SimilarityScorer** to compare free-text descriptions — no structured output required. The default scorer uses cosine similarity between sentence embeddings (`all-mpnet-base-v2`).
 
 Two metrics are available:
 
@@ -50,7 +50,7 @@ for r in results:
 |-----------|------|---------|-------------|
 | `retriever` | `Type[Retriever]` | — | Data source class |
 | `threshold` | `float` | `0.75` | Similarity cutoff for hallucination detection |
-| `model_name` | `str` | `"all-mpnet-base-v2"` | Sentence Transformer model for embeddings |
+| `scorer` | `SimilarityScorer` | `CosineSimilarity(SentenceTransformerEmbedder("all-mpnet-base-v2"))` | Strategy used to compare descriptions |
 | `verbose` | `bool` | `False` | Enable verbose logging |
 
 ### Threshold Guide
@@ -214,7 +214,15 @@ for r in results:
 
 <AccordionGroup>
   <Accordion title="Similarity scores are lower than expected">
-    The default model (`all-mpnet-base-v2`) is sensitive to domain-specific vocabulary. If your VLM uses technical terms not well represented in the model, try a domain-adapted Sentence Transformer via the `model_name` parameter.
+    The default model (`all-mpnet-base-v2`) is sensitive to domain-specific vocabulary. If your VLM uses technical terms not well represented in the model, pass a custom scorer with a domain-adapted embedder:
+
+    ```python
+    from fair_forge.embedders import SentenceTransformerEmbedder
+    from fair_forge.scorers import CosineSimilarity
+
+    scorer = CosineSimilarity(SentenceTransformerEmbedder(model="your-domain-model"))
+    results = VisionSimilarity.run(VLMRetriever, scorer=scorer, threshold=0.75)
+    ```
   </Accordion>
 
   <Accordion title="All frames flagged as hallucinations">
