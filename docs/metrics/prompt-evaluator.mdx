@@ -1,0 +1,235 @@
+---
+title: Prompt Evaluator
+description: Score a system prompt against a pre-run dataset using an LLM judge
+---
+
+# Prompt Evaluator
+
+PromptEvaluator measures how well a system prompt performs against a dataset of real conversations. You bring the responses your agent already produced — the metric judges each one and aggregates the results into a quality score.
+
+## Overview
+
+- **LLM-as-a-Judge**: A language model evaluates each response step by step, identifying what is correct and what is wrong before assigning a score
+- **prompt\_score**: Average quality across all interactions (0.0–1.0), capturing partial credit for responses that are mostly but not fully correct
+- **pass\_rate**: Fraction of interactions that scored at or above the threshold
+
+<Note>
+The judge model you choose directly affects the scores. A stricter model will score lower on the same dataset than a lenient one. For consistent comparisons across evaluations, always use the same judge model.
+</Note>
+
+## How it works
+
+For each interaction, the judge receives:
+
+1. The business objective the prompt is trying to achieve
+2. The user query
+3. The available context
+4. The expected response (ground truth)
+5. The actual response your agent produced
+
+The judge reasons through what the response gets right and wrong, then assigns a proportional score. This chain-of-thought approach produces granular scores (e.g. `0.65`, `0.30`) rather than collapsing to binary `0` or `1`.
+
+| Score Range | Meaning |
+|-------------|---------|
+| 0.8 – 1.0 | Fully or mostly correct, uses only context |
+| 0.4 – 0.6 | Partially correct, missing key info or slightly off |
+| 0.1 – 0.3 | Vague, refuses when context has the answer, or mostly wrong |
+| 0.0 | Completely wrong or fully hallucinated |
+
+## Installation
+
+```bash
+uv add alquimia-fair-forge
+uv add langchain-groq  # Or your preferred LLM provider
+```
+
+## Basic Usage
+
+```python
+from fair_forge import Retriever
+from fair_forge.metrics.prompt_evaluator import PromptEvaluator
+from fair_forge.schemas import Dataset
+from langchain_groq import ChatGroq
+import json
+from pathlib import Path
+
+class MyRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        with open(Path("dataset.json"), encoding="utf-8") as f:
+            return [Dataset.model_validate(item) for item in json.load(f)]
+
+judge = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key", temperature=0.0)
+
+results = PromptEvaluator.run(
+    MyRetriever,
+    model=judge,
+    seed_prompt="You are a helpful customer support assistant...",
+    objective="Answer questions using only the provided context, without hallucinating.",
+    threshold=0.6,
+)
+
+for r in results:
+    r.display()
+```
+
+## Parameters
+
+### Required
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `retriever` | `Type[Retriever]` | Data source class with pre-run responses |
+| `model` | `BaseChatModel` | LangChain model used as the judge |
+| `seed_prompt` | `str` | The system prompt being evaluated |
+| `objective` | `str` | Business goal the prompt is trying to achieve |
+
+### Optional
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `threshold` | `float` | `0.6` | Minimum score for an interaction to be considered passing |
+| `verbose` | `bool` | `False` | Log each interaction score as it runs |
+
+## Dataset Format
+
+Each entry in your dataset must include the responses your agent already produced in the `assistant` field, and the expected correct responses in `ground_truth_assistant`.
+
+```json
+[
+  {
+    "session_id": "support-billing",
+    "assistant_id": "support-bot-v1",
+    "language": "english",
+    "context": "Pro plan costs $15/month per user...",
+    "conversation": [
+      {
+        "qa_id": "billing-001",
+        "query": "How much does the Pro plan cost?",
+        "ground_truth_assistant": "The Pro plan costs $15 per user per month.",
+        "assistant": "The Pro plan is $15 per user per month."
+      }
+    ]
+  }
+]
+```
+
+## Output Schema
+
+```python
+class PromptInteractionScore(BaseModel):
+    qa_id: str
+    score: float   # 0.0–1.0 judge score for this interaction
+    passed: bool   # True if score >= threshold
+
+class PromptEvaluatorMetric(BaseMetric):
+    session_id: str
+    assistant_id: str
+    seed_prompt: str
+    objective: str
+    prompt_score: float              # Average score across all interactions
+    pass_rate: float                 # Fraction of passing interactions
+    threshold: float
+    n_interactions: int
+    interactions: list[PromptInteractionScore]
+```
+
+**Example output:**
+
+```
+Session: support-billing  |  Assistant: support-bot-v1
+Prompt score:  0.55
+Pass rate:     50%  (3/6 interactions passed @ threshold=0.6)
+
+  billing-001  score=1.00  pass
+  billing-002  score=0.20  FAIL
+  billing-003  score=0.70  pass
+  billing-004  score=1.00  pass
+  billing-005  score=0.00  FAIL
+  billing-006  score=0.40  FAIL
+```
+
+## Judge Model Options
+
+<CodeGroup>
+```python Groq
+from langchain_groq import ChatGroq
+
+judge = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    api_key="your-api-key",
+    temperature=0.0,
+)
+```
+
+```python OpenAI
+from langchain_openai import ChatOpenAI
+
+judge = ChatOpenAI(
+    model="gpt-4o",
+    api_key="your-api-key",
+    temperature=0.0,
+)
+```
+
+```python Anthropic
+from langchain_anthropic import ChatAnthropic
+
+judge = ChatAnthropic(
+    model="claude-3-5-sonnet-20241022",
+    api_key="your-api-key",
+    temperature=0.0,
+)
+```
+
+```python Ollama (Local)
+from langchain_ollama import ChatOllama
+
+judge = ChatOllama(
+    model="llama3.1:70b",
+    temperature=0.0,
+)
+```
+</CodeGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use the same judge model across evaluations">
+    Different models have different interpretations of quality. If you switch from Llama to GPT-4o mid-evaluation, the scores are not comparable. Pick one judge and use it consistently throughout your evaluation cycle.
+  </Accordion>
+
+  <Accordion title="Design your dataset with varied response quality">
+    A dataset where all responses are correct will give a `prompt_score` of 1.0 regardless of how good the prompt is. Include responses that are fully correct, partially correct, vague, and clearly wrong — this is how you surface real prompt weaknesses.
+  </Accordion>
+
+  <Accordion title="Write a specific objective">
+    The `objective` is the context the judge uses to evaluate. A vague objective like "be helpful" leads to lenient and inconsistent scoring. Be specific: "Answer using only the provided context, without adding information not present in it."
+  </Accordion>
+
+  <Accordion title="Use temperature=0.0 for the judge">
+    Setting `temperature=0.0` makes the judge deterministic. This ensures the same response always gets the same score, making your evaluations reproducible.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="All scores are 1.0 or 0.0">
+    The judge is collapsing to binary scoring. This usually means the responses in your dataset are too obviously correct or incorrect, leaving no room for partial credit. Add responses that are partially right — wrong on one specific fact, or missing one piece of information.
+  </Accordion>
+
+  <Accordion title="Scores vary between runs on the same dataset">
+    Make sure the judge model is initialized with `temperature=0.0`. Non-zero temperature introduces randomness in the judge's reasoning.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Prompt Optimizer" icon="wand-magic-sparkles" href="/prompt-optimizer/gepa">
+    Once you know your prompt score, use GEPA to automatically improve the prompt using the same dataset.
+  </Card>
+  <Card title="Agentic" icon="robot" href="/metrics/agentic">
+    Evaluate agent responses with pass@K metrics and tool correctness scoring.
+  </Card>
+</CardGroup>

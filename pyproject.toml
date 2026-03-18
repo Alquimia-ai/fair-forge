@@ -59,6 +59,7 @@ dependencies = [
     # Tokenizers (required for schemas)
     "transformers>=4.35.0",
     "optuna>=4.7.0",
+    "langchain-groq>=1.1.2",
 ]
 
 [project.optional-dependencies]
