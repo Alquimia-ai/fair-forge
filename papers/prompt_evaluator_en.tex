@@ -50,7 +50,7 @@
 \maketitle
 
 \begin{abstract}
-Evaluating the quality of a system prompt for a large language model (LLM) is a non-trivial task. Existing approaches often collapse quality into a single scalar score derived from a single LLM judge call, which lacks scientific grounding and diagnostic value. In this work, we analyze the space of available metrics for prompt evaluation and propose a set of components with distinct root causes, organized by objectivity and availability. Our main proposal for integration in evaluation libraries is grounded in two objective and reproducible metrics as a mandatory core: the Consistency/Stability Rate (CSR), which measures how stable the model's response distribution is under repeated sampling, and the normalized Semantic Entropy (SE), which quantifies uncertainty over the space of meanings of the outputs. Two optional components are added, which the user can enable according to their use case: the Reference Similarity Score (RSS), applicable when reference responses are available, the Instruction Compliance Rate (ICR), applicable when the prompt contains programmatically verifiable constraints, and the Judge Quality (JQ), for those who prioritize exhaustiveness over strict reproducibility. This design decision—privileging objectivity and reproducibility in the core, delegating to the user the incorporation of signals dependent on external models—is formally justified throughout the paper.
+Evaluating the quality of a system prompt for a large language model (LLM) is a non-trivial task. Existing approaches often collapse quality into a single scalar score derived from a single LLM judge call, which lacks scientific grounding and diagnostic value. In this work, we analyze the space of available metrics for prompt evaluation and propose a set of components with distinct root causes, organized by objectivity and availability. Our main proposal for integration in evaluation libraries is grounded in two objective and reproducible metrics as a mandatory core: the Consistency/Stability Rate (CSR), which measures how stable the model's response distribution is under repeated sampling, and the normalized Semantic Entropy (SE), which quantifies uncertainty over the space of meanings of the outputs. Three optional components are added, which the user can enable according to their use case: the Reference Similarity Score (RSS), applicable when reference responses are available, the Instruction Compliance Rate (ICR), applicable when the prompt contains programmatically verifiable constraints, and the Judge Quality (JQ), for those who prioritize exhaustiveness over strict reproducibility. This design decision—privileging objectivity and reproducibility in the core, delegating to the user the incorporation of signals dependent on external models—is formally justified throughout the paper.
 \end{abstract}
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -132,7 +132,7 @@ Let $\{C_\ell\}$ be the semantic clusters of the $K$ responses, with $n_\ell$ re
 \mathrm{SE}(p, x) = -\sum_{\ell} \hat{p}(C_\ell \mid x) \log \hat{p}(C_\ell \mid x)
 \]
 
-We normalize by $\log K$ so the result falls in $[0, 1]$, and invert it so that a higher score is better:
+We normalize by $\log K$ so the result falls in $[0, 1]$, and invert it so that a higher score is better. This normalization requires $K \geq 2$; in the degenerate case $K = 1$ we define $\mathrm{SE}_n(p, x) = 0$ by convention:
 \[
 \mathrm{SE}_n(p, x) = \frac{\mathrm{SE}(p, x)}{\log K}, \qquad \text{component in } \mathbf{m}: \ 1 - \mathrm{SE}_n
 \]
@@ -144,10 +144,10 @@ Both CSR and SE depend on being able to group the $K$ responses by semantic equi
 
 \begin{itemize}[noitemsep]
     \item \textbf{Bidirectional NLI}: two responses are grouped if a natural language inference model verifies that $y_i \Rightarrow y_j$ and $y_j \Rightarrow y_i$. This is the most rigorous method but requires an additional NLI model and has $O(K^2)$ cost in calls.
-    \item \textbf{Cosine similarity over embeddings}: two responses are grouped if $\mathrm{cos}(\mathbf{e}_i, \mathbf{e}_j) \geq \tau$, where $\mathbf{e}_i$ is the embedding of response $y_i$ and $\tau$ is a configurable threshold.
+    \item \textbf{Cosine similarity over embeddings}: we construct an undirected graph on the $K$ responses with an edge between $y_i$ and $y_j$ if $\mathrm{cos}(\mathbf{e}_i, \mathbf{e}_j) \geq \tau$, where $\mathbf{e}_i$ is the embedding of response $y_i$ and $\tau$ is a configurable threshold, and define clusters as the connected components of this threshold graph (equivalently, single-linkage clustering with similarity threshold $\tau$).
 \end{itemize}
 
-We adopt cosine similarity as the clustering strategy for three reasons: it requires no additional model beyond the embedding model already available in the system, the threshold $\tau$ is explicit and configurable by the user, and the cost is significantly lower than NLI.
+We adopt cosine similarity with connected-components over the threshold graph as the clustering strategy for three reasons: it requires no additional model beyond the embedding model already available in the system, the threshold $\tau$ is explicit and configurable by the user, and the cost is significantly lower than NLI.
 
 \paragraph{Effect of threshold $\tau$.}
 The threshold determines how similar two responses must be to be considered equivalent. Table~\ref{tab:tau} describes the effect on CSR and SE according to the value of $\tau$.
@@ -213,9 +213,9 @@ If the prompt has 3 verifiable constraints and the response meets 2, $\mathrm{IC
 
 \begin{definition}[ICR]
 \[
-\mathrm{ICR}_\mathrm{inst}(p, x) = \frac{1}{M} \sum_{m=1}^{M} \mathbf{1}\left[\mathrm{is\_followed}(y, c_m)\right]
+\mathrm{ICR}_\mathrm{inst}(p, x) = \frac{1}{KM} \sum_{k=1}^{K} \sum_{m=1}^{M} \mathbf{1}\left[\mathrm{is\_followed}(y_k, c_m)\right]
 \qquad
-\mathrm{ICR}_\mathrm{prompt}(p, x) = \mathbf{1}\left[\bigwedge_{m=1}^{M} \mathrm{is\_followed}(y, c_m)\right]
+\mathrm{ICR}_\mathrm{prompt}(p, x) = \frac{1}{K} \sum_{k=1}^{K} \mathbf{1}\left[\bigwedge_{m=1}^{M} \mathrm{is\_followed}(y_k, c_m)\right]
 \]
 \end{definition}
 
@@ -279,7 +279,7 @@ The final result of evaluating a prompt $p$ over a query $x$ is the vector $\mat
 
 \begin{definition}[Metric vector]
 \[
-\mathbf{m} = \left[\mathrm{CSR},\ 1 - \mathrm{SE}_n,\ \underbrace{\mathrm{RSS}^*,\ \mathrm{ICR}^*,\ \mathrm{JQ}^*,\ \mathrm{RM}^*,\ 1 - \mathrm{PP}_n^*}_{\text{Tier 2 (optional)}}\right]
+\mathbf{m} = \left[\mathrm{CSR},\ 1 - \mathrm{SE}_n,\ \underbrace{\mathrm{RSS}^*,\ \mathrm{ICR}^*,\ \mathrm{JQ}^*,\ \mathrm{RM}^*,\ 1 - \mathrm{PP}_n^*}_{\text{optional (see Table~\ref{tab:components})}}\right]
 \]
 \end{definition}
 
