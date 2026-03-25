@@ -1,0 +1,413 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{multirow}
+\usepackage{geometry}
+\usepackage{natbib}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+
+\geometry{margin=1in}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    citecolor=blue!60!black,
+    urlcolor=blue!60!black
+}
+
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+
+\title{
+    \vspace{-1cm}
+    \textbf{Metric Selection for the Objective Evaluation\\
+    of System Prompts in Large Language Models}\\
+    \vspace{0.4cm}
+    \large Distributional Signals, Programmatic Verification,\\
+    and Structured Judgment as Evaluation Foundations
+}
+
+\author{
+    % Authors
+}
+
+\date{}
+
+% ─────────────────────────────────────────────────────────────────────────────
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Evaluating the quality of a system prompt for a large language model (LLM) is a non-trivial task. Existing approaches often collapse quality into a single scalar score derived from a single LLM judge call, which lacks scientific grounding and diagnostic value. In this work, we analyze the space of available metrics for prompt evaluation and propose a set of components with distinct root causes, organized by objectivity and availability. Our main proposal for integration in evaluation libraries is grounded in two objective and reproducible metrics as a mandatory core: the Consistency/Stability Rate (CSR), which measures how stable the model's response distribution is under repeated sampling, and the normalized Semantic Entropy (SE), which quantifies uncertainty over the space of meanings of the outputs. Two optional components are added, which the user can enable according to their use case: the Reference Similarity Score (RSS), applicable when reference responses are available, the Instruction Compliance Rate (ICR), applicable when the prompt contains programmatically verifiable constraints, and the Judge Quality (JQ), for those who prioritize exhaustiveness over strict reproducibility. This design decision—privileging objectivity and reproducibility in the core, delegating to the user the incorporation of signals dependent on external models—is formally justified throughout the paper.
+\end{abstract}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Introduction}
+% ─────────────────────────────────────────────────────────────────────────────
+
+The quality of a system prompt has a direct impact on the behavior of an LLM in production. Yet, despite the central role of prompt engineering in applied AI, rigorous methods for prompt evaluation remain underexplored. Most practitioners rely on anecdotal comparisons or single-call LLM judges that produce a score with no explicit scientific justification.
+
+This paper addresses the following question: \textit{What is a scientifically defensible way to score a system prompt, and what should that score represent?}
+
+Our answer is grounded in three observations from the literature. First, a single score is difficult to defend unless the dimensions it aggregates are made explicit \citep{unieval2022}. Second, high output consistency under sampling is a meaningful distributional signal of prompt quality, but consistency alone does not imply correctness \citep{selfconsistency2023, glape2024}. Third, multi-objective reward models trained on human preference data outperform single-score LLM judges on standard benchmarks, and their advantage lies precisely in operating over a vector of objectives \citep{armorm2024}.
+
+We therefore propose to return a vector $\mathbf{m}$ of normalized metrics, each with a distinct measurement methodology, and to make scalar aggregation an optional, explicitly calibrated step.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Related Work}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Self-consistency and distributional signals.}
+\citet{selfconsistency2023} propose self-consistency as a decoding strategy: multiple reasoning chains are sampled and the most frequent answer is selected via majority vote. This establishes output frequency as a reference-free signal of model stability. \citet{glape2024} extend this to prompt evaluation, defining self-consistency as the mode frequency among $n$ sampled outputs and introducing a mutual-consistency refinement across prompt variants. They report Spearman correlation with ground-truth accuracy and show that GLaPE outperforms raw self-consistency across eight reasoning datasets.
+
+\paragraph{Programmatic instruction verification.}
+\citet{ifeval2023} propose IFEval, which restricts evaluation to verifiable instructions—those whose compliance can be checked with a deterministic program (e.g., word count, JSON format, keyword inclusion). They define strict and loose compliance metrics at both the prompt and instruction level, providing a reproducible and objective evaluation component.
+
+\paragraph{Prompt perplexity.}
+\citet{promptperplexity2022} show that prompts with lower perplexity tend to yield better task performance, interpreting perplexity as a proxy for model familiarity with the prompt. They propose SPELL, a method to select and expand prompt candidates by ranking on perplexity over a held-out sample of inputs.
+
+\paragraph{Multi-dimensional evaluation.}
+\citet{unieval2022} argue that human evaluation of natural language generation (NLG) is inherently multi-dimensional (e.g., coherence, fluency, relevance) and that a one-size-fits-all score is scientifically untenable. They reformulate each dimension as a Boolean question answered by a unified model, reporting probabilities of ``Yes'' as dimension-level scores.
+
+\paragraph{Reward models.}
+\citet{rewardbench2024} formalize reward model evaluation using triples (prompt, chosen, rejected) and define accuracy as the rate at which the model assigns a higher score to chosen over rejected. \citet{armorm2024} extend this to multi-objective reward modeling: a vector of absolute ratings is predicted and dynamically scalarized via a gating network conditioned on the prompt, arguing that fixed-weight linear combinations are too rigid for general use.
+
+\paragraph{LLM-as-a-judge.}
+\citet{geval2023} propose G-Eval, which uses chain-of-thought followed by structured form-filling to evaluate NLG dimensions, reporting Spearman correlation of 0.514 with human judgments in summarization. They also document systematic biases in LLM judges, including position bias and preference for LLM-generated text.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Method}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Notation and Sampling Setup}
+
+The central idea of the method is not to evaluate the prompt with a single model response, but to observe how the model behaves when asked the same question multiple times. We call $p$ the prompt under evaluation, $x$ an input query, and $K$ the number of times the model generates a response for each pair $(p, x)$.
+
+Formally, $\{y_k\}_{k=1}^{K}$ are the $K$ outputs generated with temperature $T > 0$ (which introduces variability between responses) and $\mathcal{D} = \{x_j\}_{j=1}^{J}$ is the set of queries over which the prompt is evaluated. The result per instance is a vector $\mathbf{m}(p, x)$; the global prompt result is the average over all queries:
+\[
+\bar{\mathbf{m}}(p) = \frac{1}{J} \sum_{j=1}^{J} \mathbf{m}(p, x_j)
+\]
+
+\subsection{Tier 1 — Core Metrics (Always Applicable)}
+
+Tier 1 consists of two components that require no special infrastructure: only $K$ model calls. They work with any prompt, any provider, and any dataset.
+
+\subsubsection{CSR — Consistency/Stability Rate}
+
+A quality prompt should lead the model to give coherent responses to each other, even when run multiple times with positive temperature. CSR measures exactly that: what fraction of the $K$ responses falls into the most frequent group.
+
+If we run the same prompt 10 times and 7 responses say essentially the same thing, then CSR = 0.70. A prompt that produces scattered and contradictory responses will have low CSR.
+
+Formally, let $a_k$ be the response extracted from sample $k$ (via regex for numeric QA, or semantic grouping for free text). Following \citet{selfconsistency2023} and \citet{glape2024}:
+
+\begin{definition}[CSR]
+\[
+\mathrm{CSR}(p, x) = \max_{a} \frac{1}{K} \sum_{k=1}^{K} \mathbf{1}[a_k = a]
+\]
+\end{definition}
+
+For free text, responses are grouped semantically (see \S\ref{sec:clustering}) and CSR is the mass of the largest cluster: $\max_{\ell} n_\ell / K$, where $n_\ell$ is the number of responses in cluster $\ell$. CSR $\in [0, 1]$ by construction.
+
+\subsubsection{SE — Semantic Entropy}
+
+CSR only looks at the most frequent group. SE complements that view by measuring the complete distribution of meanings: if responses cluster into a few very dense groups, entropy is low (the model is certain). If they scatter into many different groups, entropy is high (the model is uncertain).
+
+The key difference from token entropy is that SE groups first by meaning, not by form. Two responses that say the same thing with different words count as one \citep{semanticentropy2024}.
+
+Let $\{C_\ell\}$ be the semantic clusters of the $K$ responses, with $n_\ell$ responses each. In the discrete variant (without needing to access internal model probabilities):
+\[
+\hat{p}(C_\ell \mid x) = \frac{n_\ell}{K}, \qquad
+\mathrm{SE}(p, x) = -\sum_{\ell} \hat{p}(C_\ell \mid x) \log \hat{p}(C_\ell \mid x)
+\]
+
+We normalize by $\log K$ so the result falls in $[0, 1]$, and invert it so that a higher score is better:
+\[
+\mathrm{SE}_n(p, x) = \frac{\mathrm{SE}(p, x)}{\log K}, \qquad \text{component in } \mathbf{m}: \ 1 - \mathrm{SE}_n
+\]
+
+\subsection{Semantic Clustering Strategy}
+\label{sec:clustering}
+
+Both CSR and SE depend on being able to group the $K$ responses by semantic equivalence. There are two approaches for determining whether two responses belong to the same cluster:
+
+\begin{itemize}[noitemsep]
+    \item \textbf{Bidirectional NLI}: two responses are grouped if a natural language inference model verifies that $y_i \Rightarrow y_j$ and $y_j \Rightarrow y_i$. This is the most rigorous method but requires an additional NLI model and has $O(K^2)$ cost in calls.
+    \item \textbf{Cosine similarity over embeddings}: two responses are grouped if $\mathrm{cos}(\mathbf{e}_i, \mathbf{e}_j) \geq \tau$, where $\mathbf{e}_i$ is the embedding of response $y_i$ and $\tau$ is a configurable threshold.
+\end{itemize}
+
+We adopt cosine similarity as the clustering strategy for three reasons: it requires no additional model beyond the embedding model already available in the system, the threshold $\tau$ is explicit and configurable by the user, and the cost is significantly lower than NLI.
+
+\paragraph{Effect of threshold $\tau$.}
+The threshold determines how similar two responses must be to be considered equivalent. Table~\ref{tab:tau} describes the effect on CSR and SE according to the value of $\tau$.
+
+\begin{table}[h]
+\centering
+\caption{Effect of threshold $\tau$ on CSR and SE.}
+\label{tab:tau}
+\begin{tabular}{p{2cm} p{3.5cm} p{3.5cm} p{3.5cm}}
+\toprule
+Value of $\tau$ & Behavior & Effect on CSR and SE & When to use \\
+\midrule
+$\tau < 0.70$ &
+Very permissive. Groups superficially similar responses even if they say different things. &
+Artificially high CSR. Artificially low SE. Overestimates prompt consistency. &
+Not recommended. \\
+\addlinespace
+$\tau = 0.75$--$0.85$ &
+Balanced. Groups paraphrases and style variations; separates responses with different content. &
+Representative estimates of the prompt's real behavior. &
+Recommended default configuration. \\
+\addlinespace
+$\tau = 0.85$--$0.92$ &
+Strict. Only groups nearly identical responses in content and phrasing. &
+Lower CSR, higher SE. Detects subtle content variations. &
+High-precision evaluations or prompts with highly structured responses. \\
+\addlinespace
+$\tau > 0.92$ &
+Very strict. Almost all responses fall into different clusters. &
+CSR and SE lose diagnostic value — every superficial variation is interpreted as semantic. &
+Not recommended except for very specific cases. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent The recommended default value is $\tau = 0.80$. Users seeking greater rigor in detecting semantic variations can increase it toward $0.90$; users in domains with high style variability (e.g., conversational responses) can reduce it toward $0.75$.
+
+\subsection{Tier 2 — Extended Metrics (Conditional on Dependencies)}
+
+These components increase the precision of the vector but require dependencies that are not always available. They are included in $\mathbf{m}$ only when applicable.
+
+\subsubsection{RSS — Reference Similarity Score}
+
+CSR and SE measure distributional stability but do not indicate whether the responses are correct. When reference responses are available, RSS provides an objective correctness signal without introducing the variance of an external judge model.
+
+RSS computes the average cosine similarity between each generated response and the reference response $y^*$, using the same embedding model already used for clustering:
+
+\begin{definition}[RSS]
+\[
+\mathrm{RSS}(p, x) = \frac{1}{K} \sum_{k=1}^{K} \mathrm{cos}\!\left(\mathbf{e}(y_k),\, \mathbf{e}(y^*)\right)
+\]
+\end{definition}
+
+\noindent where $\mathbf{e}(\cdot)$ denotes the embedding of a response. RSS $\in [-1, 1]$ by construction; in practice it falls in $[0, 1]$ for semantically related texts.
+
+Unlike JQ, RSS does not depend on an LLM judge and produces the same result given the same embedder, dataset, and prompt. Its limitation is that embedding similarity captures surface-level semantic proximity but may not detect factual errors that are semantically close to the reference.
+
+\subsubsection{ICR — Instruction Compliance Rate}
+
+Some prompts include instructions that can be verified with a program, without needing a judge: ``respond in JSON'', ``use fewer than 100 words'', ``include keyword X''. ICR measures what fraction of those constraints are met, deterministically and reproducibly \citep{ifeval2023}.
+
+If the prompt has 3 verifiable constraints and the response meets 2, $\mathrm{ICR}_\mathrm{inst} = 0.67$. If none are met, $\mathrm{ICR}_\mathrm{prompt} = 0$ and it can be used as a hard gate: the output is rejected regardless of other scores.
+
+\begin{definition}[ICR]
+\[
+\mathrm{ICR}_\mathrm{inst}(p, x) = \frac{1}{M} \sum_{m=1}^{M} \mathbf{1}\left[\mathrm{is\_followed}(y, c_m)\right]
+\qquad
+\mathrm{ICR}_\mathrm{prompt}(p, x) = \mathbf{1}\left[\bigwedge_{m=1}^{M} \mathrm{is\_followed}(y, c_m)\right]
+\]
+\end{definition}
+
+\subsubsection{JQ — Judge Quality (Multi-Rubric)}
+
+CSR and SE measure distributional stability, but do not say whether the responses are \textit{good}. For that we use an LLM judge, but with an important difference from a naïve judge: instead of asking for a single number, we ask it to evaluate the response on four independent dimensions and return a structured JSON.
+
+This forces the judge to reason step by step (chain-of-thought) before assigning each sub-score, reducing the arbitrariness of a single score \citep{geval2023, unieval2022}.
+
+The final JQ score is the average of the four sub-scores $s_d \in [0,1]$:
+
+\begin{definition}[JQ]
+\[
+\mathrm{JQ}(p, x) = \frac{1}{D} \sum_{d=1}^{D} s_d
+\]
+\end{definition}
+
+\begin{table}[h]
+\centering
+\caption{Rubric dimensions for JQ.}
+\begin{tabular}{lll}
+\toprule
+Dimension & Symbol & What it measures \\
+\midrule
+Utility / Completeness & $s_1$ & Does the response answer the query? \\
+Faithfulness to context & $s_2$ & No hallucination beyond provided context \\
+Instruction adherence & $s_3$ & Follows non-verifiable prompt directives \\
+Clarity & $s_4$ & Coherent, well-structured response \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent \textbf{Bias mitigation:} To reduce position bias documented in LLM judges \citep{geval2023}, the evaluation is repeated $R \geq 3$ times with randomized output ordering and results are averaged.
+
+\subsubsection{RM — Reward Model Score}
+
+When a reward model $R(\cdot)$ is available—trained on pairs of preferred vs. rejected responses by humans—a learned quality signal can be obtained, complementary to the rubric-based judge. The score is averaged over the $K$ responses and normalized to $[0,1]$:
+\[
+\mathrm{RM}(p, x) = \sigma\left(\frac{1}{K} \sum_{k=1}^{K} R(p, x, y_k)\right)
+\]
+
+For multi-objective reward models \citep{armorm2024}, $R$ returns a vector of dimensions (e.g., utility, safety, conciseness) that can be scalarized with context-dependent weights, avoiding the rigidity of universal fixed weights.
+
+\subsubsection{PP — Prompt Perplexity}
+
+Perplexity measures how ``familiar'' a prompt feels to the model: prompts with natural and coherent phrasing tend to have lower perplexity and, on average, produce better performance \citep{promptperplexity2022}. This component requires access to token log-probabilities, which is not available in all providers.
+\[
+\mathrm{PP}(p) = \exp\!\left(-\frac{1}{|p|} \sum_{t=1}^{|p|} \log P(w_t \mid w_{<t})\right)
+\]
+
+Normalized over a pool of candidate prompts to be comparable across evaluations:
+\[
+\mathrm{PP}_n(p) = \frac{\mathrm{PP}(p) - \min(\mathrm{PP})}{\max(\mathrm{PP}) - \min(\mathrm{PP})}
+\]
+
+The component entering $\mathbf{m}$ is $1 - \mathrm{PP}_n$ (lower perplexity corresponds to a higher score).
+
+\subsection{The Metric Vector}
+
+The final result of evaluating a prompt $p$ over a query $x$ is the vector $\mathbf{m}$, where each component has a distinct root cause and all are normalized to $[0, 1]$:
+
+\begin{definition}[Metric vector]
+\[
+\mathbf{m} = \left[\mathrm{CSR},\ 1 - \mathrm{SE}_n,\ \underbrace{\mathrm{RSS}^*,\ \mathrm{ICR}^*,\ \mathrm{JQ}^*,\ \mathrm{RM}^*,\ 1 - \mathrm{PP}_n^*}_{\text{Tier 2 (optional)}}\right]
+\]
+\end{definition}
+
+\noindent where ${}^*$ indicates components included only when their dependencies are available.
+
+\subsection{Optional Scalar Aggregation}
+
+If the use case requires a single number (e.g., to compare prompts in a ranking), $S$ is defined as a weighted combination of the components of $\mathbf{m}$, with an optional hard gate based on ICR:
+
+\begin{definition}[Scalar aggregate]
+\[
+S(p, x) = \underbrace{\mathbf{1}\left[\mathrm{ICR}_\mathrm{prompt} = 1\right]}_{\text{optional hard gate}} \cdot \phi\!\left(\sum_{i} w_i z_i\right)
+\]
+\end{definition}
+
+\noindent where $z_i$ are the normalized components of $\mathbf{m}$, $w_i \geq 0$, $\sum_i w_i = 1$, and $\phi$ is the identity or a sigmoid to stabilize extreme values.
+
+\paragraph{Weight calibration.}
+Weights are not fixed by intuition but learned to maximize the Spearman correlation between $S$ and a reference signal (accuracy over labeled data or human evaluation), following the standard practice of \citet{glape2024} and \citet{geval2023}:
+\[
+\hat{w} = \arg\max_{w \geq 0,\ \sum w_i = 1}\ \rho_\mathrm{Spearman}\!\left(S(p, \cdot;\, w),\ h(p, \cdot)\right)
+\]
+
+As Spearman is non-differentiable, a pairwise ranking loss is optimized and validated with Spearman. Confidence intervals are reported via bootstrap (1{,}000--10{,}000 iterations).
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Implementation Proposal}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Table~\ref{tab:components} summarizes the proposed components, their level of obligation, and the dependencies they require.
+
+\begin{table}[h]
+\centering
+\caption{Components of vector $\mathbf{m}$, tier, and activation condition.}
+\label{tab:components}
+\begin{tabular}{lllp{5cm}}
+\toprule
+Component & Tier & Condition & Justification \\
+\midrule
+CSR & Mandatory & Always & Reproducible, no external dependencies \\
+SE  & Mandatory & Always & Complements CSR by measuring the full distribution \\
+RSS & Optional & Reference responses available & Objective correctness signal; no judge variance \\
+ICR & Optional & Prompt has verifiable constraints & Deterministic; does not apply to all prompts \\
+JQ  & Optional & User explicitly enables it & Introduces judge model variance \\
+RM  & Advanced & Reward model available & Requires training infrastructure \\
+PP  & Advanced & Provider exposes logprobs & Not available in all providers \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Default Configuration}
+
+The minimum recommended configuration is $K=10$ samples with temperature $T=0.7$, consistent with \citet{glape2024}. This produces a reliable estimate of CSR and SE at the cost of 10 model calls per query. For scenarios that prioritize precision over speed, $K=40$ reduces Monte Carlo variance of SE at linear cost, following \citet{selfconsistency2023}.
+
+\subsection{Justification of Core Selection}
+
+The decision to establish CSR and SE as the mandatory core, and relegate JQ to an optional component, is grounded in three reasons:
+
+\begin{enumerate}[noitemsep]
+    \item \textbf{Reproducibility}: CSR and SE produce the same result given the same model, prompt, and dataset. JQ introduces variance dependent on the judge model, whose selection is not standardized and varies between users \citep{geval2023}.
+    \item \textbf{Infrastructure independence}: CSR and SE only require calls to the model under evaluation. JQ adds a dependency on a second model, increasing cost and failure surface.
+    \item \textbf{Complementarity}: CSR and SE cover orthogonal dimensions—stability of the mode and dispersion of the complete distribution—without overlap. Their combination offers a complete distributional characterization of the prompt's behavior.
+\end{enumerate}
+
+The recognized limitation of this choice is that CSR and SE do not detect cases where the model is consistently incorrect. This problem, documented by \citet{glape2024}, can be mitigated by enabling RSS (when reference responses are available), JQ, or by providing a dataset with reference responses against which to validate consistency.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Discussion and Limitations}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\paragraph{Why a vector, not a scalar.}
+Three independent lines of evidence support returning $\mathbf{m}$ as the primary output. UniEval \citep{unieval2022} shows that human evaluation of NLG is multi-dimensional and that a unified evaluator must be explicitly designed around those dimensions. GLaPE \citep{glape2024} demonstrates quantitatively that a single signal (SC) can correlate poorly with accuracy. ArmoRM \citep{armorm2024} formally argues that fixed-weight linear scalarization of multiple objectives is too rigid, and that context-dependent weighting is required for a scalar to be principled.
+
+\paragraph{Limitations.}
+Tier 2 components introduce dependencies (logprob access, NLI model, reward model) that are not available in all deployment settings. ICR requires that the prompt contain programmatically verifiable constraints, which is not universally the case. Calibration of $S$ requires a set of human annotations or reference labels.
+
+\paragraph{Consistent incorrectness.}
+CSR and SE measure distributional stability, not correctness. A prompt that leads the model to consistently produce the same incorrect response will yield high CSR and low SE—values indicating a ``well-defined'' prompt—without implying that the responses are factually correct. This limitation is inherent to any reference-free metric and is documented in \citet{glape2024}. Users who need to validate correctness in addition to stability should enable RSS (if reference responses are available) or JQ.
+
+\paragraph{Choice of $K$ and its effect on estimates.}
+The number of samples $K$ directly affects the reliability of CSR and SE. Table~\ref{tab:k} summarizes the expected behavior according to the range of $K$.
+
+\begin{table}[h]
+\centering
+\caption{Effect of $K$ on the quality of CSR and SE estimates.}
+\label{tab:k}
+\begin{tabular}{p{2cm} p{3.5cm} p{3.5cm} p{3.5cm}}
+\toprule
+Range of $K$ & CSR & SE & Recommendation \\
+\midrule
+$K \leq 3$ &
+Unstable. The mode can change with a single different sample. &
+Unstable. With few clusters, entropy is not representative. &
+Not recommended. Sufficient only for quick sanity checks. \\
+\addlinespace
+$K = 5$--$10$ &
+Reasonable estimate for prompts with clear behavior. &
+Acceptable estimate. Moderate Monte Carlo variance. &
+Default configuration. Adequate for most use cases \citep{glape2024}. \\
+\addlinespace
+$K = 20$--$40$ &
+Stable estimate. The mode converges with high probability. &
+Reliable estimate. Low Monte Carlo variance. &
+Recommended when comparing similar prompts or high precision is needed \citep{selfconsistency2023}. \\
+\addlinespace
+$K > 40$ &
+Minimal marginal gain. &
+Minimal marginal gain. &
+The additional cost rarely justifies the improvement in precision. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent The effect is more pronounced in SE than in CSR: CSR only needs to stabilize the majority group, while SE requires estimating the mass of \textit{all} clusters, including minority ones. Therefore, for prompts with ambiguous behavior—where high entropy is expected—it is recommended to use $K \geq 20$ so that small clusters are correctly represented.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Conclusion}
+% ─────────────────────────────────────────────────────────────────────────────
+
+We proposed a set of metrics for the objective evaluation of system prompts in LLMs, organized in two tiers according to their availability and the degree of objectivity they offer. The mandatory core—CSR and SE—evaluates the distributional stability of the model's behavior under the prompt, without requiring additional infrastructure or a second model. These two components are reproducible, complementary, and applicable to any prompt and provider.
+
+On top of this core, optional components are defined: RSS, for cases where reference responses are available, providing an objective correctness signal without judge variance; ICR, for prompts with programmatically verifiable constraints; and JQ, for users who prioritize exhaustiveness over strict reproducibility. The decision to make them optional is deliberate: incorporating them into the core would introduce variance or dependencies that contradict the goal of a stable and portable metric.
+
+The main limitation of the core is that it measures consistency, not correctness. A prompt that produces consistently incorrect responses will receive good CSR and SE scores. This limitation is inherent to reference-free metrics and must be considered in the design of the evaluation dataset and in the interpretation of results.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\bibliographystyle{plainnat}
+\bibliography{refs}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\end{document}
