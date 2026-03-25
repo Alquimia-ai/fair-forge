@@ -330,6 +330,17 @@ PP  & Advanced & Provider exposes logprobs & Not available in all providers \\
 \end{tabular}
 \end{table}
 
+\subsection{Implementation Scope}
+
+The current implementation includes the mandatory core (CSR, SE) and the following Tier~2 components: RSS, ICR, and JQ. Two components defined in the framework are not implemented in the current version:
+
+\begin{itemize}[noitemsep]
+    \item \textbf{RM (Reward Model Score)}: requires a reward model trained on human preference data, which is not universally available and falls outside the scope of a general-purpose evaluation library.
+    \item \textbf{PP (Prompt Perplexity)}: requires access to token log-probabilities, which not all LLM providers expose through their APIs.
+\end{itemize}
+
+Both components are left as extensions for future work. Their inclusion in the framework is theoretical: they are defined, justified, and integrated into the metric vector $\mathbf{m}$ to provide a complete picture of available signals, even when not all are accessible in practice.
+
 \subsection{Default Configuration}
 
 The minimum recommended configuration is $K=10$ samples with temperature $T=0.7$, consistent with \citet{glape2024}. This produces a reliable estimate of CSR and SE at the cost of 10 model calls per query. For scenarios that prioritize precision over speed, $K=40$ reduces Monte Carlo variance of SE at linear cost, following \citet{selfconsistency2023}.
