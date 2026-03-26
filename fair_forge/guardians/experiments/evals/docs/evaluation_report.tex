@@ -1,0 +1,419 @@
+\documentclass[11pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[english,spanish]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{subcaption}
+\usepackage{listings}
+
+% Page layout
+\geometry{
+    a4paper,
+    left=2.5cm,
+    right=2.5cm,
+    top=2.5cm,
+    bottom=2.5cm
+}
+
+% Colors
+\definecolor{safe}{RGB}{46, 125, 50}
+\definecolor{unsafe}{RGB}{198, 40, 40}
+\definecolor{alquimia}{RGB}{88, 28, 135}
+
+% Hyperref setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=alquimia,
+    citecolor=alquimia,
+    urlcolor=blue
+}
+
+% Title information
+\title{
+    \textbf{Evaluation of Guardrail Models for Content Safety}\\
+    \large Comparative Analysis of Bias Detection Systems
+}
+\author{
+    Alquimia AI\\
+    \texttt{fair-forge}
+}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This report presents a comprehensive evaluation of five guardrail models for content safety and bias detection. The models were tested on a bilingual (English-Spanish) dataset containing [NUMBER] test cases across [NUMBER] risk categories. We analyze performance metrics including accuracy, precision, recall, F1-score, and language fairness gaps. Results indicate that [BEST MODEL] achieves the highest overall performance with an F1-score of [VALUE]\%, while [MODEL] demonstrates the most balanced bilingual performance.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+\subsection{Motivation}
+Content moderation and safety guardrails are critical components of modern AI systems. This evaluation assesses the effectiveness of multiple guardrail approaches for detecting harmful content across languages and risk categories.
+
+\subsection{Research Questions}
+\begin{enumerate}
+    \item Which model achieves the highest overall detection accuracy?
+    \item How do models perform across different risk categories?
+    \item What is the performance gap between English and Spanish content?
+    \item Which model is most suitable for multilingual LATAM deployments?
+\end{enumerate}
+
+\section{Evaluated Models}
+
+\subsection{Model Descriptions}
+
+\subsubsection{Qwen3Guard-Gen-0.6B}
+\begin{itemize}
+    \item \textbf{Parameters:} 600M
+    \item \textbf{Type:} Local inference
+    \item \textbf{Architecture:} [COMPLETE]
+    \item \textbf{Training:} [COMPLETE]
+\end{itemize}
+
+\subsubsection{Pipeline Multicapa}
+\begin{itemize}
+    \item \textbf{Parameters:} $\sim$1B (ensemble of 5 SLMs)
+    \item \textbf{Type:} Local inference
+    \item \textbf{Architecture:} [COMPLETE]
+    \item \textbf{Approach:} [COMPLETE]
+\end{itemize}
+
+\subsubsection{GPT-OSS-SAFEGUARD-20B}
+\begin{itemize}
+    \item \textbf{Parameters:} 20B
+    \item \textbf{Type:} API (Groq)
+    \item \textbf{Architecture:} [COMPLETE]
+    \item \textbf{Specialization:} [COMPLETE]
+\end{itemize}
+
+\subsubsection{Llama-Guard-3-8B}
+\begin{itemize}
+    \item \textbf{Parameters:} 8B
+    \item \textbf{Type:} HuggingFace Endpoint
+    \item \textbf{Architecture:} Meta's Llama 3.1 fine-tuned for safety
+    \item \textbf{Categories:} [COMPLETE]
+\end{itemize}
+
+\subsubsection{Granite-Guardian-3.1-2B}
+\begin{itemize}
+    \item \textbf{Parameters:} 2B
+    \item \textbf{Type:} HuggingFace Endpoint
+    \item \textbf{Architecture:} IBM Granite fine-tuned for multi-category risk detection
+    \item \textbf{Categories:} harm, jailbreak, profanity, violence, sexual\_content, social\_bias, unethical\_behavior
+\end{itemize}
+
+\section{Methodology}
+
+\subsection{Test Dataset}
+\begin{itemize}
+    \item \textbf{Total Cases:} [NUMBER]
+    \item \textbf{SAFE Cases:} [NUMBER] ([PERCENTAGE]\%)
+    \item \textbf{UNSAFE Cases:} [NUMBER] ([PERCENTAGE]\%)
+    \item \textbf{English:} [NUMBER] cases
+    \item \textbf{Spanish:} [NUMBER] cases
+    \item \textbf{Categories:} benign, jailbreak, profanity, abuse, violence, sexual, social\_bias, pii, copyright, self\_harm, illegal, system\_info, mixed, contextual\_safe
+\end{itemize}
+
+\subsection{Evaluation Metrics}
+For each model, we calculate:
+
+\begin{equation}
+\text{Accuracy} = \frac{TP + TN}{TP + TN + FP + FN}
+\end{equation}
+
+\begin{equation}
+\text{Precision} = \frac{TP}{TP + FP}
+\end{equation}
+
+\begin{equation}
+\text{Recall} = \frac{TP}{TP + FN}
+\end{equation}
+
+\begin{equation}
+\text{F1-Score} = 2 \cdot \frac{\text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}
+\end{equation}
+
+Where:
+\begin{itemize}
+    \item TP (True Positives): Correctly identified UNSAFE content
+    \item TN (True Negatives): Correctly identified SAFE content
+    \item FP (False Positives): Safe content incorrectly flagged as UNSAFE
+    \item FN (False Negatives): Unsafe content incorrectly flagged as SAFE
+\end{itemize}
+
+\subsection{Language Fairness Gap}
+We define the language fairness gap as:
+
+\begin{equation}
+\text{Gap} = |F1_{\text{English}} - F1_{\text{Spanish}}|
+\end{equation}
+
+Classification:
+\begin{itemize}
+    \item Excellent: Gap $< 5\%$
+    \item Acceptable: $5\% \leq$ Gap $< 10\%$
+    \item Significant: Gap $\geq 10\%$
+\end{itemize}
+
+\section{Results}
+
+\subsection{Overall Performance Comparison}
+
+Table \ref{tab:overall} presents the overall performance metrics for all evaluated models.
+
+\begin{table}[H]
+\centering
+\caption{Overall Performance Comparison}
+\label{tab:overall}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Model} & \textbf{Acc.} & \textbf{Prec.} & \textbf{Recall} & \textbf{F1} \\
+\midrule
+Qwen3Guard-0.6B          & 83.8\% & 100.0\% & 80.6\% & 89.3\% \\
+Pipeline Multicapa       & 74.6\% & 95.0\% & 73.5\% & 82.9\% \\
+GPT-OSS-SAFEGUARD-20B    & 97.8\% & 100.0\% & 97.4\% & 98.7\% \\
+Llama-Guard-3-8B         & 69.2\% & 100.0\% & 63.2\% & 77.5\% \\
+Granite-Guardian-3.1-2B  & 80.5\% & 99.2\% & 77.4\% & 87.0\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Key Findings:}
+\begin{itemize}
+    \item [COMPLETE WITH YOUR INSIGHTS]
+    \item [COMPLETE WITH YOUR INSIGHTS]
+    \item [COMPLETE WITH YOUR INSIGHTS]
+\end{itemize}
+
+\subsection{Language Performance Gap Analysis}
+
+Table \ref{tab:language} shows the performance breakdown by language and the fairness gap.
+
+\begin{table}[H]
+\centering
+\caption{Language-Specific Performance}
+\label{tab:language}
+\begin{tabular}{lcccl}
+\toprule
+\textbf{Model} & \textbf{EN F1} & \textbf{ES F1} & \textbf{Gap} & \textbf{Assessment} \\
+\midrule
+Qwen3Guard-0.6B          & [VALUE]\% & [VALUE]\% & [VALUE]\% & [EXCELLENT/ACCEPTABLE/SIGNIFICANT] \\
+Pipeline Multicapa       & [VALUE]\% & [VALUE]\% & [VALUE]\% & [EXCELLENT/ACCEPTABLE/SIGNIFICANT] \\
+GPT-OSS-SAFEGUARD-20B    & [VALUE]\% & [VALUE]\% & [VALUE]\% & [EXCELLENT/ACCEPTABLE/SIGNIFICANT] \\
+Llama-Guard-3-8B         & [VALUE]\% & [VALUE]\% & [VALUE]\% & [EXCELLENT/ACCEPTABLE/SIGNIFICANT] \\
+Granite-Guardian-3.1-2B  & [VALUE]\% & [VALUE]\% & [VALUE]\% & [EXCELLENT/ACCEPTABLE/SIGNIFICANT] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Analysis:}
+\begin{itemize}
+    \item [DESCRIBE WHICH MODELS SHOW ENGLISH BIAS]
+    \item [DESCRIBE BEST MODEL FOR BILINGUAL FAIRNESS]
+    \item [DISCUSS IMPLICATIONS FOR LATAM DEPLOYMENTS]
+\end{itemize}
+
+\subsection{Category-Specific Performance}
+
+\subsubsection{Profanity Detection}
+\begin{itemize}
+    \item Best performer: [MODEL] with F1 = [VALUE]\%
+    \item Analysis: [COMPLETE]
+\end{itemize}
+
+\subsubsection{Violence Detection}
+\begin{itemize}
+    \item Best performer: [MODEL] with F1 = [VALUE]\%
+    \item Analysis: [COMPLETE]
+\end{itemize}
+
+\subsubsection{Social Bias Detection}
+\begin{itemize}
+    \item Best performer: [MODEL] with F1 = [VALUE]\%
+    \item Analysis: [COMPLETE]
+\end{itemize}
+
+\subsubsection{Jailbreak Detection}
+\begin{itemize}
+    \item Best performer: [MODEL] with F1 = [VALUE]\%
+    \item Analysis: [COMPLETE]
+\end{itemize}
+
+% Add more categories as needed
+
+\subsection{Confusion Matrix Analysis}
+
+% Include figures generated from notebooks
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/confusion_matrices.png}
+    \caption{Confusion matrices for all evaluated models}
+    \label{fig:confusion}
+\end{figure}
+
+[ANALYZE COMMON ERROR PATTERNS]
+
+\subsection{Performance vs Model Size}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/performance_vs_size.png}
+    \caption{F1-Score vs Model Parameters}
+    \label{fig:perf_size}
+\end{figure}
+
+[DISCUSS EFFICIENCY TRADE-OFFS]
+
+\subsection{Latency Analysis}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figures/latency_comparison.png}
+    \caption{Average inference latency by model}
+    \label{fig:latency}
+\end{figure}
+
+\textbf{Observations:}
+\begin{itemize}
+    \item Local models (Qwen, Pipeline) show [COMPLETE]
+    \item API-based models show [COMPLETE]
+    \item Trade-offs between latency and accuracy: [COMPLETE]
+\end{itemize}
+
+\section{Discussion}
+
+\subsection{Critical Weaknesses}
+Models with F1 $< 70\%$ in specific categories:
+
+\begin{itemize}
+    \item \textbf{[MODEL]:} Weak in [CATEGORY] (F1 = [VALUE]\%)
+    \item \textbf{[MODEL]:} Weak in [CATEGORY] (F1 = [VALUE]\%)
+\end{itemize}
+
+\subsection{Failure Case Analysis}
+[DISCUSS SPECIFIC EXAMPLES WHERE MODELS FAILED]
+
+\subsection{Cost-Performance Trade-offs}
+\begin{itemize}
+    \item \textbf{Free/Local Options:} Qwen3Guard and Pipeline Multicapa require no API costs
+    \item \textbf{API Costs:} [ESTIMATE COSTS FOR GROQ/HF ENDPOINTS]
+    \item \textbf{Recommendation:} [BASED ON USE CASE]
+\end{itemize}
+
+\section{Recommendations}
+
+\subsection{Best Overall Model}
+\textbf{Recommendation:} [MODEL NAME]
+
+\textbf{Justification:}
+\begin{itemize}
+    \item Highest overall F1-score: [VALUE]\%
+    \item [OTHER REASONS]
+\end{itemize}
+
+\subsection{Best for LATAM/Bilingual Deployments}
+\textbf{Recommendation:} [MODEL NAME]
+
+\textbf{Justification:}
+\begin{itemize}
+    \item Smallest language gap: [VALUE]\%
+    \item Strong Spanish performance: [VALUE]\%
+    \item [OTHER REASONS]
+\end{itemize}
+
+\subsection{Best Cost-Effective Option}
+\textbf{Recommendation:} [MODEL NAME]
+
+\textbf{Justification:}
+\begin{itemize}
+    \item Local inference (no API costs)
+    \item Acceptable performance: F1 = [VALUE]\%
+    \item [OTHER REASONS]
+\end{itemize}
+
+\subsection{Use Case Guidelines}
+
+\begin{table}[H]
+\centering
+\caption{Model Selection by Use Case}
+\begin{tabular}{ll}
+\toprule
+\textbf{Use Case} & \textbf{Recommended Model} \\
+\midrule
+Maximum accuracy & [MODEL] \\
+Bilingual fairness & [MODEL] \\
+Low latency & [MODEL] \\
+Cost-effective & [MODEL] \\
+Profanity detection & [MODEL] \\
+Violence detection & [MODEL] \\
+Jailbreak detection & [MODEL] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Limitations}
+
+\begin{itemize}
+    \item Test dataset size: [DISCUSS]
+    \item Category distribution: [DISCUSS]
+    \item Language coverage: [DISCUSS]
+    \item Model versions tested: [DISCUSS]
+\end{itemize}
+
+\section{Future Work}
+
+\begin{itemize}
+    \item Expand test dataset to include [LANGUAGE/CATEGORIES]
+    \item Test additional models: [LIST]
+    \item Adversarial robustness testing
+    \item Real-world deployment validation
+    \item Cost-benefit analysis with production traffic
+\end{itemize}
+
+\section{Conclusion}
+
+[SUMMARIZE KEY FINDINGS AND RECOMMENDATIONS]
+
+\appendix
+
+\section{Test Dataset Details}
+\subsection{Category Distribution}
+% Include table or chart
+
+\subsection{Example Test Cases}
+% Include representative examples
+
+\section{Full Confusion Matrices}
+% Include detailed matrices for each model
+
+\section{Code and Reproducibility}
+All evaluation code is available at: \\
+\url{https://github.com/Alquimia-ai/fair-forge}
+
+\textbf{Notebooks:}
+\begin{itemize}
+    \item \texttt{1\_qwen\_evaluation.ipynb}
+    \item \texttt{2\_pipeline\_evaluation.ipynb}
+    \item \texttt{3\_gpt\_oss\_evaluation.ipynb}
+    \item \texttt{4\_llama\_guard\_evaluation.ipynb}
+    \item \texttt{5\_granite\_evaluation.ipynb}
+    \item \texttt{6\_final\_comparison.ipynb}
+\end{itemize}
+
+\bibliographystyle{plain}
+% \bibliography{references}  % Uncomment if you have a .bib file
+
+\end{document}
