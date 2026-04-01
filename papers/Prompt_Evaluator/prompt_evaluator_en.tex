@@ -39,6 +39,11 @@
 
 \author{
     Axel Fritz\\
+    \texttt{axel.fritz@alquimia.ai}\\
+    Alquimia AI
+    \and
+    Alex Fiorenza\\
+    \texttt{alex.fiorenza@alquimia.ai}\\
     Alquimia AI
 }
 
@@ -64,7 +69,7 @@ This paper addresses the following question: \textit{What is a scientifically de
 
 Our answer is grounded in three observations from the literature. First, a single score is difficult to defend unless the dimensions it aggregates are made explicit \citep{unieval2022}. Second, high output consistency under sampling is a meaningful distributional signal of prompt quality, but consistency alone does not imply correctness \citep{selfconsistency2023, glape2024}. Third, multi-objective reward models trained on human preference data outperform single-score LLM judges on standard benchmarks, and their advantage lies precisely in operating over a vector of objectives \citep{armorm2024}.
 
-We propose to return a vector $\mathbf{m}$ of five normalized signals organized in two tiers. The mandatory core consists of two reference-free distributional metrics: the Consistency/Stability Rate (CSR), which measures how often the model produces semantically equivalent responses under repeated sampling, and normalized Semantic Entropy (SE), which quantifies uncertainty over the space of meanings. Three optional signals extend the core when dependencies are available: Reference Similarity Score (RSS), Instruction Compliance Rate (ICR), and Judge Quality (JQ). Scalar aggregation is left as an optional, explicitly calibrated step.
+We propose to return a vector $\mathbf{m}$ of five normalized signals organized in two tiers. The mandatory core consists of two reference-free distributional metrics: the Consistency/Stability Rate (CSR) \citep{selfconsistency2023, glape2024}, which measures how often the model produces semantically equivalent responses under repeated sampling, and normalized Semantic Entropy (SE) \citep{semanticentropy2024}, which quantifies uncertainty over the space of meanings. Three optional signals extend the core when dependencies are available: Reference Similarity Score (RSS), Instruction Compliance Rate (ICR) \citep{ifeval2023}, and Judge Quality (JQ). Scalar aggregation is left as an optional, explicitly calibrated step.
 
 The central empirical finding of this work is that \textbf{no single signal is sufficient for behavioral prompt evaluation}. In a controlled experiment comparing a well-specified, a deliberately wrong, and a minimal system prompt for a customer service bot, we show that:
 \begin{itemize}[noitemsep]
@@ -267,74 +272,11 @@ The final result of evaluating a prompt $p$ over a query $x$ is the vector $\mat
 
 \begin{definition}[Metric vector]
 \[
-\mathbf{m} = \left[\mathrm{CSR},\ 1 - \mathrm{SE}_n,\ \underbrace{\mathrm{RSS}^*,\ \mathrm{ICR}^*,\ \mathrm{JQ}^*}_{\text{optional (see Table~\ref{tab:components})}}\right]
+\mathbf{m} = \left[\mathrm{CSR},\ 1 - \mathrm{SE}_n,\ \underbrace{\mathrm{RSS}^*,\ \mathrm{ICR}^*,\ \mathrm{JQ}^*}_{\text{optional}}\right]
 \]
 \end{definition}
 
 \noindent where ${}^*$ indicates components included only when their dependencies are available.
-
-\subsection{Optional Scalar Aggregation}
-
-If the use case requires a single number (e.g., to compare prompts in a ranking), $S$ is defined as a weighted combination of the components of $\mathbf{m}$, with an optional hard gate based on ICR:
-
-\begin{definition}[Scalar aggregate]
-\[
-S(p, x) = \underbrace{\mathbf{1}\left[\mathrm{ICR}_\mathrm{prompt} = 1\right]}_{\text{optional hard gate}} \cdot \phi\!\left(\sum_{i} w_i z_i\right)
-\]
-\end{definition}
-
-\noindent where $z_i$ are the normalized components of $\mathbf{m}$, $w_i \geq 0$, $\sum_i w_i = 1$, and $\phi$ is the identity or a sigmoid to stabilize extreme values.
-
-\paragraph{Weight calibration.}
-Weights are not fixed by intuition but learned to maximize the Spearman correlation between $S$ and a reference signal (accuracy over labeled data or human evaluation), following the standard practice of \citet{glape2024} and \citet{geval2023}:
-\[
-\hat{w} = \arg\max_{w \geq 0,\ \sum w_i = 1}\ \rho_\mathrm{Spearman}\!\left(S(p, \cdot;\, w),\ h(p, \cdot)\right)
-\]
-
-As Spearman is non-differentiable, a pairwise ranking loss is optimized and validated with Spearman. Confidence intervals are reported via bootstrap (1{,}000--10{,}000 iterations).
-
-% ─────────────────────────────────────────────────────────────────────────────
-\section{Implementation Proposal}
-% ─────────────────────────────────────────────────────────────────────────────
-
-Table~\ref{tab:components} summarizes the proposed components, their level of obligation, and the dependencies they require.
-
-\begin{table}[h]
-\centering
-\caption{Components of vector $\mathbf{m}$, tier, and activation condition.}
-\label{tab:components}
-\begin{tabular}{lllp{5cm}}
-\toprule
-Component & Tier & Condition & Justification \\
-\midrule
-CSR & Mandatory & Always & Reproducible, no external dependencies \\
-SE  & Mandatory & Always & Complements CSR by measuring the full distribution \\
-RSS & Optional & Reference responses available & Objective correctness signal; no judge variance \\
-ICR & Optional & Prompt has verifiable constraints & Deterministic; does not apply to all prompts \\
-JQ  & Optional & User explicitly enables it & Introduces judge model variance \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Implementation Scope}
-
-The current implementation includes the mandatory core (CSR, SE) and the following Tier~2 components: RSS, ICR, and JQ.
-
-\subsection{Default Configuration}
-
-The minimum recommended configuration is $K=10$ samples with temperature $T=0.7$, consistent with \citet{glape2024}. This produces a reliable estimate of CSR and SE at the cost of 10 model calls per query. For scenarios that prioritize precision over speed, $K=40$ reduces Monte Carlo variance of SE at linear cost, following \citet{selfconsistency2023}.
-
-\subsection{Justification of Core Selection}
-
-The decision to establish CSR and SE as the mandatory core, and relegate JQ to an optional component, is grounded in three reasons:
-
-\begin{enumerate}[noitemsep]
-    \item \textbf{Reproducibility}: CSR and SE produce the same result given the same model, prompt, and dataset. JQ introduces variance dependent on the judge model, whose selection is not standardized and varies between users \citep{geval2023}.
-    \item \textbf{Infrastructure independence}: CSR and SE only require calls to the model under evaluation. JQ adds a dependency on a second model, increasing cost and failure surface.
-    \item \textbf{Complementarity}: CSR and SE cover orthogonal dimensions—stability of the mode and dispersion of the complete distribution—without overlap. Their combination offers a complete distributional characterization of the prompt's behavior.
-\end{enumerate}
-
-The recognized limitation of this choice is that CSR and SE do not detect cases where the model is consistently incorrect. This problem, documented by \citet{glape2024}, can be mitigated by enabling RSS (when reference responses are available), JQ, or by providing a dataset with reference responses against which to validate consistency.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Experiments}
