@@ -168,8 +168,12 @@ Do not include any additional text after the JSON.
 
         if self.chat_history_enabled:
             self._chat_history.append(("human", query))
-            if response_content:
-                self._chat_history.append(("assistant", response_content))
+            parsed = result.get("structured_response") if result else None
+            assistant_content = response_content or (
+                json.dumps(parsed.model_dump() if isinstance(parsed, BaseModel) else parsed) if parsed else ""
+            )
+            if assistant_content:
+                self._chat_history.append(("assistant", assistant_content))
 
         return reasoning, result.get("structured_response") if result else None
 
