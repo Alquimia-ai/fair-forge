@@ -8,6 +8,8 @@ from .metrics import BaseMetric
 class ContextInteraction(BaseModel):
     qa_id: str
     context_awareness: float
+    insight: str | None = None
+    reasoning: str | None = None
 
 
 class ContextMetric(BaseMetric):

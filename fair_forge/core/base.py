@@ -197,6 +197,13 @@ class FairForge(ABC):
             float(np.quantile(bootstrap_means, 1.0 - alpha)),
         )
 
+    def _resolve_chat_history(self, preferred: bool) -> bool:
+        from fair_forge.schemas.common import IterationLevel
+
+        if self.level == IterationLevel.STREAM_BATCHES:
+            return False
+        return preferred
+
     def on_process_complete(self):  # noqa: B027
         """Optional hook evaluated after all dataset elements are processed. Useful for accumulator metrics."""
 
