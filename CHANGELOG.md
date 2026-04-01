@@ -2,6 +2,56 @@
 
 <!-- version list -->
 
+## v3.0.0-b.3 (2026-04-01)
+
+### Chores
+
+- Add LaTeX build artifacts to .gitignore ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+### Documentation
+
+- **paper**: Address review feedback on Prompt Evaluator paper
+  ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+- **paper**: Address reviewer feedback on notation and consistency
+  ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+- **paper**: Clarify RM and PP as theoretical components not yet implemented
+  ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+- **papers**: Add context adherence metrics paper
+  ([`33a4c57`](https://github.com/Alquimia-ai/fair-forge/commit/33a4c57531dbe18fedc8d77a8ec98e9e8aec8c1e))
+
+- **papers**: Add English LaTeX paper for PromptEvaluator metric design
+  ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+- **plan**: Add PromptEvaluator dataset implementation plan
+  ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+- **spec**: Add PromptEvaluator dataset design spec
+  ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+### Features
+
+- **metrics**: Add PromptEvaluator metric ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+- **metrics**: Redesign PromptEvaluator as compound distributional metric
+  ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+- **paper**: Rewrite experiments section and add behavioral case study
+  ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+
 ## v3.0.0-b.2 (2026-03-18)
 
 ### Documentation
