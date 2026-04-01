@@ -289,6 +289,72 @@ def create_regulatory_dataset() -> Dataset:
     )
 
 
+def create_vision_dataset() -> Dataset:
+    """Create a dataset for vision metrics testing with VLM free-text descriptions."""
+    conversation = [
+        create_sample_batch(
+            qa_id="frame_001",
+            query="Describe what you observe in this frame.",
+            assistant="A person is lying on the floor near the entrance. They appear to have fallen.",
+            ground_truth_assistant="A person fell near the entrance and is lying on the floor.",
+        ),
+        create_sample_batch(
+            qa_id="frame_002",
+            query="Describe what you observe in this frame.",
+            assistant="The corridor appears empty. No persons or anomalies detected.",
+            ground_truth_assistant="The corridor is empty. No events have occurred.",
+        ),
+        create_sample_batch(
+            qa_id="frame_003",
+            query="Describe what you observe in this frame.",
+            assistant="An unauthorized person is attempting to access a restricted area.",
+            ground_truth_assistant="The restricted area is empty. No intrusion has occurred.",
+        ),
+        create_sample_batch(
+            qa_id="frame_004",
+            query="Describe what you observe in this frame.",
+            assistant="The parking lot appears normal. No incidents detected.",
+            ground_truth_assistant="A vehicle has been broken into in the parking lot.",
+        ),
+    ]
+    return create_sample_dataset(
+        session_id="vision_session",
+        assistant_id="argos_vlm",
+        context="Argos security camera surveillance system monitoring building entrances and restricted areas.",
+        conversation=conversation,
+    )
+
+
+def create_prompt_evaluator_dataset() -> Dataset:
+    """Create a dataset for PromptEvaluator testing with pre-run responses."""
+    conversation = [
+        create_sample_batch(
+            qa_id="qa_001",
+            query="How much does the Pro plan cost?",
+            assistant="The Pro plan costs $15 per user per month and includes unlimited projects and priority support.",
+            ground_truth_assistant="The Pro plan costs $15 per user per month.",
+        ),
+        create_sample_batch(
+            qa_id="qa_002",
+            query="How do I reset my password?",
+            assistant="I'm not sure, you should contact support.",
+            ground_truth_assistant="Click 'Forgot your password?' on the login screen and enter your email.",
+        ),
+        create_sample_batch(
+            qa_id="qa_003",
+            query="Is there a free plan available?",
+            assistant="Yes, there is a Free plan available with limited features.",
+            ground_truth_assistant="Yes, Nexo offers a Free plan with up to 3 projects and 5 members.",
+        ),
+    ]
+    return create_sample_dataset(
+        session_id="prompt_eval_session",
+        assistant_id="support-bot-v1",
+        context="Nexo offers three plans: Free (up to 3 projects, 5 members), Pro ($15/month per user, unlimited projects, priority support), and Business ($25/month per user).",
+        conversation=conversation,
+    )
+
+
 def create_agentic_dataset() -> list[Dataset]:
     """Create datasets for Agentic metric testing with complete conversations."""
     return [

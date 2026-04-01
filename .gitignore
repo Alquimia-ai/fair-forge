@@ -32,6 +32,8 @@ test_runner/__pycache__/
 # LaTeX
 *.aux
 *.out
+*.bbl
+*.blg
 
 # Jupyter
 .ipynb_checkpoints
@@ -62,3 +64,6 @@ coverage.xml
 *.cover
 .pytest_cache/
 .ruff_cache/
+
+# Node
+node_modules/
