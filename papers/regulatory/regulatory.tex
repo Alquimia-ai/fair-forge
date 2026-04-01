@@ -1,3 +1,22 @@
+\documentclass[11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage{booktabs}
+
+\title{Regulatory Compliance Metric}
+\author{Alquimia AI}
+\date{}
+
+\begin{document}
+
+\maketitle
+
 \section{Regulatory Compliance Metric}
 
 The Regulatory Compliance Metric evaluates whether an AI assistant's responses adhere to a corpus of regulatory documents. Rather than relying on an LLM judge, this metric grounds its evaluation in a retrieval-augmented pipeline: relevant passages are retrieved from the regulatory corpus and then scored against the assistant's response using a neural reranker. This design keeps evaluation transparent and auditable, producing verdicts that are directly traceable to specific regulatory passages.
@@ -121,3 +140,47 @@ All schemas are implemented as Pydantic~\cite{pydantic2024} models with strict f
 The regulatory pipeline follows the same dependency inversion and strategy patterns used throughout the framework. The \texttt{Embedder} and \texttt{Reranker} abstractions are defined as abstract base classes; concrete implementations are injected at construction time, decoupling the pipeline from any specific model provider. This allows practitioners to substitute, for example, a local sentence-transformer embedder with a cloud-hosted embedding API without modifying the evaluation logic.
 
 The corpus is loaded lazily on the first call to \texttt{batch()}, ensuring that initialization cost is deferred until evaluation actually begins. Subsequent calls reuse the pre-built embedding index, so the $O(|D|)$ embedding cost is paid only once per \texttt{Regulatory} instance regardless of the number of sessions evaluated.
+
+\section{Proposed Experiments}
+
+A key open question in deploying the Regulatory Compliance Metric is how the choice of embedding model and reranker jointly affect the quality of retrieval and contradiction detection. We propose a benchmark that systematically evaluates these components against a fixed regulatory target.
+
+\subsection{Experimental Setup}
+
+We select the EU AI Act~\cite{euaiact2024} as the target regulatory corpus, given its breadth, public availability, and practical relevance to AI system evaluation. A human-annotated test set is constructed as follows:
+
+\begin{enumerate}
+    \item A set of $N$ query-response pairs is sampled from a conversational AI system operating in a regulated domain.
+    \item For each pair, domain experts label the subset of EU AI Act articles that are normatively relevant to the assistant's response.
+    \item Each labeled article is further annotated with a binary verdict---\texttt{SUPPORTS} or \texttt{CONTRADICTS}---indicating whether the article's normative content is consistent with the response.
+\end{enumerate}
+
+This annotated set serves as the ground truth for evaluating both retrieval quality and contradiction detection accuracy.
+
+\subsection{Embedding Model Comparison}
+
+We evaluate a set of bi-encoder embedding models spanning different architectures, training objectives, and parameter counts. Candidate models include general-purpose sentence encoders (e.g., \texttt{all-mpnet-base-v2}), instruction-tuned variants (e.g., \texttt{e5-large-instruct}), and domain-adapted legal embedders where available. For each model, retrieval quality is measured using standard information retrieval metrics computed against the ground-truth relevant articles:
+
+\begin{itemize}
+    \item \textbf{Recall@$k$}: Fraction of ground-truth relevant chunks retrieved within the top-$k$ results. This is the primary metric, as missing a relevant article is a more critical failure than including an irrelevant one.
+    \item \textbf{Mean Reciprocal Rank (MRR)}: Average reciprocal rank of the first relevant chunk across queries, measuring how highly relevant content is ranked.
+    \item \textbf{Normalized Discounted Cumulative Gain (nDCG@$k$)}: Ranking quality accounting for graded relevance across positions.
+\end{itemize}
+
+\subsection{Reranker Comparison}
+
+Given a fixed retrieval set (top-$k$ chunks from the best-performing embedding model), we evaluate a set of cross-encoder rerankers on their ability to correctly classify each chunk as \texttt{SUPPORTS} or \texttt{CONTRADICTS}. Candidate rerankers include general cross-encoders (e.g., \texttt{cross-encoder/ms-marco-MiniLM-L-6-v2}), larger rerankers (e.g., \texttt{bge-reranker-large}), and any available models fine-tuned on legal or regulatory text. Evaluation metrics are:
+
+\begin{itemize}
+    \item \textbf{Classification F1}: Macro-averaged F1 over the \texttt{SUPPORTS} / \texttt{CONTRADICTS} binary classification task, using the ground-truth annotations as labels.
+    \item \textbf{Threshold sensitivity}: F1 as a function of the contradiction threshold $\tau_c \in [0, 1]$, identifying the operating point that maximises performance on the target corpus.
+    \item \textbf{Precision-Recall curve}: Full curve across thresholds, allowing practitioners to trade off false positives (over-flagging compliant responses) against false negatives (missing genuine violations).
+\end{itemize}
+
+\subsection{Joint Evaluation}
+
+Finally, we evaluate embedding-reranker combinations end-to-end using the session-level compliance score as the outcome variable. For each pair, the predicted session verdict (\texttt{COMPLIANT} / \texttt{NON\_COMPLIANT}) is compared against a human-assigned session verdict, and overall accuracy and Cohen's $\kappa$ are reported. This joint evaluation captures interaction effects: a strong reranker may compensate for weaker retrieval, and vice versa, so individual component scores do not necessarily predict end-to-end performance.
+
+Results are expected to inform practical recommendations for corpus-specific model selection, and to surface whether domain-adapted models provide meaningful gains over general-purpose alternatives on regulatory text.
+
+\end{document}
