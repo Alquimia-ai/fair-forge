@@ -63,6 +63,7 @@ class BestOf(FairForge):
             strict=self.strict,
             bos_json_clause=self.bos_json_clause,
             eos_json_clause=self.eos_json_clause,
+            chat_history=self._resolve_chat_history(preferred=False),
         )
 
     def _build_single_contestant(self, batch: list[Batch]) -> str:

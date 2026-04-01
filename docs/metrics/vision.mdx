@@ -1,0 +1,249 @@
+---
+title: Vision
+description: Evaluate Vision Language Model (VLM) scene descriptions using semantic similarity against human-annotated ground truth
+---
+
+# Vision Metrics
+
+The Vision metrics evaluate how accurately a Vision Language Model (VLM) describes scenes compared to human-annotated ground truth. They use a pluggable **SimilarityScorer** to compare free-text descriptions — no structured output required. The default scorer uses cosine similarity between sentence embeddings (`all-mpnet-base-v2`).
+
+Two metrics are available:
+
+| Metric | What it measures |
+|--------|-----------------|
+| **VisionSimilarity** | Average semantic closeness between VLM descriptions and ground truth across all frames |
+| **VisionHallucination** | How often the VLM describes something significantly different from what actually happened |
+
+## Installation
+
+```bash
+uv add "alquimia-fair-forge[vision]"
+```
+
+## Basic Usage
+
+<CodeGroup>
+```python VisionSimilarity
+from fair_forge.metrics.vision import VisionSimilarity
+from your_retriever import VLMRetriever
+
+results = VisionSimilarity.run(VLMRetriever, threshold=0.75)
+
+for r in results:
+    r.display()
+```
+
+```python VisionHallucination
+from fair_forge.metrics.vision import VisionHallucination
+from your_retriever import VLMRetriever
+
+results = VisionHallucination.run(VLMRetriever, threshold=0.75)
+
+for r in results:
+    r.display()
+```
+</CodeGroup>
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `retriever` | `Type[Retriever]` | — | Data source class |
+| `threshold` | `float` | `0.75` | Similarity cutoff for hallucination detection |
+| `scorer` | `SimilarityScorer` | `CosineSimilarity(SentenceTransformerEmbedder("all-mpnet-base-v2"))` | Strategy used to compare descriptions |
+| `verbose` | `bool` | `False` | Enable verbose logging |
+
+### Threshold Guide
+
+```python
+# Adjust based on your domain:
+THRESHOLD = 0.85  # Strict  — only near-identical descriptions pass
+THRESHOLD = 0.75  # Balanced — default, suitable for most use cases
+THRESHOLD = 0.60  # Lenient  — allows paraphrasing and partial descriptions
+```
+
+<Note>
+`VisionSimilarity` uses the threshold only for the `VisionHallucination` metric's flag logic. In `VisionSimilarity`, the threshold parameter is stored but does not affect the similarity scores — every frame is scored regardless.
+</Note>
+
+## Data Requirements
+
+Each `Batch` only needs two text fields:
+
+- `assistant` — free-text description produced by the VLM
+- `ground_truth_assistant` — human-annotated description of what actually happened
+
+All other `Batch` fields (`agentic`, `ground_truth_agentic`, etc.) are ignored.
+
+```python
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Dataset, Batch
+
+class VLMRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        return [
+            Dataset(
+                session_id="cam-entrance-01",
+                assistant_id="argos-gpt4o",
+                language="english",
+                context="Security camera monitoring the main building entrance.",
+                conversation=[
+                    Batch(
+                        qa_id="frame_001",
+                        query="Describe what you observe in this frame.",
+                        assistant="A person is lying motionless on the floor near the entrance.",
+                        ground_truth_assistant="A person fell near the entrance and requires assistance.",
+                    ),
+                    Batch(
+                        qa_id="frame_002",
+                        query="Describe what you observe in this frame.",
+                        assistant="The entrance area appears clear. No anomalies detected.",
+                        ground_truth_assistant="An unauthorized person is tailgating through the entrance.",
+                    ),
+                ],
+            )
+        ]
+```
+
+<Note>
+Each `Dataset` represents one camera session. Multiple sessions (e.g. different cameras) are returned as separate items in the list — each produces its own metric result.
+</Note>
+
+## Output Schema
+
+### VisionSimilarityMetric
+
+```python
+class VisionSimilarityMetric(BaseMetric):
+    session_id: str                              # Camera / session identifier
+    assistant_id: str                            # VLM identifier
+    mean_similarity: float                       # Average cosine similarity (0.0–1.0)
+    min_similarity: float                        # Lowest similarity frame
+    max_similarity: float                        # Highest similarity frame
+    summary: str                                 # Human-readable summary
+    interactions: list[VisionSimilarityInteraction]
+
+class VisionSimilarityInteraction(BaseModel):
+    qa_id: str                                   # Frame identifier
+    similarity_score: float                      # Cosine similarity for this frame
+```
+
+### VisionHallucinationMetric
+
+```python
+class VisionHallucinationMetric(BaseMetric):
+    session_id: str                              # Camera / session identifier
+    assistant_id: str                            # VLM identifier
+    hallucination_rate: float                    # n_hallucinations / n_frames
+    n_hallucinations: int                        # Frames below threshold
+    n_frames: int                                # Total frames evaluated
+    threshold: float                             # Threshold used for this run
+    summary: str                                 # Human-readable summary
+    interactions: list[VisionHallucinationInteraction]
+
+class VisionHallucinationInteraction(BaseModel):
+    qa_id: str                                   # Frame identifier
+    similarity_score: float                      # Cosine similarity for this frame
+    is_hallucination: bool                       # True if similarity < threshold
+```
+
+### display()
+
+Both metric types expose a `display()` method for quick inspection:
+
+```python
+results = VisionHallucination.run(VLMRetriever, threshold=0.75)
+
+for r in results:
+    r.display()
+
+# Output:
+# Session: cam-entrance-01  |  Assistant: argos-gpt4o
+# The model hallucinated in 1 of 2 frames (50%). A frame is considered a
+# hallucination when similarity with the ground truth falls below 0.75.
+#
+#   frame_001  similarity=0.89  ok
+#   frame_002  similarity=0.17  HALLUCINATION
+```
+
+## Interpretation
+
+### VisionSimilarity Scores
+
+| Score | Interpretation |
+|-------|---------------|
+| **0.90–1.00** | Near-identical descriptions — VLM is highly accurate |
+| **0.75–0.89** | Semantically close — minor wording differences |
+| **0.50–0.74** | Partial match — key details missing or altered |
+| **< 0.50** | Low similarity — VLM description diverges significantly |
+
+### VisionHallucination Rate
+
+| Rate | Interpretation |
+|------|---------------|
+| **< 10%** | ✅ Reliable — VLM describes scenes accurately |
+| **10–30%** | ⚠️ Review needed — some frames are missed or fabricated |
+| **> 30%** | ❌ Unreliable — VLM frequently hallucinates scene content |
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Choose qa_id as a timestamp or frame ID">
+    Use a meaningful `qa_id` such as `"2026-03-17T14:00:00Z"` or `"cam1_frame_0042"` so results are traceable back to the original footage.
+  </Accordion>
+
+  <Accordion title="Tune the threshold per domain">
+    Security surveillance descriptions tend to be terse and factual — a threshold of `0.75` works well. For rich narrative descriptions (e.g. accessibility assistance), consider lowering to `0.65` to allow more paraphrasing.
+  </Accordion>
+
+  <Accordion title="Run both metrics together">
+    `VisionSimilarity` tells you the average quality across all frames. `VisionHallucination` tells you which specific frames are problematic. Run both to get a complete picture.
+
+    ```python
+    similarity = VisionSimilarity.run(VLMRetriever, threshold=THRESHOLD)
+    hallucination = VisionHallucination.run(VLMRetriever, threshold=THRESHOLD)
+    ```
+  </Accordion>
+
+  <Accordion title="Segment by session for per-camera analysis">
+    Each `Dataset` maps to one session result. Use `session_id` to identify individual cameras, shifts, or recording periods and compare performance across them.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Similarity scores are lower than expected">
+    The default model (`all-mpnet-base-v2`) is sensitive to domain-specific vocabulary. If your VLM uses technical terms not well represented in the model, pass a custom scorer with a domain-adapted embedder:
+
+    ```python
+    from fair_forge.embedders import SentenceTransformerEmbedder
+    from fair_forge.scorers import CosineSimilarity
+
+    scorer = CosineSimilarity(SentenceTransformerEmbedder(model="your-domain-model"))
+    results = VisionSimilarity.run(VLMRetriever, scorer=scorer, threshold=0.75)
+    ```
+  </Accordion>
+
+  <Accordion title="All frames flagged as hallucinations">
+    Your threshold may be too strict for the description style. Print the raw similarity scores from `VisionSimilarity` first to calibrate before running `VisionHallucination`.
+  </Accordion>
+
+  <Accordion title="Model download is slow on first run">
+    `all-mpnet-base-v2` (~420 MB) is downloaded from HuggingFace on the first run and cached locally. Subsequent runs use the cache.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Agentic Metric" icon="robot" href="/metrics/agentic">
+    Evaluate tool use and multi-step reasoning in AI agents
+  </Card>
+  <Card title="Context Metric" icon="book-open" href="/metrics/context">
+    Measure how well responses align with a given context
+  </Card>
+  <Card title="AWS Lambda" icon="aws" href="/examples/aws-lambda">
+    Deploy Vision metrics as a serverless function
+  </Card>
+</CardGroup>

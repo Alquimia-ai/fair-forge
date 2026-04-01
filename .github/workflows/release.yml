@@ -31,6 +31,8 @@ jobs:
     permissions:
       id-token: write
       contents: write
+    outputs:
+      released: ${{ steps.release.outputs.released }}
 
     steps:
       - name: Checkout code
@@ -96,5 +98,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout develop
-          git merge main --no-edit
+          git merge main -X theirs --no-edit -m "chore(sync): merge main into develop [skip release]"
           git push origin develop

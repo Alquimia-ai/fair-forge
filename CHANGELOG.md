@@ -2,6 +2,120 @@
 
 <!-- version list -->
 
+## v3.0.0-b.4 (2026-04-01)
+
+### Bug Fixes
+
+- **llm**: Fallback to structured_response for chat history assistant entry
+  ([`66fd839`](https://github.com/Alquimia-ai/fair-forge/commit/66fd8394b89bbca65d2e79819f9a16c507e0c597))
+
+- **llm**: Make judge evaluations atomic and add opt-in chat history
+  ([`a19fb46`](https://github.com/Alquimia-ai/fair-forge/commit/a19fb4676eecf5a3ab2a72c53313309fcd5a3282))
+
+- **llm**: Truncate retry log to avoid leaking sensitive data
+  ([`3879d2e`](https://github.com/Alquimia-ai/fair-forge/commit/3879d2e53fb848d1a342d5d97e704d55794c4dec))
+
+### Documentation
+
+- **examples**: Use portable PyPI install in context notebook
+  ([`6457f2a`](https://github.com/Alquimia-ai/fair-forge/commit/6457f2a760a629471fba189ba71f7a44f044a5fd))
+
+- **papers**: Add LaTeX preamble, bibliography and ignore build artifacts
+  ([`7c381f2`](https://github.com/Alquimia-ai/fair-forge/commit/7c381f2ab4d0a9173d3abfcea9b80dcf6240313e))
+
+### Refactoring
+
+- **llm**: Add chat_history property for backward compatibility
+  ([`dd5abef`](https://github.com/Alquimia-ai/fair-forge/commit/dd5abefadfb42b3b4a522f14f72d8f612935cf92))
+
+
+## v3.0.0-b.3 (2026-04-01)
+
+### Chores
+
+- Add LaTeX build artifacts to .gitignore ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+### Documentation
+
+- **paper**: Address review feedback on Prompt Evaluator paper
+  ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+- **paper**: Address reviewer feedback on notation and consistency
+  ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+- **paper**: Clarify RM and PP as theoretical components not yet implemented
+  ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+- **papers**: Add context adherence metrics paper
+  ([`33a4c57`](https://github.com/Alquimia-ai/fair-forge/commit/33a4c57531dbe18fedc8d77a8ec98e9e8aec8c1e))
+
+- **papers**: Add English LaTeX paper for PromptEvaluator metric design
+  ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+- **plan**: Add PromptEvaluator dataset implementation plan
+  ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+- **spec**: Add PromptEvaluator dataset design spec
+  ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+### Features
+
+- **metrics**: Add PromptEvaluator metric ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+- **metrics**: Redesign PromptEvaluator as compound distributional metric
+  ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+- **paper**: Rewrite experiments section and add behavioral case study
+  ([#51](https://github.com/Alquimia-ai/fair-forge/pull/51),
+  [`38265be`](https://github.com/Alquimia-ai/fair-forge/commit/38265beb1dfa77c288e73de5a949464e12b222a2))
+
+
+## v3.0.0-b.2 (2026-03-18)
+
+### Documentation
+
+- **metrics**: Add vision metrics documentation and test fixtures
+  ([`16313bc`](https://github.com/Alquimia-ai/fair-forge/commit/16313bc021b6e88a2f1a8bef665415fbd1c1f792))
+
+### Features
+
+- **metrics**: Add VisionSimilarity and VisionHallucination metrics for VLM evaluation
+  ([`ca50030`](https://github.com/Alquimia-ai/fair-forge/commit/ca500307702fc5471b7c2f6429c72aee379432e3))
+
+- **metrics**: Replace vision hallucination metrics with VisionSimilarity and VisionHallucination
+  ([`10e9f88`](https://github.com/Alquimia-ai/fair-forge/commit/10e9f88951e18291bc4242236cffac5cf6eaef2e))
+
+### Refactoring
+
+- **metrics**: Apply Strategy and Adapter patterns to vision metrics
+  ([`e0a7c8d`](https://github.com/Alquimia-ai/fair-forge/commit/e0a7c8d423dc7c0ad02d011367cee6de1f2c34ea))
+
+
+## v3.0.0-b.1 (2026-03-12)
+
+### Chores
+
+- **ci**: Fix sync-develop job output and auto-resolve conflicts with main
+  ([`3ab30ed`](https://github.com/Alquimia-ai/fair-forge/commit/3ab30ed326b0d6192f30a400b92a04643bfd1e80))
+
+### Features
+
+- **prompt-optimizer**: Add GEPA and MIPROv2 prompt optimization module
+  ([`9dd083b`](https://github.com/Alquimia-ai/fair-forge/commit/9dd083beceb65f08b014e8a45fdab4ab829c3217))
+
+- **prompt-optimizer**: Expose tips and proposal prompts as optional args in MIPROv2
+  ([`e662879`](https://github.com/Alquimia-ai/fair-forge/commit/e6628799e9107dde534b0d8592972e67ad8deae5))
+
+
 ## v2.0.0 (2026-03-12)
 
 ### Bug Fixes

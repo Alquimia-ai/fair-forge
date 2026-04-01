@@ -81,6 +81,7 @@ class Conversational(FairForge):
             strict=self.strict,
             bos_json_clause=self.bos_json_clause,
             eos_json_clause=self.eos_json_clause,
+            chat_history=self._resolve_chat_history(preferred=True),
         )
 
         if session_id not in self._session_data:

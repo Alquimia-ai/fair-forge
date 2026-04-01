@@ -35,10 +35,12 @@ from tests.fixtures.mock_data import (
     create_context_dataset,
     create_conversational_dataset,
     create_emotional_dataset,
+    create_prompt_evaluator_dataset,
     create_regulatory_dataset,
     create_sample_batch,
     create_sample_dataset,
     create_toxicity_dataset,
+    create_vision_dataset,
 )
 from tests.fixtures.mock_retriever import (
     AgenticDatasetRetriever,
@@ -50,9 +52,11 @@ from tests.fixtures.mock_retriever import (
     EmptyRetriever,
     MockRetriever,
     MultipleDatasetRetriever,
+    PromptEvaluatorDatasetRetriever,
     RegulatoryDatasetRetriever,
     SingleDatasetRetriever,
     ToxicityDatasetRetriever,
+    VisionDatasetRetriever,
 )
 
 
@@ -180,6 +184,30 @@ def bestof_dataset_retriever() -> type[BestOfDatasetRetriever]:
 def agentic_dataset_retriever() -> type[AgenticDatasetRetriever]:
     """Fixture providing AgenticDatasetRetriever class."""
     return AgenticDatasetRetriever
+
+
+@pytest.fixture
+def prompt_evaluator_dataset() -> Dataset:
+    """Fixture providing a prompt evaluator testing dataset."""
+    return create_prompt_evaluator_dataset()
+
+
+@pytest.fixture
+def prompt_evaluator_dataset_retriever() -> type[PromptEvaluatorDatasetRetriever]:
+    """Fixture providing PromptEvaluatorDatasetRetriever class."""
+    return PromptEvaluatorDatasetRetriever
+
+
+@pytest.fixture
+def vision_dataset() -> Dataset:
+    """Fixture providing a vision testing dataset."""
+    return create_vision_dataset()
+
+
+@pytest.fixture
+def vision_dataset_retriever() -> type[VisionDatasetRetriever]:
+    """Fixture providing VisionDatasetRetriever class."""
+    return VisionDatasetRetriever
 
 
 @pytest.fixture

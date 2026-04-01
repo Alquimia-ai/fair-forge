@@ -10,9 +10,11 @@ from tests.fixtures.mock_data import (
     create_conversational_dataset,
     create_emotional_dataset,
     create_multiple_datasets,
+    create_prompt_evaluator_dataset,
     create_regulatory_dataset,
     create_sample_dataset,
     create_toxicity_dataset,
+    create_vision_dataset,
 )
 
 
@@ -115,6 +117,22 @@ class AgenticDatasetRetriever(Retriever):
     def load_dataset(self) -> list[Dataset]:
         """Return agentic testing dataset with K responses."""
         return create_agentic_dataset()
+
+
+class PromptEvaluatorDatasetRetriever(Retriever):
+    """Mock retriever for PromptEvaluator metric testing."""
+
+    def load_dataset(self) -> list[Dataset]:
+        """Return prompt evaluator testing dataset."""
+        return [create_prompt_evaluator_dataset()]
+
+
+class VisionDatasetRetriever(Retriever):
+    """Mock retriever for Vision metric testing."""
+
+    def load_dataset(self) -> list[Dataset]:
+        """Return vision testing dataset."""
+        return [create_vision_dataset()]
 
 
 class RegulatoryDatasetRetriever(Retriever):

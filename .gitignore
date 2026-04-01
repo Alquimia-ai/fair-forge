@@ -32,6 +32,23 @@ test_runner/__pycache__/
 # LaTeX
 *.aux
 *.out
+*.log
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex(busy)
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+*.nav
+*.snm
+*.vrb
+*.dvi
+*.pdf
 
 # Jupyter
 .ipynb_checkpoints
@@ -41,6 +58,7 @@ examples/pipeline/.virtual_documents/
 # Generated files from notebooks
 examples/**/topic.md
 examples/**/*.json
+!examples/**/data/*.json
 
 # IDEs
 .vscode/
@@ -61,3 +79,6 @@ coverage.xml
 *.cover
 .pytest_cache/
 .ruff_cache/
+
+# Node
+node_modules/

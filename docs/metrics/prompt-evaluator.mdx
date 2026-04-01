@@ -1,0 +1,492 @@
+---
+title: Prompt Evaluator
+description: Score a system prompt using distributional signals — consistency, semantic entropy, and optional reference similarity
+---
+
+# Prompt Evaluator
+
+PromptEvaluator scores a system prompt by observing **how stable its response distribution is** across repeated sampling. Instead of a single LLM judge call, it runs the prompt K times per query and computes two objective, reproducible signals: **CSR** (Consistency/Stability Rate) and **Stability** (inverted Semantic Entropy). When reference responses are present in the dataset, a third signal — **RSS** (Reference Similarity Score) — is computed automatically. An optional LLM judge (**JQ**) can be added on demand.
+
+## Overview
+
+- **CSR** — Fraction of K responses that fall in the dominant semantic cluster. High CSR means the prompt reliably produces the same meaning.
+- **Stability** — `1 - SE_n`, where SE\_n is the normalized Semantic Entropy over the cluster distribution. High stability means the distribution of meanings is focused, not scattered.
+- **RSS** — Average cosine similarity between K generated responses and the reference response. Enabled automatically when `ground_truth_assistant` is present in the dataset.
+- **ICR** — Average fraction of verifiable prompt constraints satisfied across K responses. Enabled automatically when `constraints` are passed. No additional model calls — purely deterministic.
+- **JQ** — LLM-as-judge score averaged over K responses. Enabled via `jq_enabled=True`.
+
+### How it works
+
+```
+For each query in the dataset:
+  1. Run seed_prompt + query → K responses (with temperature > 0)
+  2. Embed all K responses
+  3. Cluster by cosine similarity ≥ τ (union-find)
+  4. CSR    = size of dominant cluster / K
+  5. SE_n   = normalized entropy over cluster distribution
+  6. Stability = 1 - SE_n
+  7. RSS    = avg cosine similarity to reference (if available)
+  8. ICR    = avg fraction of constraints satisfied (if provided)
+  9. JQ     = avg LLM judge score (if jq_enabled=True)
+
+Final metric = mean of each signal across all queries
+```
+
+<Note>
+The model must be configured with **temperature > 0** for K samples to vary. With `temperature=0`, every response is identical → CSR = 1.0 always, which gives no diagnostic signal.
+</Note>
+
+## Installation
+
+```bash
+uv add "alquimia-fair-forge[prompt-evaluator]"
+uv add langchain-groq          # or your preferred LLM provider
+uv add sentence-transformers   # for the default embedder
+```
+
+## Basic Usage
+
+<CodeGroup>
+```python Frequentist (default)
+from fair_forge.metrics.prompt_evaluator import PromptEvaluator
+from fair_forge.embedders.sentence_transformer import SentenceTransformerEmbedder
+from langchain_groq import ChatGroq
+from your_retriever import MyRetriever
+
+model = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key", temperature=0.7)
+embedder = SentenceTransformerEmbedder(model_name="all-MiniLM-L6-v2")
+
+metrics = PromptEvaluator.run(
+    MyRetriever,
+    model=model,
+    seed_prompt="You are a helpful assistant. Answer using only the provided context.",
+    embedder=embedder,
+    k=10,
+)
+
+for m in metrics:
+    print(f"Session: {m.session_id}")
+    print(f"  CSR:       {m.csr:.3f}")      # Consistency
+    print(f"  Stability: {m.stability:.3f}") # 1 - Semantic Entropy
+    if m.rss is not None:
+        print(f"  RSS:       {m.rss:.3f}")   # Reference similarity (auto)
+```
+
+```python With JQ (LLM judge)
+from fair_forge.metrics.prompt_evaluator import PromptEvaluator
+from fair_forge.embedders.sentence_transformer import SentenceTransformerEmbedder
+from langchain_groq import ChatGroq
+from your_retriever import MyRetriever
+
+model = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key", temperature=0.7)
+embedder = SentenceTransformerEmbedder(model_name="all-MiniLM-L6-v2")
+
+metrics = PromptEvaluator.run(
+    MyRetriever,
+    model=model,
+    seed_prompt="You are a helpful assistant. Answer using only the provided context.",
+    embedder=embedder,
+    k=10,
+    jq_enabled=True,
+    objective="Answer the user's question using only the provided context, without hallucinating.",
+)
+
+for m in metrics:
+    print(f"CSR: {m.csr:.3f}  Stability: {m.stability:.3f}  JQ: {m.jq:.3f}")
+```
+
+```python Bayesian mode
+from fair_forge.metrics.prompt_evaluator import PromptEvaluator
+from fair_forge.embedders.sentence_transformer import SentenceTransformerEmbedder
+from fair_forge.statistical import BayesianMode
+from langchain_groq import ChatGroq
+from your_retriever import MyRetriever
+
+model = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key", temperature=0.7)
+embedder = SentenceTransformerEmbedder(model_name="all-MiniLM-L6-v2")
+
+metrics = PromptEvaluator.run(
+    MyRetriever,
+    model=model,
+    seed_prompt="You are a helpful assistant...",
+    embedder=embedder,
+    k=10,
+    statistical_mode=BayesianMode(mc_samples=5000, ci_level=0.95),
+)
+
+for m in metrics:
+    print(f"CSR: {m.csr:.3f}  Stability: {m.stability:.3f}")
+```
+</CodeGroup>
+
+## Parameters
+
+### Required Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `retriever` | `Type[Retriever]` | Data source class supplying the dataset |
+| `model` | `BaseChatModel` | LangChain-compatible model — used as executor and optional JQ judge |
+| `seed_prompt` | `str` | The system prompt under evaluation |
+| `embedder` | `Embedder` | Embedding model for semantic clustering and RSS |
+
+### Optional Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `k` | `int` | `10` | Number of samples generated per query |
+| `tau` | `float` | `0.80` | Cosine similarity threshold for semantic clustering |
+| `constraints` | `list[Constraint]` | `None` | Verifiable prompt constraints — activates ICR |
+| `statistical_mode` | `StatisticalMode` | `FrequentistMode()` | Statistical computation mode |
+| `jq_enabled` | `bool` | `False` | Enable LLM-as-judge scoring |
+| `objective` | `str` | `""` | Judge criteria — required when `jq_enabled=True` |
+| `executor` | `Executor` | LLM invocation | Custom callable `(prompt, query, context) → str` |
+| `verbose` | `bool` | `False` | Enable verbose logging |
+
+## Output Schema
+
+### PromptEvaluatorMetric
+
+```python
+class PromptEvaluatorMetric(BaseMetric):
+    session_id: str               # Dataset session identifier
+    assistant_id: str             # Assistant identifier
+    seed_prompt: str              # The evaluated prompt
+    k: int                        # Samples per query
+    tau: float                    # Clustering threshold used
+    csr: float                    # Mean CSR over all queries
+    stability: float              # Mean (1 - SE_n) over all queries
+    rss: float | None             # Mean RSS — present when references available
+    icr: float | None             # Mean ICR — present when constraints provided
+    jq: float | None              # Mean JQ — present when jq_enabled=True
+    n_queries: int                # Total queries evaluated
+    interactions: list[QuerySampleMetrics]
+```
+
+### QuerySampleMetrics
+
+```python
+class QuerySampleMetrics(BaseModel):
+    qa_id: str        # Query identifier
+    k: int            # Samples generated
+    csr: float        # CSR for this query
+    stability: float  # Stability (1 - SE_n) for this query
+    rss: float | None # RSS for this query (if reference available)
+    icr: float | None # ICR for this query (if constraints provided)
+    jq: float | None  # JQ for this query (if jq_enabled)
+    n_clusters: int   # Number of semantic clusters found
+```
+
+## Interpretation
+
+### CSR — Consistency/Stability Rate
+
+| Value | Interpretation |
+|-------|---------------|
+| 0.9–1.0 | Excellent — the prompt produces the same meaning almost every run |
+| 0.7–0.9 | Good — occasional variation but a clear dominant response |
+| 0.5–0.7 | Moderate — noticeable semantic scatter, review prompt clarity |
+| < 0.5 | Poor — responses are scattered across many different meanings |
+
+### Stability — 1 - Semantic Entropy
+
+| Value | Interpretation |
+|-------|---------------|
+| 0.9–1.0 | Excellent — responses cluster tightly, very focused distribution |
+| 0.7–0.9 | Good — distribution has a clear mode |
+| 0.5–0.7 | Moderate — multiple competing meaning groups |
+| < 0.5 | Poor — high entropy, unpredictable output distribution |
+
+### Comparing Two Prompts
+
+| Prompt A | Prompt B | Conclusion |
+|----------|----------|------------|
+| CSR=0.9, Stability=0.85 | CSR=0.6, Stability=0.5 | A is more consistent and focused |
+| CSR=0.9 (no RSS) | CSR=0.9, RSS=0.3 | A is consistent but may be consistently wrong |
+| CSR=0.6, RSS=0.8 | CSR=0.9, RSS=0.4 | A's varied responses are closer to the reference |
+
+<Warning>
+High CSR + low RSS means the prompt is **consistently producing the wrong answer**. Always use RSS or JQ alongside CSR/Stability when correctness matters.
+</Warning>
+
+## Clustering Threshold τ
+
+The `tau` parameter controls how similar two responses must be to be considered semantically equivalent.
+
+| Range | Behavior | When to use |
+|-------|----------|-------------|
+| `< 0.70` | Very permissive — groups unrelated responses together | Not recommended |
+| `0.75–0.85` | Balanced — separates paraphrases from different content | **Recommended default** |
+| `0.85–0.92` | Strict — only nearly identical responses cluster together | High-precision evaluations |
+| `> 0.92` | Very strict — almost all responses are separate clusters | Not recommended |
+
+The recommended default is `tau=0.80`.
+
+## Choosing K
+
+| K | Quality | Cost | Recommendation |
+|---|---------|------|----------------|
+| ≤3 | Unstable — mode can flip with a single different sample | Low | Sanity checks only |
+| 5–10 | Reasonable for prompts with clear behavior | Moderate | **Default** |
+| 20–40 | Stable — reliable CSR and SE estimates | High | Comparing similar prompts |
+| > 40 | Minimal marginal gain | Very high | Rarely justified |
+
+SE is more sensitive to K than CSR — use K ≥ 20 when expecting ambiguous or high-entropy prompts.
+
+## Data Requirements
+
+```python
+from fair_forge.core.retriever import Retriever
+from fair_forge.schemas.common import Dataset, Batch
+
+class MyRetriever(Retriever):
+    def load_dataset(self) -> list[Dataset]:
+        return [
+            Dataset(
+                session_id="eval_session_001",
+                assistant_id="support-bot-v2",
+                language="english",
+                context="Nexo offers three plans: Free (3 projects, 5 members), Pro ($15/month).",
+                conversation=[
+                    Batch(
+                        qa_id="qa_001",
+                        query="How much does the Pro plan cost?",
+                        assistant="",                             # Not used by PromptEvaluator
+                        ground_truth_assistant="$15 per user per month.",  # Enables RSS
+                    ),
+                    Batch(
+                        qa_id="qa_002",
+                        query="Is there a free plan?",
+                        assistant="",
+                        ground_truth_assistant="Yes, the Free plan supports up to 3 projects.",
+                    ),
+                ],
+            )
+        ]
+```
+
+<Note>
+The `assistant` field in each `Batch` is **not used** — PromptEvaluator generates its own responses by running `seed_prompt` against each query. `ground_truth_assistant` activates RSS automatically when present.
+</Note>
+
+## Statistical Modes
+
+<Tabs>
+  <Tab title="Frequentist (default)">
+    Computes CSR as `n_dominant / K` — a direct point estimate. Fast and simple.
+
+    ```python
+    # K=10, 7 responses in dominant cluster:
+    # CSR = 7/10 = 0.70
+    ```
+  </Tab>
+  <Tab title="Bayesian">
+    Uses a **Beta-Binomial posterior** over the true cluster mass. CSR is the posterior mean, which is slightly more conservative than the frequentist ratio — it shrinks toward 0.5 when K is small, avoiding overconfident estimates.
+
+    ```python
+    # K=10, 7 responses in dominant cluster:
+    # CSR = (7+1) / (10+2) = 0.667  (vs frequentist 0.70)
+
+    # K=5, all 5 in dominant cluster:
+    # CSR = (5+1) / (5+2) = 0.857  (vs frequentist 1.0)
+    ```
+
+    Use Bayesian when K is small (≤ 10) and you want a more conservative estimate that does not jump to 1.0 on limited data.
+
+    ```python
+    from fair_forge.statistical import BayesianMode
+
+    metrics = PromptEvaluator.run(
+        MyRetriever,
+        model=model,
+        seed_prompt="...",
+        embedder=embedder,
+        statistical_mode=BayesianMode(mc_samples=5000),
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Instruction Compliance Rate (ICR)
+
+ICR measures whether the model's responses satisfy programmatically verifiable constraints embedded in the prompt — things like responding in JSON, staying under a word limit, or including a required keyword. It is computed deterministically: no extra model calls.
+
+### When to use it
+
+Use ICR when your prompt tells the model **how** to respond — not just what to say, but in what format, length, or structure. If your prompt contains instructions like *"always respond in JSON"*, *"keep your answer under 100 words"*, or *"always include the word 'source'"*, those are verifiable constraints and ICR will measure whether the model follows them consistently.
+
+If your prompt has no explicit formatting rules, skip ICR — CSR and RSS already cover what you need.
+
+Pass a list of `Constraint` objects via the `constraints` parameter. ICR activates automatically and appears in `print(result)`.
+
+### Built-in Constraints
+
+| Constraint | What it checks |
+|------------|----------------|
+| `JsonConstraint()` | Response is valid JSON |
+| `WordCountConstraint(max_words)` | Response has at most N words |
+| `KeywordConstraint(keyword)` | Response contains the keyword (case-insensitive by default) |
+| `RegexConstraint(pattern)` | Response matches a regular expression |
+
+<CodeGroup>
+```python Built-in constraints
+from fair_forge.metrics.constraints import JsonConstraint, KeywordConstraint, WordCountConstraint
+from fair_forge.metrics.prompt_evaluator import PromptEvaluator
+from fair_forge.embedders.sentence_transformer import SentenceTransformerEmbedder
+from langchain_groq import ChatGroq
+from your_retriever import MyRetriever
+
+model = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key", temperature=0.7)
+embedder = SentenceTransformerEmbedder(model_name="all-MiniLM-L6-v2")
+
+metrics = PromptEvaluator.run(
+    MyRetriever,
+    model=model,
+    seed_prompt=(
+        "Answer in valid JSON with exactly two keys: 'answer' and 'confidence'. "
+        "Keep your answer under 50 words."
+    ),
+    embedder=embedder,
+    k=10,
+    constraints=[
+        JsonConstraint(),                  # must be valid JSON
+        WordCountConstraint(max_words=50), # must stay concise
+        KeywordConstraint("confidence"),   # must include the key
+    ],
+)
+
+for m in metrics:
+    print(m)  # ICR appears automatically in the output
+```
+
+```python Custom constraint
+from fair_forge.metrics.prompt_evaluator import PromptEvaluator
+
+class StartsWithConstraint:
+    def __init__(self, prefix: str):
+        self._prefix = prefix
+
+    def check(self, response: str) -> bool:
+        return response.strip().startswith(self._prefix)
+
+metrics = PromptEvaluator.run(
+    MyRetriever,
+    model=model,
+    seed_prompt="Always begin your answer with 'Based on the context,'.",
+    embedder=embedder,
+    constraints=[StartsWithConstraint("Based on the context,")],
+)
+```
+</CodeGroup>
+
+<Note>
+ICR is averaged across K responses per query, then averaged across queries. A score of `0.8` means the model satisfies 80% of the provided constraints on average.
+</Note>
+
+## Custom Executor
+
+Replace the default LLM invocation with your own function — useful for systems with custom API wrappers, tool injection, or RAG pipelines:
+
+```python
+def my_executor(prompt: str, query: str, context: str) -> str:
+    # Your custom invocation logic here
+    return my_system.call(system_prompt=prompt, user_input=query, context=context)
+
+metrics = PromptEvaluator.run(
+    MyRetriever,
+    model=model,          # Still needed for JQ if enabled
+    seed_prompt="...",
+    embedder=embedder,
+    executor=my_executor,
+)
+```
+
+## LLM Provider Options
+
+<CodeGroup>
+```python Groq
+from langchain_groq import ChatGroq
+
+model = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key", temperature=0.7)
+```
+
+```python OpenAI
+from langchain_openai import ChatOpenAI
+
+model = ChatOpenAI(model="gpt-4o", api_key="your-api-key", temperature=0.7)
+```
+
+```python Anthropic
+from langchain_anthropic import ChatAnthropic
+
+model = ChatAnthropic(model="claude-3-5-sonnet-20241022", api_key="your-api-key", temperature=0.7)
+```
+
+```python Ollama (Local)
+from langchain_ollama import ChatOllama
+
+model = ChatOllama(model="llama3.1:70b", temperature=0.7)
+```
+</CodeGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always use temperature > 0">
+    CSR and Stability are distributional metrics — they need variance across K samples. With `temperature=0`, every response is identical and CSR = 1.0 regardless of prompt quality. A value of `0.7` is a safe default for most providers.
+  </Accordion>
+
+  <Accordion title="Include ground_truth_assistant to get RSS">
+    RSS is the only signal that detects consistent incorrectness — a prompt that consistently answers wrong will have high CSR but low RSS. Always provide reference responses when correctness matters.
+  </Accordion>
+
+  <Accordion title="Start with K=10, increase if prompts are similar">
+    K=10 is sufficient for most evaluations. When comparing two prompts that differ subtly in wording, use K=20–40 so that small distributional differences are reliably detected.
+  </Accordion>
+
+  <Accordion title="Tune τ for your domain">
+    Conversational or creative tasks benefit from a lower τ (0.75) since style variability is expected. Structured output tasks (JSON, SQL) benefit from a higher τ (0.85–0.90) since responses should be nearly identical when correct.
+  </Accordion>
+
+  <Accordion title="Use ICR for prompts with explicit formatting rules">
+    If your prompt instructs the model to respond in JSON, limit word count, or include specific keywords, encode these as constraints and pass them to `PromptEvaluator`. ICR will tell you whether the model reliably follows those rules — at zero extra cost since it is purely deterministic.
+  </Accordion>
+
+  <Accordion title="Use JQ sparingly — it adds LLM calls">
+    `jq_enabled=True` calls the judge model K times per query. With K=10 and 20 queries, that is 200 additional judge calls per evaluation. Reserve it for cases where RSS alone is insufficient (e.g., no reference responses or nuanced quality criteria).
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="CSR is always 1.0">
+    The model temperature is likely 0. Set `temperature=0.7` (or higher) on the model before passing it to PromptEvaluator.
+  </Accordion>
+
+  <Accordion title="RSS is None even though I have ground truth">
+    Check that `ground_truth_assistant` is not an empty string in your Batch objects. PromptEvaluator treats empty strings as absent references and skips RSS.
+  </Accordion>
+
+  <Accordion title="Stability is 0 for every query">
+    All K responses are in separate clusters — every response has a completely different meaning. This indicates a severely underspecified or ambiguous prompt. Lower τ slightly (try 0.70) to confirm, or inspect the raw responses with `verbose=True`.
+  </Accordion>
+
+  <Accordion title="Evaluation is very slow">
+    Each query makes K model calls. With K=10 and 50 queries that is 500 calls. Reduce K (try K=5) for fast iteration, then increase for final evaluation. You can also parallelize queries by subclassing the executor.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Statistical Modes" icon="chart-line" href="/core-concepts/statistical-modes">
+    Deep dive into Frequentist vs Bayesian approaches
+  </Card>
+  <Card title="Prompt Optimizer" icon="wand-magic-sparkles" href="/prompt-optimizer/overview">
+    Automatically improve prompts using GEPA or MIPROv2
+  </Card>
+  <Card title="Best Of" icon="trophy" href="/metrics/best-of">
+    Compare multiple prompt variants head-to-head
+  </Card>
+</CardGroup>

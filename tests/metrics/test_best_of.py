@@ -123,6 +123,7 @@ class TestBestOfMetric:
             strict=True,
             bos_json_clause="[",
             eos_json_clause="]",
+            chat_history=False,
         )
 
     @patch("fair_forge.metrics.best_of.Judge")

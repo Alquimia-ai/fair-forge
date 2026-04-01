@@ -72,7 +72,9 @@
               "metrics/humanity",
               "metrics/best-of",
               "metrics/agentic",
-              "metrics/regulatory"
+              "metrics/prompt-evaluator",
+              "metrics/regulatory",
+              "metrics/vision"
             ]
           },
           {
@@ -92,6 +94,15 @@
               "runners/overview",
               "runners/alquimia-runner",
               "runners/custom-runners"
+            ]
+          },
+          {
+            "group": "Prompt Optimizer",
+            "icon": "wand-magic-sparkles",
+            "pages": [
+              "prompt-optimizer/overview",
+              "prompt-optimizer/gepa",
+              "prompt-optimizer/miprov2"
             ]
           },
           {

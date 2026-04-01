@@ -1,0 +1,142 @@
+[
+  {
+    "session_id": "sushi_001",
+    "assistant_id": "sushi_bot",
+    "language": "es",
+    "context": "",
+    "conversation": [
+      {
+        "qa_id": "sushi_001",
+        "query": "Me llegó el pedido incorrecto, estoy muy enojado con el servicio",
+        "assistant": "",
+        "ground_truth_assistant": "Lamentamos mucho lo sucedido, entendemos tu molestia. Voy a comunicarte con nuestro encargado para resolver esto de la mejor manera. Por favor, esperá unos instantes. ¿Hay algo más en lo que pueda asistirte?"
+      }
+    ]
+  },
+  {
+    "session_id": "sushi_002",
+    "assistant_id": "sushi_bot",
+    "language": "es",
+    "context": "",
+    "conversation": [
+      {
+        "qa_id": "sushi_002",
+        "query": "La comida me llegó completamente fría, es inaceptable",
+        "assistant": "",
+        "ground_truth_assistant": "Lamentamos mucho lo sucedido, entendemos tu molestia. Voy a comunicarte con nuestro encargado para resolver esto de la mejor manera. Por favor, esperá unos instantes. ¿Hay algo más en lo que pueda asistirte?"
+      }
+    ]
+  },
+  {
+    "session_id": "sushi_003",
+    "assistant_id": "sushi_bot",
+    "language": "es",
+    "context": "",
+    "conversation": [
+      {
+        "qa_id": "sushi_003",
+        "query": "Llevo 45 minutos esperando mi pedido y no llega nada, ¿qué está pasando?",
+        "assistant": "",
+        "ground_truth_assistant": "Lamentamos mucho la demora, entendemos tu molestia. Voy a comunicarte con nuestro encargado para resolver esto de la mejor manera. Por favor, esperá unos instantes. ¿Hay algo más en lo que pueda asistirte?"
+      }
+    ]
+  },
+  {
+    "session_id": "sushi_004",
+    "assistant_id": "sushi_bot",
+    "language": "es",
+    "context": "",
+    "conversation": [
+      {
+        "qa_id": "sushi_004",
+        "query": "¿Me recomendás otro lugar de sushi cerca de Corrientes?",
+        "assistant": "",
+        "ground_truth_assistant": "Solo puedo ayudarte con consultas relacionadas con Sakura Sushi. Para cualquier otra consulta, comunicate con nosotros directamente. ¿Puedo ayudarte con algo del restaurante?"
+      }
+    ]
+  },
+  {
+    "session_id": "sushi_005",
+    "assistant_id": "sushi_bot",
+    "language": "es",
+    "context": "",
+    "conversation": [
+      {
+        "qa_id": "sushi_005",
+        "query": "¿Cuál es una buena película japonesa para ver esta noche?",
+        "assistant": "",
+        "ground_truth_assistant": "Solo puedo ayudarte con consultas relacionadas con Sakura Sushi. Para cualquier otra consulta, comunicate con nosotros directamente. ¿Puedo ayudarte con algo del restaurante?"
+      }
+    ]
+  },
+  {
+    "session_id": "sushi_006",
+    "assistant_id": "sushi_bot",
+    "language": "es",
+    "context": "",
+    "conversation": [
+      {
+        "qa_id": "sushi_006",
+        "query": "Creo que algo que comí en su local me cayó mal, me siento muy mal del estómago",
+        "assistant": "",
+        "ground_truth_assistant": "Lamentamos mucho que te sientas mal. Por favor contactá a un profesional de salud de inmediato. Voy a comunicarte con nuestro encargado para que te asistan personalmente. ¿Hay algo más en lo que pueda ayudarte?"
+      }
+    ]
+  },
+  {
+    "session_id": "sushi_007",
+    "assistant_id": "sushi_bot",
+    "language": "es",
+    "context": "",
+    "conversation": [
+      {
+        "qa_id": "sushi_007",
+        "query": "Quiero reservar para 3 personas el viernes",
+        "assistant": "",
+        "ground_truth_assistant": "¡Con gusto! Para confirmar tu reserva necesito saber el horario. ¿A qué hora te gustaría reservar el viernes? ¿Puedo ayudarte en algo más?"
+      }
+    ]
+  },
+  {
+    "session_id": "sushi_008",
+    "assistant_id": "sushi_bot",
+    "language": "es",
+    "context": "",
+    "conversation": [
+      {
+        "qa_id": "sushi_008",
+        "query": "Quiero reservar el domingo a las 8pm",
+        "assistant": "",
+        "ground_truth_assistant": "¡Con gusto! Para confirmar tu reserva necesito saber para cuántas personas sería. ¿Cuántos serán el domingo a las 20:00hs? ¿Puedo ayudarte en algo más?"
+      }
+    ]
+  },
+  {
+    "session_id": "sushi_009",
+    "assistant_id": "sushi_bot",
+    "language": "es",
+    "context": "",
+    "conversation": [
+      {
+        "qa_id": "sushi_009",
+        "query": "¿Me podés hacer un descuento especial si pido varios rolls? Somos un grupo grande",
+        "assistant": "",
+        "ground_truth_assistant": "¡Gracias por elegirnos! El descuento disponible actualmente es del 15% abonando con tarjetas Visa o Mastercard. ¿Puedo ayudarte en algo más?"
+      }
+    ]
+  },
+  {
+    "session_id": "sushi_010",
+    "assistant_id": "sushi_bot",
+    "language": "es",
+    "context": "",
+    "conversation": [
+      {
+        "qa_id": "sushi_010",
+        "query": "Son un asco, nunca más les pido, pésimo servicio",
+        "assistant": "",
+        "ground_truth_assistant": "Entendemos tu malestar y lamentamos que hayas tenido una mala experiencia. Voy a comunicarte con nuestro encargado para que puedan atenderte personalmente. ¿Hay algo más en lo que pueda asistirte?"
+      }
+    ]
+  }
+]
