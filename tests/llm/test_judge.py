@@ -32,7 +32,7 @@ class TestJudge:
         assert judge.bos_json_clause == "```json"
         assert judge.eos_json_clause == "```"
         assert judge.chat_history_enabled is False
-        assert judge._chat_history == []
+        assert judge.chat_history == []
 
     def test_initialization_with_structured_output(self, mock_model):
         """Test Judge initialization with structured output enabled."""

@@ -56,6 +56,10 @@ class Judge:
         mode = "enabled" if chat_history else "disabled"
         self.logger.info(f"Judge initialized with chat_history {mode}")
 
+    @property
+    def chat_history(self) -> list[tuple[str, str]]:
+        return self._chat_history
+
     def check(
         self,
         system_prompt: str,
