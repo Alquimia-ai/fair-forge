@@ -142,8 +142,15 @@ Do not include any additional text after the JSON.
                 parsed = result.get("structured_response")
 
                 if parsed is None and attempt < max_retries - 1:
+                    messages_val = result.get("messages", [])
+                    result_summary = {
+                        "keys": list(result.keys()),
+                        "has_structured_response": "structured_response" in result,
+                        "messages_count": len(messages_val) if isinstance(messages_val, list) else 0,
+                    }
                     self.logger.warning(
-                        f"Retry {attempt + 1}/{max_retries} - model returned invalid JSON. " f"Raw result: {result}"
+                        f"Retry {attempt + 1}/{max_retries} - model returned invalid JSON. "
+                        f"Result summary: {result_summary}"
                     )
                     continue
 
