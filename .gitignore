@@ -32,8 +32,23 @@ test_runner/__pycache__/
 # LaTeX
 *.aux
 *.out
+*.log
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex(busy)
 *.bbl
 *.blg
+*.bcf
+*.run.xml
+*.nav
+*.snm
+*.vrb
+*.dvi
+*.pdf
 
 # Jupyter
 .ipynb_checkpoints

@@ -1,3 +1,18 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\title{Context Adherence Metrics for AI Assistant Evaluation}
+\author{Alquimia AI}
+\date{}
+
+\begin{document}
+\maketitle
+
 \section{Context Adherence Metrics}
 
 The evaluation of context adherence in AI assistant responses is crucial for ensuring relevant and appropriate interactions. This section presents a framework for assessing how well an assistant's responses align with the provided context and expected outcomes. Our approach builds upon the LLM-as-a-judge paradigm introduced by Zheng et al.~\cite{zheng2023judging}, which demonstrated that strong LLMs can achieve over 80\% agreement with human preferences---matching inter-human agreement levels---when used as evaluators.
@@ -119,3 +134,8 @@ The LLM-as-a-judge approach is not without limitations. Zheng et al.~\cite{zheng
     \item Decoupling the judge model from the assistant under evaluation, preventing self-enhancement bias
     \item Providing explicit scoring rubrics within the system prompt to anchor the evaluation criteria
 \end{itemize}
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
