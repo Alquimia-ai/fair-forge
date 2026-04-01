@@ -23,14 +23,15 @@ class Judge:
     - Structured output: Uses create_agent with response_format for schema validation
     - Regex extraction: Parses JSON from model response using regex patterns
 
-    Reasoning content is automatically extracted from LangChain's
-    additional_kwargs.reasoning_content when available.
+    Each call to check() is atomic by default. When chat_history is enabled,
+    both human queries and assistant responses are preserved across calls.
 
     Args:
         model: LangChain BaseChatModel instance
         use_structured_output: If True, use create_agent with response_format
         bos_json_clause: Opening marker for JSON block (default: ```json)
         eos_json_clause: Closing marker for JSON block (default: ```)
+        chat_history: If True, accumulate conversation history across check() calls
     """
 
     def __init__(
@@ -41,6 +42,7 @@ class Judge:
         bos_json_clause: str = "```json",
         eos_json_clause: str = "```",
         verbose: bool = False,
+        chat_history: bool = False,
     ):
         self.model = model
         self.use_structured_output = use_structured_output
@@ -48,8 +50,11 @@ class Judge:
         self.bos_json_clause = bos_json_clause
         self.eos_json_clause = eos_json_clause
         self.verbose = verbose
-        self.chat_history: list[tuple[str, str]] = []
+        self.chat_history_enabled = chat_history
+        self._chat_history: list[tuple[str, str]] = []
         self.logger = VerboseLogger(verbose=verbose)
+        mode = "enabled" if chat_history else "disabled"
+        self.logger.info(f"Judge initialized with chat_history {mode}")
 
     def check(
         self,
@@ -78,6 +83,15 @@ class Judge:
             model instance (structured mode) or dict (regex mode). reasoning_content
             is extracted from LangChain's additional_kwargs when available.
         """
+        if not self.chat_history_enabled and self._chat_history:
+            self.logger.warning(
+                f"Chat history is disabled but contains {len(self._chat_history)} stale entries. Clearing."
+            )
+            self._chat_history.clear()
+
+        if self.chat_history_enabled:
+            self.logger.debug(f"Chat history has {len(self._chat_history)} entries")
+
         if self.use_structured_output and output_schema:
             return self._check_structured(system_prompt, query, data, output_schema)
         return self._check_regex(system_prompt, query, data, output_schema)
@@ -118,8 +132,7 @@ Do not include any additional text after the JSON.
             system_prompt=rendered_system,
         )
 
-        messages = [*self.chat_history, ("human", query)]
-        self.chat_history.append(("human", query))
+        messages = [*self._chat_history, ("human", query)]
 
         max_retries = 5
         result = None
@@ -129,23 +142,34 @@ Do not include any additional text after the JSON.
                 parsed = result.get("structured_response")
 
                 if parsed is None and attempt < max_retries - 1:
-                    self.logger.warning(f"Retry {attempt + 1}/{max_retries} - model returned invalid JSON")
+                    self.logger.warning(
+                        f"Retry {attempt + 1}/{max_retries} - model returned invalid JSON. " f"Raw result: {result}"
+                    )
                     continue
 
                 break
             except Exception as e:
+                self.logger.warning(f"Attempt {attempt + 1}/{max_retries} failed: {e}")
                 if "400" in str(e) and attempt < max_retries - 1:
-                    self.logger.warning(f"Retry {attempt + 1}/{max_retries} after 400 error")
                     continue
                 raise
 
         reasoning = ""
+        response_content = ""
         if result:
             for msg in reversed(result.get("messages", [])):
                 reasoning_content = getattr(msg, "additional_kwargs", {}).get("reasoning_content", "")
                 if reasoning_content:
                     reasoning = reasoning_content
+                if not response_content and hasattr(msg, "content") and msg.content:
+                    response_content = str(msg.content)
+                if reasoning and response_content:
                     break
+
+        if self.chat_history_enabled:
+            self._chat_history.append(("human", query))
+            if response_content:
+                self._chat_history.append(("assistant", response_content))
 
         return reasoning, result.get("structured_response") if result else None
 
@@ -162,13 +186,18 @@ Do not include any additional text after the JSON.
         else:
             enhanced_prompt = system_prompt
 
-        self.chat_history.append(("human", query))
-        prompt = ChatPromptTemplate.from_messages([("system", enhanced_prompt), *self.chat_history])
+        messages = [("system", enhanced_prompt), *self._chat_history, ("human", query)]
+        prompt = ChatPromptTemplate.from_messages(messages)
         chain = prompt | self.model
         response = chain.invoke(data)
         content = str(response.content)
         reasoning = response.additional_kwargs.get("reasoning_content", "")
         json_data = self._extract_json(content)
+
+        if self.chat_history_enabled:
+            self._chat_history.append(("human", query))
+            self._chat_history.append(("assistant", content))
+
         return reasoning, json_data
 
     def _extract_json(self, text: str) -> dict | None:

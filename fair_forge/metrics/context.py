@@ -66,6 +66,7 @@ class Context(FairForge):
             bos_json_clause=self.bos_json_clause,
             eos_json_clause=self.eos_json_clause,
             verbose=self.verbose,
+            chat_history=self._resolve_chat_history(preferred=False),
         )
 
         if session_id not in self._session_data:
@@ -108,7 +109,12 @@ class Context(FairForge):
             self._session_data[session_id]["batches"].append(interaction)
             self._session_data[session_id]["scores"].append(score)
             self._session_data[session_id]["interactions"].append(
-                ContextInteraction(qa_id=interaction.qa_id, context_awareness=score)
+                ContextInteraction(
+                    qa_id=interaction.qa_id,
+                    context_awareness=score,
+                    insight=insight,
+                    reasoning=reasoning if reasoning else None,
+                )
             )
 
     def on_process_complete(self):

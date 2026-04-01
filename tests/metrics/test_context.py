@@ -75,6 +75,8 @@ class TestContextMetric:
         assert len(metric.interactions) == 2
         assert metric.interactions[0].qa_id == "qa_001"
         assert metric.interactions[0].context_awareness == pytest.approx(0.85)
+        assert metric.interactions[0].insight == "Good context awareness"
+        assert metric.interactions[0].reasoning == "I analyzed the context..."
 
     @patch("fair_forge.metrics.context.Judge")
     def test_batch_session_accumulation(self, mock_judge_class, mock_model):
@@ -89,6 +91,8 @@ class TestContextMetric:
 
         assert len(context.metrics) == 1
         assert context.metrics[0].n_interactions == 2
+        assert context.metrics[0].interactions[0].insight == "ok"
+        assert context.metrics[0].interactions[0].reasoning is None
 
     @patch("fair_forge.metrics.context.Judge")
     def test_batch_multiple_sessions(self, mock_judge_class, mock_model):
@@ -180,6 +184,7 @@ class TestContextMetric:
             bos_json_clause="[",
             eos_json_clause="]",
             verbose=False,
+            chat_history=False,
         )
 
     @patch("fair_forge.metrics.context.Judge")

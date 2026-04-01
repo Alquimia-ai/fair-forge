@@ -375,6 +375,7 @@ Examples:
             bos_json_clause=self.bos_json_clause,
             eos_json_clause=self.eos_json_clause,
             verbose=self.verbose,
+            chat_history=False,
         )
 
         for dataset_idx, dataset in enumerate(self.dataset, 1):

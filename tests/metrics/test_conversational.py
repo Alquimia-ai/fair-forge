@@ -191,6 +191,7 @@ class TestConversationalMetric:
             strict=True,
             bos_json_clause="[",
             eos_json_clause="]",
+            chat_history=True,
         )
 
     @patch("fair_forge.metrics.conversational.Judge")

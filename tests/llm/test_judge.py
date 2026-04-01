@@ -31,7 +31,8 @@ class TestJudge:
         assert judge.use_structured_output is False
         assert judge.bos_json_clause == "```json"
         assert judge.eos_json_clause == "```"
-        assert judge.chat_history == []
+        assert judge.chat_history_enabled is False
+        assert judge._chat_history == []
 
     def test_initialization_with_structured_output(self, mock_model):
         """Test Judge initialization with structured output enabled."""
@@ -205,8 +206,8 @@ class TestJudge:
         assert result == {"score": 0.5}
 
     @patch("fair_forge.llm.judge.ChatPromptTemplate")
-    def test_chat_history_accumulates(self, mock_template, mock_model):
-        """Test that chat history accumulates across calls."""
+    def test_chat_history_disabled_by_default(self, mock_template, mock_model):
+        """Test that chat history does not accumulate when disabled."""
         mock_response = MagicMock()
         mock_response.content = '```json\n{"result": 1}\n```'
         mock_response.additional_kwargs = {}
@@ -219,15 +220,34 @@ class TestJudge:
         mock_template.from_messages.return_value = mock_prompt
 
         judge = Judge(model=mock_model)
-        assert len(judge.chat_history) == 0
-
         judge.check("System", "Query 1", {})
-        assert len(judge.chat_history) == 1
-        assert judge.chat_history[0] == ("human", "Query 1")
+        judge.check("System", "Query 2", {})
+        assert len(judge._chat_history) == 0
+
+    @patch("fair_forge.llm.judge.ChatPromptTemplate")
+    def test_chat_history_accumulates_when_enabled(self, mock_template, mock_model):
+        """Test that chat history accumulates human and assistant messages when enabled."""
+        mock_response = MagicMock()
+        mock_response.content = '```json\n{"result": 1}\n```'
+        mock_response.additional_kwargs = {}
+
+        mock_chain = MagicMock()
+        mock_chain.invoke.return_value = mock_response
+
+        mock_prompt = MagicMock()
+        mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+        mock_template.from_messages.return_value = mock_prompt
+
+        judge = Judge(model=mock_model, chat_history=True)
+        judge.check("System", "Query 1", {})
+        assert len(judge._chat_history) == 2
+        assert judge._chat_history[0] == ("human", "Query 1")
+        assert judge._chat_history[1][0] == "assistant"
 
         judge.check("System", "Query 2", {})
-        assert len(judge.chat_history) == 2
-        assert judge.chat_history[1] == ("human", "Query 2")
+        assert len(judge._chat_history) == 4
+        assert judge._chat_history[2] == ("human", "Query 2")
+        assert judge._chat_history[3][0] == "assistant"
 
     @patch("fair_forge.llm.judge.ChatPromptTemplate")
     def test_check_json_with_whitespace(self, mock_template, mock_model):
