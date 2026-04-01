@@ -2,6 +2,33 @@
 
 <!-- version list -->
 
+## v3.0.0-b.4 (2026-04-01)
+
+### Bug Fixes
+
+- **llm**: Fallback to structured_response for chat history assistant entry
+  ([`66fd839`](https://github.com/Alquimia-ai/fair-forge/commit/66fd8394b89bbca65d2e79819f9a16c507e0c597))
+
+- **llm**: Make judge evaluations atomic and add opt-in chat history
+  ([`a19fb46`](https://github.com/Alquimia-ai/fair-forge/commit/a19fb4676eecf5a3ab2a72c53313309fcd5a3282))
+
+- **llm**: Truncate retry log to avoid leaking sensitive data
+  ([`3879d2e`](https://github.com/Alquimia-ai/fair-forge/commit/3879d2e53fb848d1a342d5d97e704d55794c4dec))
+
+### Documentation
+
+- **examples**: Use portable PyPI install in context notebook
+  ([`6457f2a`](https://github.com/Alquimia-ai/fair-forge/commit/6457f2a760a629471fba189ba71f7a44f044a5fd))
+
+- **papers**: Add LaTeX preamble, bibliography and ignore build artifacts
+  ([`7c381f2`](https://github.com/Alquimia-ai/fair-forge/commit/7c381f2ab4d0a9173d3abfcea9b80dcf6240313e))
+
+### Refactoring
+
+- **llm**: Add chat_history property for backward compatibility
+  ([`dd5abef`](https://github.com/Alquimia-ai/fair-forge/commit/dd5abefadfb42b3b4a522f14f72d8f612935cf92))
+
+
 ## v3.0.0-b.3 (2026-04-01)
 
 ### Chores
