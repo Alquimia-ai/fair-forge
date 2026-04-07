@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from fair_forge.core import FairForge, Retriever
 from fair_forge.llm import Judge
 from fair_forge.schemas import Batch
-from fair_forge.schemas.agentic import AgenticMetric, ToolCorrectnessScore
+from fair_forge.schemas.agentic import AgenticConversation, AgenticMetric, ToolCorrectnessScore
 from fair_forge.statistical import FrequentistMode, StatisticalMode
 
 
@@ -73,8 +73,8 @@ class Agentic(FairForge):
     Agentic metric for evaluating complete agent conversations with pass@K/pass^K formulas.
 
     Evaluates conversations as complete units where a conversation is correct only if ALL
-    its interactions are correct. This measures the agent's capability to maintain fully
-    correct multi-turn conversations.
+    its interactions are correct. pass@K and pass^K are computed globally across all
+    evaluated conversations using p = c/n (fully correct / total).
 
     Metrics:
     - pass@K: Probability of ≥1 correct conversation when attempting K different conversations (0.0-1.0)
@@ -108,9 +108,8 @@ class Agentic(FairForge):
     Example:
         >>> from langchain_groq import ChatGroq
         >>> model = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
-        >>> results = Agentic.run(MyRetriever, model=model, k=3, threshold=0.8)
-        >>> for r in results:
-        ...     print(f"{r.session_id}: pass@3={r.pass_at_k:.3f}, pass^3={r.pass_pow_k:.3f}")
+        >>> result = Agentic.run(MyRetriever, model=model, k=3, threshold=0.8)
+        >>> print(f"pass@3={result.pass_at_k:.3f}, pass^3={result.pass_pow_k:.3f}")
     """
 
     def __init__(
@@ -118,7 +117,7 @@ class Agentic(FairForge):
         retriever: type[Retriever],
         model: BaseChatModel,
         k: int,
-        use_structured_output: bool = True,
+        use_structured_output: bool = False,
         strict: bool = True,
         bos_json_clause: str = "```json",
         eos_json_clause: str = "```",
@@ -154,7 +153,7 @@ class Agentic(FairForge):
         self.logger.info(f"Statistical mode: {self.statistical_mode.get_result_type()}")
 
     @classmethod
-    def run(cls, retriever: type[Retriever], k: int, **kwargs) -> list[AgenticMetric]:
+    def run(cls, retriever: type[Retriever], k: int, **kwargs) -> AgenticMetric:
         return cls(retriever, k=k, **kwargs)._process()
 
     def batch(
@@ -203,39 +202,33 @@ Examples:
 - Q: "Capital of France?", A: "Paris", GT: "Paris" → 1.0 (perfect match)
 - Q: "Capital of France?", A: "The capital of France is Paris", GT: "Paris" → 0.95 (correct, verbose)
 - Q: "Capital of France?", A: "Poris", GT: "Paris" → 0.7 (TYPO PENALTY - core fact known but misspelled)
-- Q: "Capital of France?", A: "Pariis", GT: "Paris" → 0.7 (TYPO PENALTY)
 - Q: "Capital of France?", A: "Lyon", GT: "Paris" → 0.0 (completely wrong city)
 - Q: "Capital of France?", A: "London", GT: "Paris" → 0.0 (wrong country)
-"""
+
+After your reasoning, respond with ONLY this:
+<result>
+{{"correctness_score": 0.95, "reasoning": "brief explanation"}}
+</result>
+Replace 0.95 with the actual score (0.0-1.0). Do not include anything outside the <result> tags."""
 
         data = {"answer": answer, "ground_truth": ground_truth}
 
-        try:
-            _reasoning, result = judge.check(system_prompt, query, data, output_schema=AnswerCorrectnessOutput)
+        for attempt in range(3):
+            try:
+                judge.chat_history = []
+                _reasoning, result = judge.check(system_prompt, query, data)
 
-            self.logger.debug(f"Judge returned - reasoning: {_reasoning[:100] if _reasoning else 'None'}...")
+                if result is not None:
+                    score = float(result.get("correctness_score", 0.0))
+                    self.logger.debug(f"✓ Judge score: {score}")
+                    return score
 
-            if result is None:
-                self.logger.error("❌ Judge returned None - no valid JSON found in response")
-                return 0.0
+                self.logger.warning(f"Retry {attempt + 1}/3 - judge returned None")
+            except Exception:
+                self.logger.exception(f"❌ Error on attempt {attempt + 1}")
 
-            self.logger.debug(f"✓ Judge result type: {type(result)}")
-            self.logger.debug(f"✓ Judge result content: {result}")
-
-            if isinstance(result, dict):
-                score = float(result.get("correctness_score", 0.0))
-                self.logger.debug(f"✓ Extracted score from dict: {score}")
-                if score == 0.0 and "correctness_score" not in result:
-                    self.logger.warning(f"⚠️  Dict missing 'correctness_score' key. Keys: {list(result.keys())}")
-                return score
-
-            score = float(result.correctness_score)
-            self.logger.debug(f"✓ Extracted score from object: {score}")
-            return score
-
-        except Exception:
-            self.logger.exception("❌ Error evaluating answer correctness")
-            return 0.0
+        self.logger.error("❌ Judge failed after 3 attempts")
+        return 0.0
 
     def _evaluate_tool_correctness(
         self, agentic: dict[str, Any], ground_truth_agentic: dict[str, Any]
@@ -364,19 +357,21 @@ Examples:
             reasoning=reasoning,
         )
 
-    def _process(self) -> list[AgenticMetric]:
-        """Evaluate each conversation (dataset) as a complete unit."""
+    def _process(self) -> AgenticMetric:
+        """Evaluate each conversation, then compute global pass@K and pass^K from aggregate success rate."""
         self.logger.info(f"[Agentic] Evaluating {len(self.dataset)} conversations")
 
         judge = Judge(
             model=self.model,
             use_structured_output=self.use_structured_output,
             strict=self.strict,
-            bos_json_clause=self.bos_json_clause,
-            eos_json_clause=self.eos_json_clause,
+            bos_json_clause="<result>",
+            eos_json_clause="</result>",
             verbose=self.verbose,
             chat_history=False,
         )
+
+        conversations: list[AgenticConversation] = []
 
         for dataset_idx, dataset in enumerate(self.dataset, 1):
             total_interactions = len(dataset.conversation)
@@ -389,11 +384,9 @@ Examples:
             correct_indices = []
             tool_correctness_scores = []
 
-            # Evaluate each interaction in the conversation
             for i, batch in enumerate(dataset.conversation):
                 self.logger.debug(f"  Interaction {i + 1}/{total_interactions} (qa_id: {batch.qa_id})")
 
-                # Evaluate answer correctness
                 score = self._evaluate_answer_correctness(
                     judge=judge,
                     query=batch.query,
@@ -409,7 +402,6 @@ Examples:
                 else:
                     self.logger.debug(f"    Answer score: {score:.3f} ❌ INCORRECT")
 
-                # Evaluate tool correctness if applicable
                 if batch.ground_truth_agentic:
                     if batch.agentic and batch.agentic.get("tools_used"):
                         tool_correctness = self._evaluate_tool_correctness(
@@ -426,7 +418,6 @@ Examples:
                 else:
                     tool_correctness_scores.append(None)
 
-            # Determine if conversation is fully correct
             correct_interactions = len(correct_indices)
             is_fully_correct = correct_interactions == total_interactions
 
@@ -435,10 +426,8 @@ Examples:
             )
             self.logger.info(f"  Conversation result: {status}")
 
-            p_result = self.statistical_mode.rate_estimation(correct_interactions, total_interactions)
-
-            if self.statistical_mode.get_result_type() == "point_estimate":
-                metric = AgenticMetric(
+            conversations.append(
+                AgenticConversation(
                     session_id=dataset.session_id,
                     assistant_id=dataset.assistant_id,
                     total_interactions=total_interactions,
@@ -448,41 +437,176 @@ Examples:
                     correctness_scores=correctness_scores,
                     correct_indices=correct_indices,
                     tool_correctness_scores=tool_correctness_scores if tool_correctness_scores else [],
-                    k=self.k,
-                    pass_at_k=pass_at_k(total_interactions, correct_interactions, self.k),
-                    pass_pow_k=pass_pow_k(total_interactions, correct_interactions, self.k),
                 )
-            else:
-                p_samples = p_result["samples"]
-                pass_at_k_samples = 1.0 - (1.0 - p_samples) ** self.k
-                pass_pow_k_samples = p_samples**self.k
+            )
 
-                alpha = (1.0 - getattr(self.statistical_mode, "ci_level", 0.95)) / 2.0
-                metric = AgenticMetric(
-                    session_id=dataset.session_id,
-                    assistant_id=dataset.assistant_id,
-                    total_interactions=total_interactions,
-                    correct_interactions=correct_interactions,
-                    is_fully_correct=is_fully_correct,
-                    threshold=self.threshold,
-                    correctness_scores=correctness_scores,
-                    correct_indices=correct_indices,
-                    tool_correctness_scores=tool_correctness_scores if tool_correctness_scores else [],
-                    k=self.k,
-                    pass_at_k=float(np.mean(pass_at_k_samples)),
-                    pass_at_k_ci_low=float(np.quantile(pass_at_k_samples, alpha)),
-                    pass_at_k_ci_high=float(np.quantile(pass_at_k_samples, 1.0 - alpha)),
-                    pass_pow_k=float(np.mean(pass_pow_k_samples)),
-                    pass_pow_k_ci_low=float(np.quantile(pass_pow_k_samples, alpha)),
-                    pass_pow_k_ci_high=float(np.quantile(pass_pow_k_samples, 1.0 - alpha)),
-                )
+        n = len(conversations)
+        c = sum(1 for conv in conversations if conv.is_fully_correct)
+        p = c / n if n > 0 else 0.0
 
-            self.metrics.append(metric)
-
-        fully_correct_count = sum(1 for m in self.metrics if m.is_fully_correct)
         self.logger.info(
             f"[Agentic] Completed evaluation. "
-            f"{fully_correct_count}/{len(self.metrics)} conversations fully correct "
-            f"({fully_correct_count/len(self.metrics)*100:.1f}%)"
+            f"{c}/{n} conversations fully correct (p = {p:.1%}). "
+            f"pass@{self.k} = {pass_at_k(n, c, self.k):.4f}, "
+            f"pass^{self.k} = {pass_pow_k(n, c, self.k):.4f}"
         )
-        return self.metrics
+
+        p_result = self.statistical_mode.rate_estimation(c, n)
+
+        if self.statistical_mode.get_result_type() == "point_estimate":
+            return AgenticMetric(
+                k=self.k,
+                n=n,
+                c=c,
+                p=p,
+                pass_at_k=pass_at_k(n, c, self.k),
+                pass_pow_k=pass_pow_k(n, c, self.k),
+                conversations=conversations,
+            )
+
+        p_samples = p_result["samples"]
+        pass_at_k_samples = 1.0 - (1.0 - p_samples) ** self.k
+        pass_pow_k_samples = p_samples**self.k
+
+        alpha = (1.0 - getattr(self.statistical_mode, "ci_level", 0.95)) / 2.0
+        return AgenticMetric(
+            k=self.k,
+            n=n,
+            c=c,
+            p=p,
+            pass_at_k=float(np.mean(pass_at_k_samples)),
+            pass_at_k_ci_low=float(np.quantile(pass_at_k_samples, alpha)),
+            pass_at_k_ci_high=float(np.quantile(pass_at_k_samples, 1.0 - alpha)),
+            pass_pow_k=float(np.mean(pass_pow_k_samples)),
+            pass_pow_k_ci_low=float(np.quantile(pass_pow_k_samples, alpha)),
+            pass_pow_k_ci_high=float(np.quantile(pass_pow_k_samples, 1.0 - alpha)),
+            conversations=conversations,
+        )
+
+    @staticmethod
+    def summary(result: AgenticMetric) -> None:
+        """Print global pass@K results and per-conversation breakdown."""
+        print("=" * 70)
+        print(f"{'AGENTIC EVALUATION RESULTS':^70}")
+        print("=" * 70)
+        print(f"\n  Conversations : {result.c}/{result.n} fully correct  (p = {result.p:.1%})")
+
+        if result.pass_at_k_ci_low is not None:
+            print(
+                f"  pass@{result.k}        = {result.pass_at_k:.4f}  [{result.pass_at_k_ci_low:.4f}, {result.pass_at_k_ci_high:.4f}]"
+            )
+            print(
+                f"  pass^{result.k}        = {result.pass_pow_k:.4f}  [{result.pass_pow_k_ci_low:.4f}, {result.pass_pow_k_ci_high:.4f}]"
+            )
+        else:
+            print(f"  pass@{result.k}        = {result.pass_at_k:.4f}")
+            print(f"  pass^{result.k}        = {result.pass_pow_k:.4f}")
+        print("\n" + "-" * 70)
+        for i, conv in enumerate(result.conversations, 1):
+            status = "✅ CORRECT" if conv.is_fully_correct else "❌ FAILED"
+            print(f"\n  [{i}] {conv.session_id} / {conv.assistant_id}")
+            print(f"       Status : {status}")
+            print(f"       Turns  : {conv.correct_interactions}/{conv.total_interactions} correct")
+            print(f"       Scores : {[round(s, 2) for s in conv.correctness_scores]}")
+        print("\n" + "=" * 70)
+
+    @staticmethod
+    def compare_k(result: AgenticMetric, k_max: int = 10) -> None:
+        """Print pass@K and pass^K for K from 1 to k_max using the global success rate."""
+        print(f"\n{'K':<6} {'pass@K':<14} {'pass^K':<14}")
+        print("-" * 34)
+        for k in range(1, k_max + 1):
+            pak = pass_at_k(result.n, result.c, k)
+            ppk = pass_pow_k(result.n, result.c, k)
+            print(f"k={k:<4} {pak:<14.4f} {ppk:<14.4f}")
+
+    @staticmethod
+    def plot(result: AgenticMetric, k_max: int = 10, save_path: str | None = None) -> None:
+        """Plot pass@K and pass^K curves based on the global success rate."""
+        import matplotlib.pyplot as plt
+
+        k_range = list(range(1, k_max + 1))
+        pak = [pass_at_k(result.n, result.c, k) for k in k_range]
+        ppk = [pass_pow_k(result.n, result.c, k) for k in k_range]
+        color = "#2ecc71"
+        label = f"Agent  p = {result.p:.0%}  ({result.c}/{result.n} conversations correct)"
+
+        _fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+
+        ax1.plot(k_range, pak, "o-", color=color, linewidth=2, markersize=6, label=label)
+        ax1.axhline(y=0.95, color="gray", linestyle="--", alpha=0.5, label="95% target")
+        ax1.set_xlabel("K (number of attempts)")
+        ax1.set_ylabel("Probability")
+        ax1.set_title("pass@K  =  1 - (1 - p)^K\nP(at least 1 correct in K attempts)", fontweight="bold")
+        ax1.set_ylim(0, 1.05)
+        ax1.grid(True, alpha=0.3)
+        ax1.legend(fontsize=9)
+
+        ax2.plot(k_range, ppk, "o-", color=color, linewidth=2, markersize=6, label=label)
+        ax2.axhline(y=0.7, color="gray", linestyle="--", alpha=0.5, label="70% target")
+        ax2.set_xlabel("K (number of attempts)")
+        ax2.set_ylabel("Probability")
+        ax2.set_title("pass^K  =  p^K\nP(all K attempts correct)", fontweight="bold")
+        ax2.set_ylim(0, 1.05)
+        ax2.grid(True, alpha=0.3)
+        ax2.legend(fontsize=9)
+
+        plt.suptitle("Agentic Metric — pass@K curves", fontsize=13, fontweight="bold", y=1.02)
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        plt.show()
+
+    @staticmethod
+    def plot_tools(result: AgenticMetric, save_path: str | None = None) -> None:
+        """Plot per-interaction tool correctness breakdown for each conversation."""
+        import matplotlib.pyplot as plt
+
+        dim_colors = ["#2ecc71", "#3498db", "#e74c3c", "#9b59b6"]
+
+        scored = [
+            (conv, [t for t in conv.tool_correctness_scores if t is not None])
+            for conv in result.conversations
+            if any(t is not None for t in conv.tool_correctness_scores)
+        ]
+
+        if not scored:
+            print("No tool correctness data — add agentic/ground_truth_agentic fields to your Batch objects.")
+            return
+
+        _fig, axes = plt.subplots(len(scored), 1, figsize=(12, 4 * len(scored)))
+        if len(scored) == 1:
+            axes = [axes]
+
+        for ax, (conv, tool_scores) in zip(axes, scored, strict=False):
+            n = len(tool_scores)
+            x = np.arange(n)
+            bar_w = 0.18
+            dim_values = {
+                "Selection": [t.tool_selection_correct for t in tool_scores],
+                "Parameters": [t.parameter_accuracy for t in tool_scores],
+                "Sequence": [t.sequence_correct for t in tool_scores],
+                "Utilization": [t.result_utilization for t in tool_scores],
+            }
+            for di, (dim, vals) in enumerate(dim_values.items()):
+                ax.bar(x + di * bar_w, vals, bar_w, label=dim, color=dim_colors[di], alpha=0.85)
+
+            overall = [t.overall_correctness for t in tool_scores]
+            ax.plot(
+                x + 1.5 * bar_w, overall, "D--", color="#2c3e50", markersize=7, linewidth=1.5, label="Overall", zorder=5
+            )
+            ax.axhline(y=1.0, color="gray", linestyle=":", alpha=0.5)
+            ax.set_xlabel("Interaction index")
+            ax.set_ylabel("Score")
+            ax.set_title(f"Tool correctness — {conv.assistant_id}", fontsize=11)
+            ax.set_xticks(x + 1.5 * bar_w)
+            ax.set_xticklabels([f"#{i}" for i in range(n)])
+            ax.set_ylim(0, 1.15)
+            ax.legend(fontsize=9, loc="lower right")
+            ax.grid(axis="y", alpha=0.3)
+
+        plt.suptitle("Tool Correctness — per-interaction breakdown", fontsize=13, fontweight="bold")
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        plt.show()

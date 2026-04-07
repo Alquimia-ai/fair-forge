@@ -2,8 +2,6 @@
 
 from pydantic import BaseModel, Field
 
-from .metrics import BaseMetric
-
 
 class ToolCorrectnessScore(BaseModel):
     """
@@ -23,31 +21,47 @@ class ToolCorrectnessScore(BaseModel):
     reasoning: str | None = None
 
 
-class AgenticMetric(BaseMetric):
+class AgenticConversation(BaseModel):
     """
-    Metric for evaluating complete agent conversations with pass@K and tool correctness.
+    Per-conversation evaluation detail.
 
-    Evaluates conversations as complete units where a conversation is correct only if
-    ALL its interactions are correct. This measures the agent's capability to maintain
-    fully correct conversations.
-
-    pass@K: Probability of ≥1 correct conversation when attempting k different conversations (0.0-1.0).
-    pass^K: Probability of k consecutive correct conversations (0.0-1.0).
-    tool_correctness: Optional evaluation of tool usage quality per interaction.
+    Stores the raw correctness data for a single evaluated conversation —
+    interaction-level scores, which indices passed, and optional tool scores.
+    Does not contain pass@K/pass^K (those are global metrics computed across
+    all conversations in AgenticMetric).
     """
 
-    session_id: str  # Unique conversation ID
-    total_interactions: int  # Number of interactions in the conversation
-    correct_interactions: int  # Number of correct interactions
-    is_fully_correct: bool  # True if ALL interactions are correct
-    threshold: float  # Threshold for answer correctness
-    correctness_scores: list[float]  # Score per interaction
-    correct_indices: list[int]  # Indices of correct interactions
-    tool_correctness_scores: list[ToolCorrectnessScore | None] = []  # Tool scores per interaction
-    k: int = 0
-    pass_at_k: float = 0.0
+    session_id: str
+    assistant_id: str
+    total_interactions: int
+    correct_interactions: int
+    is_fully_correct: bool
+    threshold: float
+    correctness_scores: list[float]
+    correct_indices: list[int]
+    tool_correctness_scores: list[ToolCorrectnessScore | None] = []
+
+
+class AgenticMetric(BaseModel):
+    """
+    Global agentic evaluation result across all evaluated conversations.
+
+    pass@K and pass^K are computed using the global success rate p = c/n,
+    where n is the total number of conversations evaluated and c is the number
+    of fully correct conversations (all interactions passed the threshold).
+
+    pass@K = 1 - (1 - p)^k  — probability ≥1 of k attempts is fully correct.
+    pass^K = p^k             — probability all k attempts are fully correct.
+    """
+
+    k: int
+    n: int
+    c: int
+    p: float
+    pass_at_k: float
     pass_at_k_ci_low: float | None = None
     pass_at_k_ci_high: float | None = None
-    pass_pow_k: float = 0.0
+    pass_pow_k: float
     pass_pow_k_ci_low: float | None = None
     pass_pow_k_ci_high: float | None = None
+    conversations: list[AgenticConversation]
