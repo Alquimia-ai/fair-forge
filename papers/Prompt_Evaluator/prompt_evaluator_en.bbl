@@ -1,0 +1,72 @@
+\begin{thebibliography}{9}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Kuhn et~al.(2023)Kuhn, Gal, and Farquhar]{semanticentropy2024}
+Lorenz Kuhn, Yarin Gal, and Sebastian Farquhar.
+\newblock Semantic uncertainty: Linguistic invariances for uncertainty
+  estimation in natural language generation.
+\newblock In \emph{International Conference on Learning Representations}, 2023.
+
+\bibitem[Lambert et~al.(2024)Lambert, Pyatkin, Morrison, Miranda, Lin, Chandu,
+  Dziri, Kumar, Zick, Choi, Smith, and Hajishirzi]{rewardbench2024}
+Nathan Lambert, Valentina Pyatkin, Jacob Morrison, LJ~Miranda, Bill~Yuchen Lin,
+  Khyathi Chandu, Nouha Dziri, Sachin Kumar, Tom Zick, Yejin Choi, Noah~A.
+  Smith, and Hannaneh Hajishirzi.
+\newblock Rewardbench: Evaluating reward models for language modeling.
+\newblock \emph{arXiv preprint arXiv:2403.13787}, 2024.
+
+\bibitem[Liu et~al.(2023)Liu, Iter, Xu, Wang, Xu, and Zhu]{geval2023}
+Yang Liu, Dan Iter, Yichong Xu, Shuohang Wang, Ruochen Xu, and Chenguang Zhu.
+\newblock G-eval: Nlg evaluation using gpt-4 with better human alignment.
+\newblock In \emph{Proceedings of the 2023 Conference on Empirical Methods in
+  Natural Language Processing}, pages 2511--2522. Association for Computational
+  Linguistics, 2023.
+
+\bibitem[Sclar et~al.(2024)Sclar, Choi, Tsvetkov, and Suhr]{glape2024}
+Melanie Sclar, Yejin Choi, Yulia Tsvetkov, and Alane Suhr.
+\newblock Glape: Gold label-agnostic prompt evaluation and optimization with
+  consistency measures.
+\newblock \emph{arXiv preprint arXiv:2402.02408}, 2024.
+
+\bibitem[Wang et~al.(2024)Wang, Xiong, Xie, Zhao, and Zhang]{armorm2024}
+Haoxiang Wang, Wei Xiong, Tengyang Xie, Han Zhao, and Tong Zhang.
+\newblock Interpretable preferences via multi-objective reward modeling and
+  mixture-of-experts.
+\newblock \emph{arXiv preprint arXiv:2406.12845}, 2024.
+
+\bibitem[Wang et~al.(2023)Wang, Wei, Schuurmans, Le, Chi, Narang, Chowdhery,
+  and Zhou]{selfconsistency2023}
+Xuezhi Wang, Jason Wei, Dale Schuurmans, Quoc Le, Ed~Chi, Sharan Narang,
+  Aakanksha Chowdhery, and Denny Zhou.
+\newblock Self-consistency improves chain of thought reasoning in language
+  models.
+\newblock In \emph{International Conference on Learning Representations}, 2023.
+
+\bibitem[Xu et~al.(2022)Xu, Wang, Yang, Ma, Zhang, and
+  Zhao]{promptperplexity2022}
+Yuheng Xu, Yongchao Wang, Xuan Yang, Fei Ma, Yixuan Zhang, and Zhiwu Zhao.
+\newblock Spell: Semantic prompt evolution based on a llm.
+\newblock In \emph{Findings of the Association for Computational Linguistics},
+  2022.
+
+\bibitem[Zhong et~al.(2022)Zhong, Liu, Chen, Shang, Zhu, Chen, Peng, and
+  Jiang]{unieval2022}
+Ming Zhong, Yang Liu, Da~Chen, Jiawei Shang, Qi~Zhu, Pengfei Chen, Nanyun Peng,
+  and Jiawei Jiang.
+\newblock Towards a unified multi-dimensional evaluator for text generation.
+\newblock In \emph{Proceedings of the 2022 Conference on Empirical Methods in
+  Natural Language Processing}, pages 1--26. Association for Computational
+  Linguistics, 2022.
+
+\bibitem[Zhou et~al.(2023)Zhou, Lu, Mishra, Brahma, Basu, Luan, Zhou, and
+  Hou]{ifeval2023}
+Jeffrey Zhou, Tianhao Lu, Swaroop Mishra, Siddhartha Brahma, Sujoy Basu,
+  Yi~Luan, Denny Zhou, and Le~Hou.
+\newblock Instruction-following evaluation for large language models.
+\newblock \emph{arXiv preprint arXiv:2311.07911}, 2023.
+
+\end{thebibliography}
