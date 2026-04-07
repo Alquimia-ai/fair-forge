@@ -1,33 +1,30 @@
 ---
 title: Agentic
-description: Evaluate AI agent responses with pass@K metrics, tool correctness, and pluggable statistical modes
+description: Evaluate AI agent reliability with global pass@K, pass^K and four-dimensional tool correctness
 ---
 
 # Agentic Metric
 
-The Agentic metric evaluates AI agent performance by measuring complete conversation correctness. A conversation is correct only if **ALL** its interactions are correct. It supports pluggable **statistical modes** — frequentist returns point estimates for pass@K, Bayesian propagates the uncertainty in the estimated success rate through the pass@K formula to produce credible intervals.
+The Agentic metric evaluates AI agent performance at the **conversation level**. A conversation is correct only if **ALL** its interactions are correct. pass@K and pass^K are computed globally across all evaluated conversations using the agent's overall success rate `p = c/n`.
 
 ## Overview
 
-- **Conversation Correctness**: A conversation is correct only if ALL interactions are correct
-- **pass@K**: Probability of ≥1 correct conversation when attempting k conversations (0.0–1.0)
-- **pass^K**: Probability of all k conversations being correct (0.0–1.0)
-- **Tool Correctness**: Evaluates tool selection, parameter accuracy, execution sequence, and result utilization per interaction
+- **Conversation Correctness**: All-or-nothing — one wrong turn fails the whole conversation
+- **pass@K**: `1 - (1-p)^k` — probability of ≥1 correct conversation in k attempts
+- **pass^K**: `p^k` — probability of all k conversations being correct
+- **Tool Correctness**: Four-dimensional score per interaction — selection, parameters, sequence, utilization
+- **Statistical Modes**: Frequentist (point estimate) or Bayesian (credible intervals)
 
 ### Formulas
 
 ```
-pass@k = 1 - (1 - p)^k   # Probability of ≥1 correct in k independent attempts
-pass^k = p^k              # Probability of all k attempts correct
-
-Where p = estimated success rate from evaluation
+p       = c / n                 # Global success rate (fully correct conversations / total)
+pass@k  = 1 - (1 - p)^k        # P(≥1 correct in k independent attempts)
+pass^k  = p^k                   # P(all k attempts correct)
 ```
 
-**Frequentist**: `p = c/n` — a point estimate
-**Bayesian**: `p` is a Beta-Binomial posterior distribution — the pass@K formula is applied across all posterior samples, yielding a credible interval for pass@K and pass^K
-
 <Note>
-`k` is a **required** parameter. pass@K and pass^K are computed per conversation using `n = total_interactions` and `c = correct_interactions`. The default `tool_threshold=1.0` requires perfect tool usage — lower it (e.g. `0.75`) to allow minor deviations.
+`p` is computed **globally** across all evaluated conversations — not per conversation. `k` is a required parameter representing how many independent attempts to model.
 </Note>
 
 ## Installation
@@ -47,18 +44,17 @@ from your_retriever import AgenticRetriever
 
 judge_model = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key", temperature=0.0)
 
-metrics = Agentic.run(
+result = Agentic.run(
     AgenticRetriever,
     model=judge_model,
     k=3,
     threshold=0.7,
 )
 
-for metric in metrics:
-    print(f"{metric.session_id}:")
-    print(f"  pass@{metric.k} = {metric.pass_at_k:.3f}")
-    print(f"  pass^{metric.k} = {metric.pass_pow_k:.3f}")
-    # metric.pass_at_k_ci_low / ci_high are None in frequentist mode
+# Single global result
+print(f"Conversations: {result.c}/{result.n} fully correct  (p = {result.p:.1%})")
+print(f"pass@{result.k} = {result.pass_at_k:.4f}")
+print(f"pass^{result.k} = {result.pass_pow_k:.4f}")
 ```
 
 ```python Bayesian
@@ -69,7 +65,7 @@ from your_retriever import AgenticRetriever
 
 judge_model = ChatGroq(model="llama-3.3-70b-versatile", api_key="your-api-key", temperature=0.0)
 
-metrics = Agentic.run(
+result = Agentic.run(
     AgenticRetriever,
     model=judge_model,
     k=3,
@@ -77,12 +73,60 @@ metrics = Agentic.run(
     statistical_mode=BayesianMode(mc_samples=5000, ci_level=0.95),
 )
 
-for metric in metrics:
-    print(f"{metric.session_id}:")
-    print(f"  pass@{metric.k} = {metric.pass_at_k:.3f}  [{metric.pass_at_k_ci_low:.3f}, {metric.pass_at_k_ci_high:.3f}]")
-    print(f"  pass^{metric.k} = {metric.pass_pow_k:.3f}  [{metric.pass_pow_k_ci_low:.3f}, {metric.pass_pow_k_ci_high:.3f}]")
+print(f"pass@{result.k} = {result.pass_at_k:.4f}  [{result.pass_at_k_ci_low:.4f}, {result.pass_at_k_ci_high:.4f}]")
+print(f"pass^{result.k} = {result.pass_pow_k:.4f}  [{result.pass_pow_k_ci_low:.4f}, {result.pass_pow_k_ci_high:.4f}]")
 ```
 </CodeGroup>
+
+## Built-in Display Methods
+
+`Agentic` ships four static methods for zero-boilerplate result inspection:
+
+```python
+# Print global stats + per-conversation breakdown
+Agentic.summary(result)
+
+# Plot pass@K and pass^K curves (optionally save for papers/reports)
+Agentic.plot(result, k_max=10, save_path="figures/passk_curves.png")
+
+# Print pass@K and pass^K table for K = 1..k_max
+Agentic.compare_k(result, k_max=10)
+
+# Plot per-conversation tool correctness breakdown
+Agentic.plot_tools(result, save_path="figures/tool_correctness.png")
+```
+
+**`summary()` output example:**
+
+```
+======================================================================
+                    AGENTIC EVALUATION RESULTS
+======================================================================
+
+  Conversations : 2/3 fully correct  (p = 66.7%)
+  pass@2        = 0.8889
+  pass^2        = 0.4444
+
+----------------------------------------------------------------------
+
+  [1] session_001 / agent_v1
+       Status : ✅ CORRECT
+       Turns  : 3/3 correct
+       Scores : [1.0, 1.0, 0.95]
+
+  [3] session_003 / agent_v1
+       Status : ❌ FAILED
+       Turns  : 2/3 correct
+       Scores : [0.0, 0.95, 0.95]
+======================================================================
+```
+
+With `BayesianMode`, credible intervals are shown automatically:
+
+```
+  pass@2        = 0.8889  [0.4500, 0.9987]
+  pass^2        = 0.4444  [0.1200, 0.8012]
+```
 
 ## Parameters
 
@@ -101,43 +145,41 @@ for metric in metrics:
 | `statistical_mode` | `StatisticalMode` | `FrequentistMode()` | Statistical computation mode |
 | `threshold` | `float` | `0.7` | Answer correctness threshold (0.0–1.0) |
 | `tool_threshold` | `float` | `1.0` | Tool correctness threshold (0.0–1.0) |
-| `tool_weights` | `dict[str, float]` | `0.25` each | Weights for tool aspects (selection, parameters, sequence, utilization) |
-| `use_structured_output` | `bool` | `True` | Use LangChain structured output |
-| `bos_json_clause` | `str` | `"```json"` | JSON block start marker |
-| `eos_json_clause` | `str` | `"```"` | JSON block end marker |
+| `tool_weights` | `dict[str, float]` | `0.25` each | Weights for tool dimensions (selection, parameters, sequence, utilization) |
+| `use_structured_output` | `bool` | `False` | Use LangChain structured output (not supported by all providers) |
 | `verbose` | `bool` | `False` | Enable verbose logging |
 
 ## Statistical Modes
 
 <Tabs>
   <Tab title="Frequentist">
-    Computes `p = c/n` as a point estimate and plugs it directly into the pass@K formulas. Simple and fast.
+    Computes `p = c/n` as a point estimate and plugs it directly into the pass@K formulas.
 
     ```python
-    # With 7 correct out of 10 interactions, k=3:
-    # p = 7/10 = 0.70
-    # pass@3 = 1 - (1 - 0.70)^3 = 0.973
-    # pass^3 = 0.70^3 = 0.343
+    # 2 fully correct out of 3 conversations, k=2:
+    # p = 2/3 = 0.667
+    # pass@2 = 1 - (1 - 0.667)^2 = 0.889
+    # pass^2 = 0.667^2 = 0.444
     ```
 
     `pass_at_k_ci_low`, `pass_at_k_ci_high`, `pass_pow_k_ci_low`, `pass_pow_k_ci_high` are all `None`.
   </Tab>
   <Tab title="Bayesian">
-    Uses a **Beta-Binomial posterior** over `p`. The pass@K formula is applied vectorized across all MC samples, yielding a full posterior distribution for both pass@K and pass^K.
+    Places a Beta prior on `p`, samples from the posterior `p | c,n ~ Beta(c+1, n-c+1)`, and propagates uncertainty through the pass@K formulas to produce credible intervals.
 
     ```python
-    # With 7 correct out of 10 interactions, k=3, Beta(1,1) prior:
-    # Posterior for p: Beta(8, 4) — centered at 0.67 but with uncertainty
-    # pass@3 samples: 1 - (1 - p_samples)^3  → mean=0.960, CI=[0.820, 0.998]
-    # pass^3 samples: p_samples^3            → mean=0.330, CI=[0.126, 0.570]
+    # 2 correct out of 3 conversations, k=2, Beta(1,1) prior:
+    # Posterior: Beta(3, 2) — centered near 0.667 but with uncertainty
+    # pass@2 samples → mean=0.889, CI=[0.35, 0.99]
+    # pass^2 samples → mean=0.444, CI=[0.08, 0.85]
     ```
 
-    The CI tells you: with only 10 observations, your true pass@3 could plausibly be anywhere in that range.
+    Recommended when `n < 20` conversations — the wide CI honestly communicates that more data is needed.
 
     ```python
     from fair_forge.statistical import BayesianMode
 
-    metrics = Agentic.run(
+    result = Agentic.run(
         AgenticRetriever,
         model=judge_model,
         k=3,
@@ -148,21 +190,13 @@ for metric in metrics:
             beta_prior_b=1.0,
         ),
     )
-
-    for metric in metrics:
-        print(f"pass@3 = {metric.pass_at_k:.3f}  [{metric.pass_at_k_ci_low:.3f}, {metric.pass_at_k_ci_high:.3f}]")
-        print(f"pass^3 = {metric.pass_pow_k:.3f}  [{metric.pass_pow_k_ci_low:.3f}, {metric.pass_pow_k_ci_high:.3f}]")
     ```
   </Tab>
 </Tabs>
 
-<Note>
-**Why Bayesian matters for agentic evaluation:** A pass@3 of 0.90 sounds great — but if it comes from only 5 conversations, the 95% CI might be [0.55, 0.99]. With 100 conversations, the same rate gives [0.84, 0.95], which is much more trustworthy. Use Bayesian mode when you have few test conversations and need to communicate reliability honestly.
-</Note>
-
 ## Data Requirements
 
-Each `Dataset` represents one complete conversation. A conversation is correct only if ALL interactions are correct:
+Each `Dataset` represents one complete conversation. Provide `agentic` and `ground_truth_agentic` on `Batch` objects to enable tool correctness scoring:
 
 ```python
 from fair_forge.core.retriever import Retriever
@@ -178,7 +212,7 @@ class AgenticRetriever(Retriever):
                 context="Math calculator conversation",
                 conversation=[
                     Batch(
-                        qa_id="q1_interaction1",
+                        qa_id="q1_t1",
                         query="What is 5 + 3?",
                         assistant="The result is 8.",
                         ground_truth_assistant="8",
@@ -197,11 +231,11 @@ class AgenticRetriever(Retriever):
                                 "parameters": {"a": 5, "b": 3},
                                 "step": 1
                             }],
-                            "tool_sequence_matters": False
+                            "tool_sequence_matters": True
                         }
                     ),
                     Batch(
-                        qa_id="q1_interaction2",
+                        qa_id="q1_t2",
                         query="What is 100 / 4?",
                         assistant="100 divided by 4 is 25.",
                         ground_truth_assistant="25"
@@ -211,9 +245,9 @@ class AgenticRetriever(Retriever):
         ]
 ```
 
-### Agentic Data Structure
+### Tool Data Structure
 
-**`agentic`** (actual tool usage):
+**`agentic`** (actual tool usage in the response):
 ```python
 {
     "tools_used": [{"tool_name": "calculator", "parameters": {"a": 5, "b": 3}, "result": 8, "step": 1}],
@@ -225,7 +259,7 @@ class AgenticRetriever(Retriever):
 ```python
 {
     "expected_tools": [{"tool_name": "calculator", "parameters": {"a": 5, "b": 3}, "step": 1}],
-    "tool_sequence_matters": False
+    "tool_sequence_matters": True
 }
 ```
 
@@ -233,80 +267,116 @@ class AgenticRetriever(Retriever):
 
 ### AgenticMetric
 
+Global result returned by `Agentic.run()`:
+
 ```python
-class AgenticMetric(BaseMetric):
-    session_id: str                                             # Unique conversation ID
-    total_interactions: int                                     # Interactions in conversation
-    correct_interactions: int                                   # Correct interactions
-    is_fully_correct: bool                                      # True if ALL interactions correct
-    threshold: float                                            # Answer correctness threshold
-    correctness_scores: list[float]                             # Score per interaction
-    correct_indices: list[int]                                  # Indices of correct interactions
-    tool_correctness_scores: list[ToolCorrectnessScore | None]  # Tool scores per interaction
-    k: int                                                      # Attempts used for pass@K
-    pass_at_k: float                                            # P(≥1 fully correct in k attempts)
-    pass_at_k_ci_low: float | None                              # Lower CI — Bayesian only
-    pass_at_k_ci_high: float | None                             # Upper CI — Bayesian only
-    pass_pow_k: float                                           # P(all k attempts fully correct)
-    pass_pow_k_ci_low: float | None                             # Lower CI — Bayesian only
-    pass_pow_k_ci_high: float | None                            # Upper CI — Bayesian only
+class AgenticMetric(BaseModel):
+    k: int                          # Attempts used for pass@K computation
+    n: int                          # Total conversations evaluated
+    c: int                          # Fully correct conversations
+    p: float                        # Global success rate = c/n
+    pass_at_k: float                # 1 - (1-p)^k
+    pass_pow_k: float               # p^k
+    pass_at_k_ci_low: float | None  # Lower CI — Bayesian only
+    pass_at_k_ci_high: float | None # Upper CI — Bayesian only
+    pass_pow_k_ci_low: float | None # Lower CI — Bayesian only
+    pass_pow_k_ci_high: float | None# Upper CI — Bayesian only
+    conversations: list[AgenticConversation]
+```
+
+### AgenticConversation
+
+Per-conversation detail, accessible via `result.conversations`:
+
+```python
+class AgenticConversation(BaseModel):
+    session_id: str
+    assistant_id: str
+    total_interactions: int
+    correct_interactions: int
+    is_fully_correct: bool
+    threshold: float
+    correctness_scores: list[float]
+    correct_indices: list[int]
+    tool_correctness_scores: list[ToolCorrectnessScore | None]
 ```
 
 ### ToolCorrectnessScore
 
 ```python
 class ToolCorrectnessScore(BaseModel):
-    tool_selection_correct: float   # 0-1: Correct tools chosen
-    parameter_accuracy: float       # 0-1: Correct parameters passed
-    sequence_correct: float         # 0-1: Correct order (if required)
-    result_utilization: float       # 0-1: Tool results used in answer
-    overall_correctness: float      # Weighted average
-    is_correct: bool                # overall >= tool_threshold
-    reasoning: str | None           # Explanation
+    tool_selection_correct: float  # Correct tools chosen
+    parameter_accuracy: float      # Correct parameters passed
+    sequence_correct: float        # Correct order (if required)
+    result_utilization: float      # Tool results used in final answer
+    overall_correctness: float     # Weighted average of the four dimensions
+    is_correct: bool               # overall_correctness >= tool_threshold
+    reasoning: str | None
 ```
 
 ## Interpretation
 
+### Deployment Readiness
+
+| pass@1 | pass^3 | Classification |
+|--------|--------|----------------|
+| > 0.90 | > 0.70 | Production-ready |
+| > 0.90 | 0.30–0.70 | Functional but inconsistent |
+| 0.70–0.90 | — | Needs improvement |
+| < 0.70 | — | Not ready |
+
 ### pass@K vs pass^K
 
-| Metric | Formula | Meaning |
-|--------|---------|---------|
-| `pass_at_k` | `1 - (1-p)^k` | Probability of ≥1 correct conversation in k attempts |
-| `pass_pow_k` | `p^k` | Probability of ALL k attempts being correct |
+| Metric | Answers |
+|--------|---------|
+| `pass_at_k` | "If I run the agent K times, what's the chance of getting at least one correct result?" |
+| `pass_pow_k` | "What's the chance the agent is correct every single time over K requests?" |
 
-**Examples with k=3:**
-- pass@3 = 0.92 → 92% chance of getting ≥1 fully correct conversation in 3 attempts
-- pass^3 = 0.15 → 15% chance all 3 conversations are fully correct
+**Example — `p = 0.667`:**
 
-### Agent Quality Assessment
+| K | pass@K | pass^K |
+|---|--------|--------|
+| 1 | 0.667 | 0.667 |
+| 2 | 0.889 | 0.444 |
+| 3 | 0.963 | 0.296 |
+| 5 | 0.996 | 0.132 |
 
-| pass@K | pass^K | Assessment |
-|--------|--------|------------|
-| &gt;0.95 | &gt;0.70 | ✅ **Reliable** — High success and consistency |
-| &gt;0.95 | &lt;0.50 | ⚠️ **Inconsistent** — Can succeed but unreliable |
-| &lt;0.70 | any | ❌ **Needs Improvement** — Low success rate |
+The gap between pass@K and pass^K is the reliability inconsistency — a wide gap means the agent can succeed but not consistently.
 
-### Tool Correctness Scores
+### Tool Correctness
 
-| Score Range | Interpretation |
-|-------------|----------------|
-| **1.0** | Perfect — all aspects correct |
-| 0.75–0.99 | Good — minor issues |
-| 0.50–0.74 | Moderate — several issues |
-| < 0.50 | Poor — significant problems |
+| Dimension | What it measures |
+|-----------|-----------------|
+| Selection | Right tools were called |
+| Parameters | Correct arguments were passed |
+| Sequence | Tools were called in the right order |
+| Utilization | Tool results appear in the final answer |
 
-## Aggregation Functions
+## Custom Tool Weights
 
-`pass_at_k` and `pass_pow_k` are embedded in each `AgenticMetric`. The standalone functions are available for computing additional K values after the fact:
+```python
+result = Agentic.run(
+    AgenticRetriever,
+    model=judge_model,
+    k=3,
+    tool_weights={
+        "selection": 0.4,
+        "parameters": 0.3,
+        "sequence": 0.2,
+        "utilization": 0.1,
+    },
+)
+```
+
+## Computing Additional K Values
 
 ```python
 from fair_forge.metrics.agentic import pass_at_k, pass_pow_k
 
-for metric in metrics:
-    for k in [1, 3, 5, 10]:
-        pak = pass_at_k(metric.total_interactions, metric.correct_interactions, k)
-        ppk = pass_pow_k(metric.total_interactions, metric.correct_interactions, k)
-        print(f"  K={k}: pass@K={pak:.3f}  pass^K={ppk:.3f}")
+for k in [1, 3, 5, 10]:
+    pak = pass_at_k(result.n, result.c, k)
+    ppk = pass_pow_k(result.n, result.c, k)
+    print(f"K={k}: pass@K={pak:.3f}  pass^K={ppk:.3f}")
 ```
 
 ## LLM Provider Options
@@ -337,72 +407,47 @@ model = ChatOllama(model="llama3.1:70b", temperature=0.0)
 ```
 </CodeGroup>
 
-## Custom Tool Weights
-
-```python
-metrics = Agentic.run(
-    AgenticRetriever,
-    model=judge_model,
-    k=3,
-    tool_weights={
-        "selection": 0.4,
-        "parameters": 0.2,
-        "sequence": 0.1,
-        "utilization": 0.3,
-    },
-)
-```
-
 ## Best Practices
 
 <AccordionGroup>
   <Accordion title="Use Bayesian Mode for Small Test Suites">
-    If you have fewer than 30 conversations, frequentist pass@K estimates can be misleading. Bayesian mode shows you the credible interval, making it clear when more data is needed before drawing conclusions.
+    With fewer than 20 conversations, frequentist pass@K estimates can be misleading. A `p = 0.80` from 5 conversations has a 95% CI of roughly [0.38, 0.97] — Bayesian mode surfaces this uncertainty so you don't over-conclude from limited data.
   </Accordion>
 
-  <Accordion title="Choose Appropriate K Values">
-    - **K=1**: Evaluate single conversation success rate
-    - **K=3–5**: Balance between reliability and cost (recommended)
-    - **K=10+**: High-stakes scenarios requiring high confidence
+  <Accordion title="Choose K to Match Your Deployment">
+    - **K=1**: What fraction of single attempts succeed?
+    - **K=3–5**: Best for most production scenarios (retry budget)
+    - **K=10+**: High-stakes deployments requiring near-certain success
   </Accordion>
 
   <Accordion title="Set Meaningful Thresholds">
-    - **Strict (0.8–0.9)**: Factual accuracy matters (medical, legal)
+    - **Strict (0.8–0.9)**: Factual accuracy critical (medical, legal, finance)
     - **Moderate (0.7)**: General purpose — recommended default
     - **Lenient (0.6)**: Creative or subjective tasks
   </Accordion>
 
-  <Accordion title="Define Clear Tool Expectations">
-    Provide complete `ground_truth_agentic` per interaction with expected tool names, required parameters, whether sequence matters, and whether tool results should influence the final answer.
-  </Accordion>
-
-  <Accordion title="Use Strong Judge Models">
-    Larger models (GPT-4, Claude-3, Llama-3-70B+) provide more reliable correctness evaluations.
+  <Accordion title="Define Complete Tool Ground Truth">
+    Always provide `expected_tools` with exact parameter values and `tool_sequence_matters` set explicitly. Ambiguous ground truth produces unreliable tool correctness scores.
   </Accordion>
 </AccordionGroup>
 
 ## Troubleshooting
 
 <AccordionGroup>
-  <Accordion title="Judge Returns Low Scores for Correct Answers">
-    Lower the `threshold` parameter (try 0.6–0.65), use a more capable judge model, or ensure ground truth is clear and unambiguous. Check verbose logs to see judge reasoning.
+  <Accordion title="Judge Returns 0.0 for Correct Answers">
+    The model may not be following the output format. The metric retries up to 3 times automatically. If scores remain 0.0, enable `verbose=True` to inspect judge responses and consider switching to a larger model.
   </Accordion>
 
   <Accordion title="Tool Correctness Always Fails">
-    The default `tool_threshold=1.0` requires perfect tool correctness. Lower it with `tool_threshold=0.75` to allow minor deviations. Verify tool names match exactly (case-sensitive) and check parameter structure.
+    The default `tool_threshold=1.0` requires perfect tool execution. Lower it with `tool_threshold=0.75` to allow minor deviations. Verify tool names match exactly (case-sensitive) between `tools_used` and `expected_tools`.
   </Accordion>
 
-  <Accordion title="Some Interactions Have None for Tool Correctness">
-    This is expected — `tool_correctness_scores[i]` is `None` when an interaction did not use tools.
-
-    ```python
-    valid = [tc for tc in metric.tool_correctness_scores if tc is not None]
-    avg = sum(tc.overall_correctness for tc in valid) / len(valid)
-    ```
+  <Accordion title="use_structured_output Raises 400 Error">
+    Some providers (e.g. Groq with certain models) do not support `response_format: json_schema`. Keep `use_structured_output=False` (the default) — the metric uses XML-delimited JSON extraction instead.
   </Accordion>
 
   <Accordion title="Bayesian CI is Very Wide">
-    A wide CI means there is not enough data to estimate the true success rate precisely. This is intentional — collect more test conversations to narrow the interval.
+    A wide CI means not enough data to estimate the true success rate precisely. This is correct behavior — collect more test conversations to narrow it. A CI of [0.2, 0.9] on 5 conversations honestly reflects the uncertainty.
   </Accordion>
 </AccordionGroup>
 
