@@ -2,6 +2,266 @@
 
 <!-- version list -->
 
+## v3.0.0-b.5 (2026-04-08)
+
+### Bug Fixes
+
+- **ci**: Update mintlify CLI to version with validate command
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **core**: Use statistical_mode rng and guard zero-weight in bootstrap
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **core**: Validate assigned weights sum in _resolve_weights
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **docs**: Address PR review comments ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **guardians**: Handle API error responses in OpenAIGuardianProvider
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **llm**: Fallback to structured_response for chat history assistant entry
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **llm**: Make judge evaluations atomic and add opt-in chat history
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **llm**: Move ChatPromptTemplate to module level and update structured mode tests
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **llm**: Truncate retry log to avoid leaking sensitive data
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **metrics**: Skip single-assistant blocks and document king-of-the-hill semantics
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **metrics**: Warn on mixed-language datasets and document limitation
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **schemas**: Enforce non-negative constraint on Batch.weight
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+### Chores
+
+- Add LaTeX build artifacts to .gitignore ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- Remove cloud deps group and fix notebook cell source format
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- Remove dep aenum ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **ci**: Fix sync-develop job output and auto-resolve conflicts with main
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **deps**: Update uv.lock ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **storage**: Remove storage module and docs
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+### Continuous Integration
+
+- Downgrade node to 18 to fix katex __VERSION__ error in mintlify
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- Pin mintlify to 4.0.5 to avoid katex __VERSION__ build bug
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- Restrict release trigger to fair_forge directory changes
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+### Documentation
+
+- **core-concepts**: Clarify BestOf granularity behavior with stream_batches
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **core-concepts**: Rewrite retriever docs and add streaming retrievers page
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **examples**: Note json.load memory limitation in streaming retrievers
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **examples**: Use portable PyPI install in context notebook
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **metrics**: Add vision metrics documentation and test fixtures
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **metrics**: Update agentic docs to reflect global pass@K and new API
+  ([`910808e`](https://github.com/Alquimia-ai/fair-forge/commit/910808ecb09cfb12efa6fa72810a06df23d8b595))
+
+- **paper**: Add agentic metric white paper with experiments and results
+  ([`3bf24e2`](https://github.com/Alquimia-ai/fair-forge/commit/3bf24e2d42093fdf57879dab9119aa112ef1e2c8))
+
+- **paper**: Address review feedback on Prompt Evaluator paper
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **paper**: Address reviewer feedback on notation and consistency
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **paper**: Clarify RM and PP as theoretical components not yet implemented
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **papers**: Add context adherence metrics paper
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **papers**: Add English LaTeX paper for PromptEvaluator metric design
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **papers**: Add LaTeX preamble, bibliography and ignore build artifacts
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **papers**: Add preamble and proposed experiments section to regulatory paper
+  ([`aeb66db`](https://github.com/Alquimia-ai/fair-forge/commit/aeb66db8b23889985425d7de78596bb43a1b9f3f))
+
+- **papers**: Add references section (.bib) to regulatory paper
+  ([`36f4204`](https://github.com/Alquimia-ai/fair-forge/commit/36f42045709f42df1386fe8d0f718d9bf2f0030f))
+
+- **papers**: Add regulatory compliance metric paper
+  ([`5e9e382`](https://github.com/Alquimia-ai/fair-forge/commit/5e9e382f5e7d745c97f705608a587a2fdb3248ff))
+
+- **plan**: Add PromptEvaluator dataset implementation plan
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **spec**: Add PromptEvaluator dataset design spec
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+### Features
+
+- **core**: Add streaming dataset support with iteration level strategy
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **examples**: Add Heretic generator notebook for vLLM HuggingFace endpoint
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **examples**: Add streaming retrievers and context notebook streaming section
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **metrics**: Add PromptEvaluator metric ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **metrics**: Add statistical mode support to bias and agentic
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **metrics**: Add statistical mode to conversational, context, regulatory
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **metrics**: Add VisionSimilarity and VisionHallucination metrics for VLM evaluation
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **metrics**: Compute pass@K and pass^K globally across all conversations
+  ([`dbb265a`](https://github.com/Alquimia-ai/fair-forge/commit/dbb265a3cf6506cf31820131745063e2a7b92f5f))
+
+- **metrics**: Redesign PromptEvaluator as compound distributional metric
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **metrics**: Replace vision hallucination metrics with VisionSimilarity and VisionHallucination
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **paper**: Rewrite experiments section and add behavioral case study
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **prompt-optimizer**: Add GEPA and MIPROv2 prompt optimization module
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **prompt-optimizer**: Expose tips and proposal prompts as optional args in MIPROv2
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **schemas**: Add IterationLevel, SessionMetadata, and StreamedBatch types
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+### Performance Improvements
+
+- **core**: Vectorize bayesian bootstrap sampling in _aggregate_scores
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+### Refactoring
+
+- Move experiments directory outside fair_forge package
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **core**: Extract Embedder and Reranker ABCs for dependency inversion
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **core**: Simplify iteration_level handling and remove retriever_cls
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **llm**: Add chat_history property for backward compatibility
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **llm**: Migrate Judge to create_agent with ProviderStrategy
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **metrics**: Apply Strategy and Adapter patterns to vision metrics
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+### Testing
+
+- **core**: Add streaming mode and iteration level detection tests
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **metrics**: Add missing strict param to Judge initialization assertions
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+- **toxicity**: Call on_process_complete after batch in unit tests
+  ([#56](https://github.com/Alquimia-ai/fair-forge/pull/56),
+  [`3fcd87e`](https://github.com/Alquimia-ai/fair-forge/commit/3fcd87e5725f4ed392001aea5a9e871af676e4fe))
+
+
 ## v3.0.0-b.4 (2026-04-01)
 
 ### Bug Fixes
